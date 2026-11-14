@@ -605,9 +605,11 @@ class Kit {
           const uni = { time: { value: 0 }, map: { value: tex } };
           const mat = new THREE.ShaderMaterial({
             uniforms: uni, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: false,
-            vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-            fragmentShader: `uniform sampler2D map; uniform float time; varying vec2 vUv;
+            vertexShader: '#include <logdepthbuf_pars_vertex>\nvarying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);\n#include <logdepthbuf_vertex>\n}',
+            fragmentShader: `#include <logdepthbuf_pars_fragment>
+              uniform sampler2D map; uniform float time; varying vec2 vUv;
               void main(){
+                #include <logdepthbuf_fragment>
                 float band = step(0.985, fract(sin(floor(time * 2.5) * 91.7 + floor(vUv.y * 12.0)) * 43758.5));
                 vec2 uv = vUv + vec2(band * 0.04, 0.0);
                 vec4 t = texture2D(map, uv);

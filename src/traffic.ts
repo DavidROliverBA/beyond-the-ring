@@ -1,6 +1,11 @@
-// Crowds of ships. Each model is drawn once per part with instancing, so a few hundred
-// hulls cost a few dozen draw calls. Ships fly slow ellipses round a port, a planet or a
-// queue at the gate; a warm or blue glint at the stern keeps them visible from far off.
+// Ships on routes. Each one flies a straight line from a spot near one port to a spot near
+// another: it burns toward the goal, flips at the half-way point and burns to a stop, waits
+// a while as if docking, then picks its next destination. Ships are their true size (tens to
+// a few hundred metres), so from far off they are only a glint at the stern; the model
+// appears when it would be a pixel or more across.
+//
+// Positions are kept in doubles on the objects (the renderer works them out relative to the
+// camera) and glints are stored relative to their fleet's origin, so nothing jitters.
 
 import * as THREE from 'three';
 import { buildModel, type ShipModel } from './ships';
@@ -8,158 +13,171 @@ import { rng } from './textures';
 
 type V3 = THREE.Vector3;
 
-/** Lengths are in scene units where one unit is about 200 m, the scale ships and stations share. */
-const KINDS: { model: ShipModel; len: number; w: number }[] = [
-  { model: 'racer', len: 0.1, w: 6 },
-  { model: 'corvette', len: 0.23, w: 4 },
-  { model: 'freighter', len: 0.5, w: 6 },
-  { model: 'hauler', len: 1.0, w: 2.5 },
-  { model: 'survey', len: 0.7, w: 1.6 },
-  { model: 'stealth', len: 0.4, w: 0.4 },
-  { model: 'battleship', len: 2.4, w: 0.35 },
-  { model: 'dreadnought', len: 3.6, w: 0.15 },
+/** Lengths in metres. */
+const KINDS: { model: ShipModel; m: number; w: number }[] = [
+  { model: 'racer', m: 25, w: 6 },
+  { model: 'corvette', m: 46, w: 4 },
+  { model: 'freighter', m: 100, w: 6 },
+  { model: 'survey', m: 120, w: 1.6 },
+  { model: 'stealth', m: 150, w: 0.4 },
+  { model: 'hauler', m: 300, w: 2.5 },
+  { model: 'battleship', m: 475, w: 0.35 },
+  { model: 'dreadnought', m: 800, w: 0.15 },
 ];
-const TOTAL_W = KINDS.reduce((a, k) => a + k.w, 0);
 
-export interface Cluster {
-  centre: V3;
-  n: number;
+/** A place ships go: a shell round a point, in scene units. */
+export interface Port {
+  pos: V3;
   inner: number;
   outer: number;
-  /** 1 keeps every orbit in the plane of the system, 0 tilts them all ways. */
-  flat?: number;
-  /** Typical speed in units per second. */
-  speed?: number;
-  /** Multiplies ship size; the ring space is drawn larger than Sol. */
-  scale?: number;
-  /** Only these kinds, by model name. */
+}
+
+export interface Fleet {
+  ports: Port[];
+  n: number;
+  /** Only these models. */
   only?: ShipModel[];
 }
 
+export const M_PER_UNIT = 149597870700 / 1000; // 1 scene unit is 1/1000 AU
+export const SOL_UNIT = 1 / M_PER_UNIT;        // scene units per metre in Sol
+
 interface Craft {
-  kind: number;
-  slot: number;
-  c: V3;
-  u: V3;
-  v: V3;
-  a: number;
-  b: number;
-  w: number;
-  phase: number;
+  g: THREE.Group;
+  fleet: number;
   len: number;
+  port: number;
+  from: V3;
+  to: V3;
+  t0: number;
+  dur: number;
+  hold: number;
+  qa: THREE.Quaternion;
+  qb: THREE.Quaternion;
+  pos: V3;
   tint: THREE.Color;
 }
 
-interface Part { geo: THREE.BufferGeometry; mat: THREE.Material | THREE.Material[]; local: THREE.Matrix4 }
+const _up = new THREE.Vector3(0, 1, 0);
+const _m = new THREE.Matrix4();
+const _flip = new THREE.Quaternion().setFromAxisAngle(_up, Math.PI);
+const _d = new THREE.Vector3();
 
-function randomBasis(r: () => number, flat: number): [V3, V3] {
-  const n = new THREE.Vector3(0, 1, 0);
-  if (flat < 1) {
-    const tilt = (1 - flat) * Math.PI * 0.5 * r();
-    const az = r() * Math.PI * 2;
-    n.set(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az)).normalize();
-  }
-  const ref = Math.abs(n.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-  const u = new THREE.Vector3().crossVectors(ref, n).normalize();
-  const v = new THREE.Vector3().crossVectors(n, u).normalize();
-  return [u, v];
-}
-
-export function makeTraffic(clusters: Cluster[], seed: number): { group: THREE.Group; tick: (dt: number) => void; count: number } {
+export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLocal = 450) {
   const r = rng(seed);
   const group = new THREE.Group();
   const crafts: Craft[] = [];
-  const perKind = KINDS.map(() => 0);
+  const templates = new Map<ShipModel, THREE.Group>();
+  const tpl = (m: ShipModel) => {
+    let t = templates.get(m);
+    if (!t) { t = buildModel(m); templates.set(m, t); }
+    return t;
+  };
 
-  for (const cl of clusters) {
-    const pool = cl.only ? KINDS.filter((k) => cl.only!.includes(k.model)) : KINDS;
-    const poolW = pool.reduce((a, k) => a + k.w, 0);
-    for (let i = 0; i < cl.n; i++) {
-      let pick = r() * (cl.only ? poolW : TOTAL_W);
-      let kind = pool[0];
-      for (const k of pool) { pick -= k.w; if (pick <= 0) { kind = k; break; } }
-      const ki = KINDS.indexOf(kind);
-      const [u, v] = randomBasis(r, cl.flat ?? 0.35);
-      // Big hulls keep further out and move slower.
-      const big = Math.min(1, kind.len / 3);
-      const a = cl.inner + (cl.outer - cl.inner) * (Math.pow(r(), 0.8) * (1 - big * 0.4) + big * 0.4 * r());
-      const speed = (cl.speed ?? 1.2) * (0.6 + r() * 0.8) * (1 - big * 0.5);
-      const scale = cl.scale ?? 1;
-      const dir = r() < 0.5 ? 1 : -1;
-      crafts.push({
-        kind: ki, slot: perKind[ki]++, c: cl.centre, u, v, a, b: a * (0.62 + r() * 0.38),
-        w: (dir * speed) / Math.max(a, 0.5), phase: r() * Math.PI * 2, len: kind.len * scale * (0.85 + r() * 0.3),
+  const pointAt = (p: Port, out: V3) => {
+    // Mostly close in, a few well out; a little flattened towards the plane of the system.
+    const d = p.inner + (p.outer - p.inner) * r() ** 1.6;
+    const y = (r() * 2 - 1) * 0.6, a = r() * Math.PI * 2, w = Math.sqrt(1 - y * y);
+    return out.set(w * Math.cos(a), y, w * Math.sin(a)).multiplyScalar(d).add(p.pos);
+  };
+
+  const pickKind = (only?: ShipModel[]) => {
+    const pool = only ? KINDS.filter((k) => only.includes(k.model)) : KINDS;
+    let x = r() * pool.reduce((a, k) => a + k.w, 0);
+    for (const k of pool) { x -= k.w; if (x <= 0) return k; }
+    return pool[0];
+  };
+
+  const plan = (c: Craft, now: number, f: Fleet) => {
+    c.from.copy(c.to);
+    let next = Math.floor(r() * f.ports.length);
+    if (f.ports.length > 1 && next === c.port && r() < 0.7) next = (next + 1) % f.ports.length;
+    c.port = next;
+    pointAt(f.ports[next], c.to);
+    const D = c.from.distanceTo(c.to);
+    c.dur = Math.min(140, Math.max(20, D / (vLocal * unit)));
+    c.t0 = now;
+    c.hold = 4 + r() * 30;
+    _d.copy(c.to).sub(c.from);
+    if (_d.lengthSq() < 1e-30) _d.set(0, 0, -1);
+    _d.normalize();
+    // lookAt aims -Z at its target, which is where the models' noses are.
+    _m.lookAt(new THREE.Vector3(), _d, Math.abs(_d.y) > 0.98 ? new THREE.Vector3(1, 0, 0) : _up);
+    c.qa.setFromRotationMatrix(_m);
+    c.qb.copy(c.qa).multiply(_flip);
+  };
+
+  const glintOrigin: V3[] = fleets.map((f) => f.ports[0].pos.clone());
+  const byFleet: Craft[][] = fleets.map(() => []);
+
+  fleets.forEach((f, fi) => {
+    for (let i = 0; i < f.n; i++) {
+      const kind = pickKind(f.only);
+      const g = tpl(kind.model).clone(true);
+      const len = kind.m * unit * (0.85 + r() * 0.3);
+      g.scale.setScalar(len);
+      group.add(g);
+      const c: Craft = {
+        g, fleet: fi, len, port: Math.floor(r() * f.ports.length), from: new THREE.Vector3(), to: new THREE.Vector3(),
+        t0: 0, dur: 1, hold: 0, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), pos: new THREE.Vector3(),
         tint: new THREE.Color(r() < 0.25 ? 0xffd9a8 : r() < 0.5 ? 0xffffff : 0x9fd8ff),
-      });
+      };
+      pointAt(f.ports[c.port], c.to);
+      plan(c, 0, f);
+      // Scatter them through their flights so the sky is busy from the first frame.
+      c.t0 = -r() * (c.dur + c.hold);
+      crafts.push(c);
+      byFleet[fi].push(c);
     }
-  }
-
-  // One InstancedMesh per mesh of each model in use.
-  const meshes: { parts: Part[]; inst: THREE.InstancedMesh[] }[] = KINDS.map((k, i) => {
-    if (!perKind[i]) return { parts: [], inst: [] };
-    const tpl = buildModel(k.model);
-    tpl.updateMatrixWorld(true);
-    const parts: Part[] = [];
-    tpl.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) parts.push({ geo: m.geometry, mat: m.material, local: m.matrixWorld.clone() });
-    });
-    const inst = parts.map((p) => {
-      const im = new THREE.InstancedMesh(p.geo, p.mat, perKind[i]);
-      im.frustumCulled = false;
-      im.castShadow = false;
-      group.add(im);
-      return im;
-    });
-    return { parts, inst };
   });
 
-  // Engine glints.
-  const N = crafts.length;
-  const gp = new Float32Array(N * 3), gc = new Float32Array(N * 3);
-  crafts.forEach((c, i) => gc.set([c.tint.r, c.tint.g, c.tint.b], i * 3));
-  const gg = new THREE.BufferGeometry();
-  gg.setAttribute('position', new THREE.BufferAttribute(gp, 3));
-  gg.setAttribute('color', new THREE.BufferAttribute(gc, 3));
-  const glints = new THREE.Points(gg, new THREE.PointsMaterial({
-    size: 3, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.9,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
-  }));
-  glints.frustumCulled = false;
-  group.add(glints);
+  // Glints: one Points per fleet, positions relative to the fleet's first port.
+  const glints = fleets.map((f, fi) => {
+    const n = byFleet[fi].length;
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    byFleet[fi].forEach((c, i) => col.set([c.tint.r, c.tint.g, c.tint.b], i * 3));
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 3, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.95,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    }));
+    pts.frustumCulled = false;
+    pts.position.copy(glintOrigin[fi]);
+    group.add(pts);
+    return { pos, geo };
+  });
 
-  const pos = new THREE.Vector3(), vel = new THREE.Vector3(), M = new THREE.Matrix4(), L = new THREE.Matrix4();
-  const S = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0), fwd = new THREE.Vector3(), tgt = new THREE.Vector3();
   let clock = 0;
-
-  const place = () => {
-    for (let i = 0; i < N; i++) {
-      const c = crafts[i];
-      const th = c.phase + c.w * clock;
-      const cs = Math.cos(th), sn = Math.sin(th);
-      pos.copy(c.c).addScaledVector(c.u, c.a * cs).addScaledVector(c.v, c.b * sn);
-      vel.copy(c.u).multiplyScalar(-c.a * sn * c.w).addScaledVector(c.v, c.b * cs * c.w);
-      if (vel.lengthSq() < 1e-12) vel.set(0, 0, -1);
-      fwd.copy(vel).normalize();
-      // Matrix4.lookAt points -Z at the target, which is where the models' noses are.
-      tgt.copy(pos).add(fwd);
-      M.lookAt(pos, tgt, up).setPosition(pos);
-      S.makeScale(c.len, c.len, c.len);
-      M.multiply(S);
-      const { parts, inst } = meshes[c.kind];
-      for (let p = 0; p < parts.length; p++) {
-        inst[p].setMatrixAt(c.slot, L.multiplyMatrices(M, parts[p].local));
+  const q = new THREE.Quaternion();
+  const tick = (dt: number, viewer: V3) => {
+    clock += dt;
+    for (let fi = 0; fi < fleets.length; fi++) {
+      const list = byFleet[fi], gl = glints[fi];
+      for (let i = 0; i < list.length; i++) {
+        const c = list[i];
+        let u = (clock - c.t0) / c.dur;
+        if (u >= 1 && clock - c.t0 >= c.dur + c.hold) { plan(c, clock, fleets[fi]); u = 0; }
+        const tt = Math.min(1, Math.max(0, u));
+        const s = tt < 0.5 ? 2 * tt * tt : 1 - 2 * (1 - tt) * (1 - tt);
+        c.pos.copy(c.from).lerp(c.to, s);
+        // Burn towards the goal, flip over about half-way, burn the other way to stop.
+        const k = Math.min(1, Math.max(0, (tt - 0.4) / 0.2));
+        q.copy(c.qa).slerp(c.qb, k * k * (3 - 2 * k));
+        c.g.position.copy(c.pos);
+        c.g.quaternion.copy(q);
+        const d = viewer.distanceTo(c.pos);
+        const show = c.len / Math.max(d, 1e-30) > 0.0018;
+        c.g.visible = show;
+        // The glint sits at the stern and goes out when the ship itself can be seen.
+        const o = glintOrigin[fi];
+        gl.pos[i * 3] = show ? 1e20 : c.pos.x - o.x;
+        gl.pos[i * 3 + 1] = show ? 1e20 : c.pos.y - o.y;
+        gl.pos[i * 3 + 2] = show ? 1e20 : c.pos.z - o.z;
       }
-      gp[i * 3] = pos.x - fwd.x * c.len * 0.5;
-      gp[i * 3 + 1] = pos.y - fwd.y * c.len * 0.5;
-      gp[i * 3 + 2] = pos.z - fwd.z * c.len * 0.5;
+      gl.geo.attributes.position.needsUpdate = true;
     }
-    for (const m of meshes) for (const im of m.inst) im.instanceMatrix.needsUpdate = true;
-    gg.attributes.position.needsUpdate = true;
   };
-  place();
-  return {
-    group, count: N,
-    tick: (dt) => { clock += dt; place(); },
-  };
+  return { group, tick, count: crafts.length };
 }

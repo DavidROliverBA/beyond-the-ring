@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeTraffic, type Cluster } from './traffic';
+import { makeTraffic, type Fleet, type Port } from './traffic';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -24,13 +24,19 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 // ---------------------------------------------------------------- renderer
 
+// Ships here are metres across in a world measured in thousandths of an AU, so the stock
+// logarithmic depth (which works on 1 + distance) cannot separate them. Scale the distance
+// first, and give every camera a far plane scaled to match.
+const LOGK = 1e9;
+THREE.ShaderChunk.logdepthbuf_vertex = THREE.ShaderChunk.logdepthbuf_vertex.replace('1.0 + gl_Position.w', `1.0 + gl_Position.w * ${LOGK.toExponential(1)}`);
+
 const canvas = $('view') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000003);
-const camera = new THREE.PerspectiveCamera(60, 1, 0.004, 4e6);
-const walkCam = new THREE.PerspectiveCamera(72, 1, 0.08, 12000);
+const camera = new THREE.PerspectiveCamera(60, 1, 1e-9, 4e6 * LOGK);
+const walkCam = new THREE.PerspectiveCamera(72, 1, 0.08, 12000 * LOGK);
 
 // Everything is drawn into a float buffer first, so lamps, drives and city lights
 // can be brighter than white and bleed a little, the way they do on film.
@@ -417,7 +423,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   const painted = mapKinds(tex);
   const kinds = { lights: painted.lights || !!photo?.night, clouds: painted.clouds || !!photo?.clouds };
   const maps = !photo || (painted.lights && !photo.night) ? (await paintBody(tex, 256, 128))! : null;
-  const big = R >= 10;
+  const big = R >= 0.2;
   const geo = new THREE.SphereGeometry(R, big ? 128 : 64, big ? 64 : 32);
   const lod: Lod = { spec: b, pos, mat: new THREE.MeshBasicMaterial(), level: 0, photo };
   if (b.kind === 'star') {
@@ -512,34 +518,39 @@ function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const pts = new THREE.Points(geo, new THREE.PointsMaterial({
-    color: b.color, size: b.dustSize, sizeAttenuation: !b.shell, transparent: true, opacity: b.opacity, depthWrite: false,
+    color: b.color, size: b.dustSize, sizeAttenuation: false, transparent: true, opacity: b.opacity, depthWrite: false,
   }));
   pts.frustumCulled = false;
   group.add(pts);
 
   const knots = (b.clusters ?? []).map((id) => posOf.get(id)).filter((p): p is V3 => !!p);
   const perKnot = 90;
-  const total = b.rocks + knots.length * perKnot;
-  if (!total) return;
-  const rocks = new THREE.InstancedMesh(rockGeo, new THREE.MeshStandardMaterial({ color: b.color, roughness: 1, flatShading: true, envMapIntensity: 0 }), total);
+  const rockMat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 1, flatShading: true, envMapIntensity: 0 });
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new V3(), e = new THREE.Euler();
-  const put = (i: number, at: V3, size: number) => {
+  const put = (rocks: THREE.InstancedMesh, i: number, at: V3, size: number) => {
     e.set(r() * TAU, r() * TAU, r() * TAU);
     q.setFromEuler(e);
     s.set(size * (0.7 + r() * 0.6), size * (0.6 + r() * 0.5), size * (0.7 + r() * 0.6));
     rocks.setMatrixAt(i, m.compose(at, q, s));
   };
-  for (let i = 0; i < b.rocks; i++) put(i, place(), b.size[0] + (b.size[1] - b.size[0]) * r() ** 3);
-  let k = b.rocks;
-  for (const c of knots) {
-    for (let i = 0; i < perKnot; i++) {
-      const y = r() * 2 - 1, a = r() * TAU, w = Math.sqrt(1 - y * y), d = 6 + 110 * r() ** 1.5;
-      v.set(w * Math.cos(a) * d, y * d * 0.5, w * Math.sin(a) * d).add(c);
-      put(k++, v, 0.08 + 0.7 * r() ** 2);
-    }
+  if (b.rocks) {
+    const rocks = new THREE.InstancedMesh(rockGeo, rockMat, b.rocks);
+    for (let i = 0; i < b.rocks; i++) put(rocks, i, place(), b.size[0] + (b.size[1] - b.size[0]) * r() ** 3);
+    rocks.frustumCulled = false;
+    group.add(rocks);
   }
-  rocks.frustumCulled = false;
-  group.add(rocks);
+  // A knot of rocks round each named body, in the body's own coordinates so they stay put when you are close.
+  for (const c of knots) {
+    const rocks = new THREE.InstancedMesh(rockGeo, rockMat, perKnot);
+    for (let i = 0; i < perKnot; i++) {
+      const y = r() * 2 - 1, a = r() * TAU, w = Math.sqrt(1 - y * y), d = 0.004 + 0.35 * r() ** 1.5;
+      v.set(w * Math.cos(a) * d, y * d * 0.5, w * Math.sin(a) * d);
+      put(rocks, i, v, 1e-6 + 2.5e-4 * r() ** 2);
+    }
+    rocks.position.copy(c);
+    rocks.frustumCulled = false;
+    group.add(rocks);
+  }
 }
 
 function orbitLine(center: V3, radius: number, y: number, opacity: number): THREE.LineLoop {
@@ -603,7 +614,7 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   await pause();
   for (const belt of spec.belts) makeBelt(belt, group, posOf);
 
-  const R = 14;
+  const R = 0.00334;
   const gpos = new V3(Math.cos(spec.gate.angle) * spec.gate.orbit, 0, Math.sin(spec.gate.angle) * spec.gate.orbit);
   const normal = gpos.clone().negate().normalize();
   const gate = makeGateObject(R, ctx);
@@ -611,25 +622,38 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   gate.quaternion.setFromUnitVectors(FWD_Z, normal);
   group.add(gate);
   const at = (id: string) => posOf.get(id);
-  const ring = (id: string, n: number, inner: number, outer: number, extra: Partial<Cluster> = {}): Cluster[] => {
+  const port = (id: string, inner: number, outer: number): Port[] => {
     const c = at(id);
-    return c ? [{ centre: c, n, inner, outer, ...extra }] : [];
+    return c ? [{ pos: c, inner, outer }] : [];
   };
-  const clusters: Cluster[] = spec.id === 'sol'
+  const fleets: Fleet[] = spec.id === 'sol'
     ? [
-      ...ring('earth', 110, 6, 46), ...ring('luna', 10, 2, 8), ...ring('mars', 60, 3.5, 24), ...ring('venus', 8, 6, 24),
-      ...ring('ceres', 70, 0.8, 14, { speed: 0.8 }), ...ring('tycho', 70, 3.2, 20), ...ring('ganymede', 40, 2.2, 14),
-      ...ring('jupiter', 25, 55, 170), ...ring('saturn', 14, 45, 150), ...ring('titan', 8, 2.2, 10),
-      { centre: new V3(), n: 45, inner: 2200, outer: 3300, flat: 1, speed: 4 },
-      { centre: gpos.clone().addScaledVector(normal, 60), n: 60, inner: 18, outer: 110, speed: 1.6 },
+      // Hubs: ships hop between spots in a shell round the port, in lanes, and out to the Ring.
+      { ports: port('earth', 0.055, 0.32), n: 90 },
+      { ports: [...port('earth', 0.06, 0.12), ...port('luna', 0.02, 0.06)], n: 25 },
+      { ports: port('luna', 0.016, 0.07), n: 12 },
+      { ports: port('mars', 0.03, 0.2), n: 50 },
+      { ports: [...port('mars', 0.03, 0.08), ...port('phobos', 0.002, 0.01)], n: 10 },
+      { ports: [...port('earth', 0.06, 0.2), ...port('mars', 0.03, 0.12)], n: 30, only: ['freighter', 'hauler', 'battleship', 'survey'] },
+      { ports: port('ceres', 0.004, 0.05), n: 60 },
+      { ports: [...port('ceres', 0.004, 0.02), ...port('tycho', 2e-6, 4e-5)], n: 25 },
+      { ports: port('tycho', 2e-6, 6e-5), n: 70 },
+      { ports: [...port('ceres', 0.01, 0.04), ...port('vesta', 0.002, 0.01), ...port('pallas', 0.002, 0.01)], n: 20, only: ['freighter', 'racer', 'survey'] },
+      { ports: port('jupiter', 0.6, 2.2), n: 25 },
+      { ports: port('ganymede', 0.03, 0.15), n: 30 },
+      { ports: [...port('jupiter', 0.6, 1.2), ...port('ganymede', 0.03, 0.08)], n: 10 },
+      { ports: port('saturn', 0.5, 2.0), n: 15 },
+      { ports: port('titan', 0.03, 0.12), n: 8 },
+      { ports: [...port('saturn', 0.5, 1.0), ...port('ceres', 0.01, 0.04)], n: 10, only: ['hauler', 'freighter'] },
+      { ports: [{ pos: gpos.clone().addScaledVector(normal, 0.06), inner: 0.004, outer: 0.18 }], n: 40 },
     ]
     : [
-      ...spec.bodies.filter((b) => b.kind === 'planet' && b.radius >= 2.5).flatMap((b) => ring(b.id, 6, b.radius * 1.6, b.radius * 5)),
-      { centre: gpos.clone().addScaledVector(normal, 50), n: 22, inner: 16, outer: 90, speed: 1.6 },
+      ...spec.bodies.filter((b) => b.kind === 'planet' && b.radius >= 0.02).flatMap((b) => port(b.id, b.radius * 1.6, b.radius * 6).map((p) => ({ ports: [p], n: 6 }))),
+      { ports: [{ pos: gpos.clone().addScaledVector(normal, 0.05), inner: 0.004, outer: 0.15 }], n: 22 },
     ];
-  const traffic = makeTraffic(clusters, spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1));
+  const traffic = makeTraffic(fleets.filter((f) => f.ports.length), spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1));
   group.add(traffic.group);
-  ctx.anim.push((dt) => traffic.tick(dt));
+  ctx.anim.push((dt) => traffic.tick(dt, ship.pos));
   const idx = spec.id === 'sol' ? 0 : Number(spec.id.slice(4));
   const gth: Thing = {
     id: 'ring', name: spec.id === 'sol' ? 'The Ring' : 'Ring gate', sub: 'Gate to the ring space',
@@ -692,12 +716,13 @@ async function buildSlowZone(): Promise<Space> {
   things.push(mth);
   addLabel({ labels }, mth, 'station');
 
+  // Here a unit is about 125 m: Medina is two kilometres across and the ships round it a few tens of metres to a few hundred.
   const crowd = makeTraffic([
-    { centre: medinaPos, n: 110, inner: 14, outer: 70, scale: 5, speed: 3 },
-    { centre: new V3(), n: 24, inner: 70, outer: 160, scale: 5, speed: 3, flat: 0.1 },
-  ], 4242);
+    { ports: [{ pos: medinaPos, inner: 14, outer: 70 }], n: 80 },
+    { ports: [{ pos: medinaPos, inner: 14, outer: 40 }, { pos: new V3(), inner: 70, outer: 160 }], n: 25 },
+  ], 4242, 1 / 125, 80);
   group.add(crowd.group);
-  ctx.anim.push((dt) => crowd.tick(dt));
+  ctx.anim.push((dt) => crowd.tick(dt, ship.pos));
 
   // The gates.
   const R = 28;
@@ -777,14 +802,15 @@ async function buildSlowZone(): Promise<Space> {
 
 // ------------------------------------------------------------------ ship
 
-const SHIP_SCALE = 0.03;
+/** Your ship is about 30 m long, so the chase camera rides a few hundred metres behind it. */
+const SHIP_SCALE = 2e-7;
 const ship = { pos: new V3(), prev: new V3(), q: new THREE.Quaternion(), speed: 0, throttle: 0 };
 let { group: shipModel, plume } = playerShip();
 shipModel.scale.setScalar(SHIP_SCALE);
 scene.add(shipModel);
 
 // Motes that drift past so slow flight still reads as motion.
-const DUST_N = 260, DUST_BOX = 3;
+const DUST_N = 260, DUST_BOX = 4e-5;
 const dustBase = new Float32Array(DUST_N * 3);
 {
   const r = rng(5);
@@ -792,7 +818,7 @@ const dustBase = new Float32Array(DUST_N * 3);
 }
 const dustGeo = new THREE.BufferGeometry();
 dustGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(DUST_N * 3), 3));
-const dustMat = new THREE.PointsMaterial({ color: 0xbfd8ff, size: 0.0035, transparent: true, opacity: 0.6, depthWrite: false });
+const dustMat = new THREE.PointsMaterial({ color: 0xbfd8ff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.6, depthWrite: false });
 const dust = new THREE.Points(dustGeo, dustMat);
 dust.frustumCulled = false;
 scene.add(dust);
@@ -886,9 +912,9 @@ function viewpoint(th: Thing): V3 {
     const side = space.id === 'slow' ? 1 : Math.sign(_a.copy(ship.pos).sub(th.pos).dot(th.normal!)) || 1;
     return th.pos.clone().addScaledVector(th.normal!, side * th.radius * 3.2);
   }
-  const stand = th.radius * (th.kind === 'star' ? 4.2 : th.kind === 'artifact' ? 4.5 : th.kind === 'station' ? 3.3 : th.kind === 'ship' ? 1.9 : 3.4) + 0.15;
+  const stand = th.radius * (th.kind === 'star' ? 4.2 : th.kind === 'artifact' ? 4.5 : th.kind === 'station' ? 3.3 : th.kind === 'ship' ? 1.9 : 3.4);
   const d = ship.pos.clone().sub(th.pos);
-  if (d.lengthSq() < 1e-9) d.set(0, 0, 1);
+  if (d.lengthSq() < 1e-40) d.set(0, 0, 1);
   d.normalize();
   if (space.star && th.kind !== 'star') {
     const toSun = space.star.clone().sub(th.pos).normalize();
@@ -1085,7 +1111,7 @@ function speedCap(): number {
     } else {
       // Gentle close in, then opening up fast, so a body only holds you back while it is worth looking at.
       const d = Math.max(0, dist - th.radius), far = d / (30 * th.radius + 20);
-      c = 1.2 * d * (1 + far * far) + 0.3 * th.radius + 0.05;
+      c = 1.2 * d * (1 + far * far) + 0.3 * th.radius + 1e-12;
     }
     if (c < cap) cap = c;
     if (th.kind !== 'gate' || th.range > 0 || dist < 500) {
@@ -1108,7 +1134,7 @@ function autopilot(dt: number, cap: number) {
   }
   const to = _a.copy(ap.point).sub(ship.pos);
   const dist = to.length();
-  if (dist < Math.max(0.02 * ap.thing.radius, 0.02)) {
+  if (dist < 0.02 * ap.thing.radius) {
     ap.phase = 'face';
     return;
   }
@@ -1122,17 +1148,17 @@ function autopilot(dt: number, cap: number) {
     const t = v.dot(dir);
     if (t <= 0 || t >= bestT) continue;
     const perp = v.addScaledVector(dir, -t);
-    const clear = th.radius * 1.7 + 0.2;
+    const clear = th.radius * 1.7;
     if (perp.length() < clear) {
       bestT = t;
-      if (perp.lengthSq() < 1e-8) perp.set(0, 1, 0).applyQuaternion(ship.q);
+      if (perp.lengthSq() < (th.radius * 1e-3) ** 2) perp.set(0, 1, 0).applyQuaternion(ship.q);
       aim = th.pos.clone().addScaledVector(perp.normalize(), -clear * 1.2);
     }
   }
   const want = aim ? aim.sub(ship.pos).normalize() : dir;
   faceShip(want, 2.6 * dt);
   const align = fwd.dot(want);
-  const target = Math.min(cap, dist * 2.2 + 0.02) * (align > 0.9 ? 1 : align > 0.5 ? 0.2 : 0);
+  const target = Math.min(cap, dist * 2.2) * (align > 0.9 ? 1 : align > 0.5 ? 0.2 : 0);
   ship.speed += (target - ship.speed) * (1 - Math.exp(-4 * dt));
   ship.speed = Math.min(ship.speed, cap, dist / dt);
   ship.pos.addScaledVector(fwd, ship.speed * dt);
@@ -1178,7 +1204,7 @@ function step(dt: number) {
 
   for (const th of space.things) {
     if (!th.solid) continue;
-    const min = th.radius * (th.kind === 'station' ? 1.0 : 1.15) + 0.03;
+    const min = th.radius * (th.kind === 'station' ? 1.0 : 1.15);
     const d = _a.copy(ship.pos).sub(th.pos);
     if (d.lengthSq() < min * min) ship.pos.copy(th.pos).addScaledVector(d.lengthSq() ? d.normalize() : d.set(0, 1, 0), min);
   }
@@ -1203,7 +1229,7 @@ function dockable(): Thing | null {
   for (const th of space.things) {
     if (!th.dock) continue;
     const d = th.pos.distanceTo(ship.pos);
-    if (d < th.radius * 10 + 8 && d < bd) { best = th; bd = d; }
+    if (d < th.radius * 12 && d < bd) { best = th; bd = d; }
   }
   return best;
 }
@@ -1295,7 +1321,7 @@ function walkStep(dt: number) {
 
 // Only a couple of bodies hold their large photo maps at once; the one that looks smallest gives its set back.
 const SHARP_MAX = 2;
-const looksBig = (x: Lod) => x.spec.radius / Math.max(1e-6, x.pos.distanceTo(ship.pos));
+const looksBig = (x: Lod) => x.spec.radius / Math.max(1e-12, x.pos.distanceTo(ship.pos));
 const sharpHeld = () => space.lods.filter((x) => x.sharp).sort((a, b) => looksBig(a) - looksBig(b));
 function roomToSharpen(l: Lod, app: number) {
   if (l.sharp) return true;
@@ -1308,7 +1334,7 @@ function lodTick() {
   if (lodBusy) return;
   let best: Lod | null = null, score = 0, want = 0;
   for (const l of space.lods) {
-    const app = l.spec.radius / Math.max(1e-6, l.pos.distanceTo(ship.pos));
+    const app = l.spec.radius / Math.max(1e-12, l.pos.distanceTo(ship.pos));
     const target = app > 0.06 ? 2 : app > 0.004 ? 1 : 0;
     if (target <= l.level || app <= score) continue;
     // A photo body that only lacks its large maps waits until there is room for them.
@@ -1317,7 +1343,7 @@ function lodTick() {
   }
   if (!best) return;
   const l = best, sp = space, level = want;
-  const w = level === 2 ? (l.spec.radius >= 2 && l.spec.kind !== 'star' ? 2048 : 1024) : 512;
+  const w = level === 2 ? (l.spec.radius >= 0.02 && l.spec.kind !== 'star' ? 2048 : 1024) : 512;
   lodBusy = true;
   const jobs: Promise<boolean>[] = [];
   const p = l.photo;
@@ -1348,12 +1374,19 @@ function lodTick() {
 
 const fmtDist = (d: number) => {
   if (d >= 50) return `${(d / AU).toFixed(d >= 10000 ? 1 : 2)} AU`;
-  const km = d * 149600;
-  return km >= 1e6 ? `${(km / 1e6).toFixed(2)}M km` : `${Math.round(km / 1000)}k km`;
+  const km = d * 149597.87;
+  if (km >= 1e6) return `${(km / 1e6).toFixed(2)}M km`;
+  if (km >= 1e5) return `${Math.round(km / 1000)}k km`;
+  if (km >= 10) return `${Math.round(km).toLocaleString()} km`;
+  if (km >= 1) return `${km.toFixed(1)} km`;
+  return `${Math.round(km * 1000)} m`;
 };
 const fmtSpeed = (v: number) => {
-  const c = Math.abs(v) * 0.499;
-  return c < 10 ? `${c.toFixed(2)} c` : `${Math.round(c).toLocaleString()} c`;
+  const kms = Math.abs(v) * 149597.87;
+  const c = kms / 299792.458;
+  if (c >= 0.01) return c < 10 ? `${c.toFixed(2)} c` : `${Math.round(c).toLocaleString()} c`;
+  if (kms >= 1) return `${kms.toFixed(kms < 10 ? 1 : 0)} km/s`;
+  return `${Math.round(kms * 1000)} m/s`;
 };
 
 const aimLabel = $('aim-label');
@@ -1513,7 +1546,7 @@ function frame(now: number) {
   }
   p.needsUpdate = true;
   dust.position.copy(cp);
-  dustMat.opacity = 0.6 * clamp(1 - Math.abs(ship.speed) / 40, 0, 1);
+  dustMat.opacity = 0.6 * clamp(1 - Math.abs(ship.speed) / (DUST_BOX * 6), 0, 1);
 
   space.tick(clock, dt);
   updateLabels();
