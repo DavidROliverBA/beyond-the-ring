@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeTraffic, type Cluster } from './traffic';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -602,13 +603,33 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   await pause();
   for (const belt of spec.belts) makeBelt(belt, group, posOf);
 
-  const R = 30;
+  const R = 14;
   const gpos = new V3(Math.cos(spec.gate.angle) * spec.gate.orbit, 0, Math.sin(spec.gate.angle) * spec.gate.orbit);
   const normal = gpos.clone().negate().normalize();
   const gate = makeGateObject(R, ctx);
   gate.position.copy(gpos);
   gate.quaternion.setFromUnitVectors(FWD_Z, normal);
   group.add(gate);
+  const at = (id: string) => posOf.get(id);
+  const ring = (id: string, n: number, inner: number, outer: number, extra: Partial<Cluster> = {}): Cluster[] => {
+    const c = at(id);
+    return c ? [{ centre: c, n, inner, outer, ...extra }] : [];
+  };
+  const clusters: Cluster[] = spec.id === 'sol'
+    ? [
+      ...ring('earth', 110, 6, 46), ...ring('luna', 10, 2, 8), ...ring('mars', 60, 3.5, 24), ...ring('venus', 8, 6, 24),
+      ...ring('ceres', 70, 0.8, 14, { speed: 0.8 }), ...ring('tycho', 70, 3.2, 20), ...ring('ganymede', 40, 2.2, 14),
+      ...ring('jupiter', 25, 55, 170), ...ring('saturn', 14, 45, 150), ...ring('titan', 8, 2.2, 10),
+      { centre: new V3(), n: 45, inner: 2200, outer: 3300, flat: 1, speed: 4 },
+      { centre: gpos.clone().addScaledVector(normal, 60), n: 60, inner: 18, outer: 110, speed: 1.6 },
+    ]
+    : [
+      ...spec.bodies.filter((b) => b.kind === 'planet' && b.radius >= 2.5).flatMap((b) => ring(b.id, 6, b.radius * 1.6, b.radius * 5)),
+      { centre: gpos.clone().addScaledVector(normal, 50), n: 22, inner: 16, outer: 90, speed: 1.6 },
+    ];
+  const traffic = makeTraffic(clusters, spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1));
+  group.add(traffic.group);
+  ctx.anim.push((dt) => traffic.tick(dt));
   const idx = spec.id === 'sol' ? 0 : Number(spec.id.slice(4));
   const gth: Thing = {
     id: 'ring', name: spec.id === 'sol' ? 'The Ring' : 'Ring gate', sub: 'Gate to the ring space',
@@ -670,6 +691,13 @@ async function buildSlowZone(): Promise<Space> {
   };
   things.push(mth);
   addLabel({ labels }, mth, 'station');
+
+  const crowd = makeTraffic([
+    { centre: medinaPos, n: 110, inner: 14, outer: 70, scale: 5, speed: 3 },
+    { centre: new V3(), n: 24, inner: 70, outer: 160, scale: 5, speed: 3, flat: 0.1 },
+  ], 4242);
+  group.add(crowd.group);
+  ctx.anim.push((dt) => crowd.tick(dt));
 
   // The gates.
   const R = 28;

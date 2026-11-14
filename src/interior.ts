@@ -6,6 +6,7 @@ import { Noise, rng } from './textures';
 import { buildModel, glowSprite, playerShip } from './ships';
 import { scan, type ScanName } from './materials';
 import { PHOTOS } from './photos';
+import { buildPerson } from './people';
 
 export interface Point { x: number; z: number; r: number; title: string; text: string; kind: 'info' | 'exit' }
 export interface Place { name: string; x: number; z: number; yaw: number }
@@ -232,6 +233,7 @@ class Kit {
   circle?: number;
   bounds?: Rect;
   stars?: THREE.Points;
+  floors: THREE.Mesh[] = [];
   private mats = new Map<string, THREE.MeshStandardMaterial>();
   r = rng(1);
 
@@ -328,6 +330,7 @@ class Kit {
       floor.rotation.x = -Math.PI / 2;
       floor.position.set(cx, 0, cz);
       this.scene.add(floor);
+      this.floors.push(floor);
       if (!o.open) {
         const ck = o.ceil ?? 'dark';
         const ceil = plane(w, d, this.mat(ck, o.tint), TILE[ck]);
@@ -452,34 +455,35 @@ class Kit {
     s.rotation.x = this.curveR ? 0 : -0.25;
   }
 
-  person(x: number, z: number, yaw = this.r() * 6.28, belter = false) {
-    const g = new THREE.Group();
-    const cloth = [0x4a5a6a, 0x6a4a3a, 0x3a4a3a, 0x5a5a62, 0x7a6a4a, 0x2f3a4a, 0x6a3a3a, 0x8a8478][Math.floor(this.r() * 8)];
-    const skin = [0xc99a7a, 0x8a5a3a, 0xe0b898, 0x6a452c, 0xb5825a][Math.floor(this.r() * 5)];
-    const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.62, 3, 8), this.flat(0x25282d));
-    legs.position.y = 0.48;
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.42, 3, 8), this.flat(cloth));
-    torso.position.y = 1.18;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), this.flat(skin));
-    head.position.y = 1.64;
-    g.add(legs, torso, head);
-    for (const s of [1, -1]) {
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.5, 2, 6), this.flat(cloth));
-      arm.position.set(s * 0.27, 1.12, 0);
-      g.add(arm);
-    }
-    if (belter) g.scale.set(0.88, 1.15, 0.88);
-    this.place(g, x, 0, z, yaw);
-    this.block(x, z, 0.3, 0.3);
+  person(x: number, z: number, yaw = this.r() * 6.28, belter = false, walk = false) {
+    const p = buildPerson(this.r, belter);
+    const g = p.group;
     const phase = this.r() * 6;
-    this.anims.push((t) => { torso.rotation.z = Math.sin(t * 0.8 + phase) * 0.03; head.rotation.y = Math.sin(t * 0.37 + phase) * 0.5; });
+    const fx = Math.sin(yaw), fz = Math.cos(yaw), A = 2.4;
+    // Walkers pace a short beat along the way they face, so long as the whole beat is open floor.
+    const beat = walk && !this.curveR && [-1, -0.5, 0, 0.5, 1].every((s) => this.free(x + fx * A * s, z + fz * A * s));
+    this.place(g, x, 0, z, yaw);
+    if (!beat) {
+      this.block(x, z, 0.3, 0.3);
+      this.anims.push((t) => p.pose(t, false));
+      return;
+    }
+    const speed = 0.28 + this.r() * 0.14;
+    this.anims.push((t) => {
+      const s = Math.sin(t * speed + phase), v = Math.cos(t * speed + phase);
+      g.position.x = x + fx * A * s;
+      g.position.z = z + fz * A * s;
+      g.rotation.y = yaw + (v >= 0 ? 0 : Math.PI);
+      p.pose(t, true);
+    });
   }
 
   crowd(x0: number, z0: number, x1: number, z1: number, n: number, belter = true) {
+    n = Math.round(n * 1.6);
     for (let i = 0, tries = 0; i < n && tries < n * 20; tries++) {
       const x = x0 + this.r() * (x1 - x0), z = z0 + this.r() * (z1 - z0);
       if (!this.free(x, z)) continue;
-      this.person(x, z, undefined, belter && this.r() < 0.8);
+      this.person(x, z, undefined, belter && this.r() < 0.8, this.r() < 0.3);
       i++;
     }
   }
@@ -493,6 +497,196 @@ class Kit {
     this.place(gem, x, 1.75, z);
     this.anims.push((t) => { gem.rotateY(0.03); gem.scale.setScalar(1 + Math.sin(t * 3) * 0.12); });
     this.points.push({ x, z, r: 3.2, title, text, kind: 'info' });
+  }
+
+  // ---- the neon pass: haze, wet floors, coloured light, signs, holograms, stalls and cables.
+  neon() {
+    if (!this.rooms.length || this.curveR) return;
+    const r = this.r;
+    const PAL = [0xff2d95, 0x2df0ff, 0xffb02d, 0x8a5cff, 0x4dff9a];
+    const hot = (c: number, k = 2.4) => { const m = new THREE.MeshBasicMaterial({ color: c }); m.color.multiplyScalar(k); return m; };
+    const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
+
+    this.scene.fog = new THREE.FogExp2(0x180a28, 0.012);
+    this.keyPower *= 0.45;
+    this.keyColor = 0xcbb8ff;
+    this.scene.traverse((o) => {
+      if (o instanceof THREE.HemisphereLight || o instanceof THREE.AmbientLight) { o.intensity *= 0.5; o.color.lerp(new THREE.Color(0x8a6cff), 0.4); }
+    });
+
+    // What a wet floor would reflect: a dark city of tall neon bars, painted once and shared.
+    const ec = document.createElement('canvas');
+    ec.width = 1024; ec.height = 512;
+    const ex = ec.getContext('2d')!;
+    const sky = ex.createLinearGradient(0, 0, 0, 512);
+    sky.addColorStop(0, '#0b0618'); sky.addColorStop(0.55, '#2a0f45'); sky.addColorStop(1, '#05030a');
+    ex.fillStyle = sky; ex.fillRect(0, 0, 1024, 512);
+    for (let i = 0; i < 70; i++) {
+      const c = hex(PAL[Math.floor(r() * PAL.length)]), x = r() * 1024, w = 3 + r() * 16, y = 40 + r() * 180, h = 60 + r() * 250;
+      ex.shadowColor = c; ex.shadowBlur = 24; ex.fillStyle = c; ex.globalAlpha = 0.55 + r() * 0.45;
+      ex.fillRect(x, y, w, h);
+    }
+    const env = new THREE.CanvasTexture(ec);
+    env.mapping = THREE.EquirectangularReflectionMapping;
+    env.colorSpace = THREE.SRGBColorSpace;
+    for (const f of this.floors) {
+      const m = (f.material as THREE.MeshStandardMaterial).clone();
+      m.roughness = 0.4; m.metalness = 0.5; m.envMap = env; m.envMapIntensity = 1.3;
+      m.normalScale?.set(0.18, 0.18);
+      m.color.multiplyScalar(0.7);
+      f.material = m;
+    }
+
+    const nearDoor = (x: number, z: number, pad = 3) => this.doors.some((d) => x > d.x0 - pad && x < d.x1 + pad && z > d.z0 - pad && z < d.z1 + pad);
+    const NAMES = [['RAMEN', 'ラーメン'], ['CHROME', 'クローム'], ['NIGHT', 'MARKET'], ['BIO-MODS', '24h'], ['NOODLES'], ['SYNTH BAR'], ['VR LOUNGE'], ['PAWN', '質屋'], ['INK', 'タトゥー'], ['O2 • WATER'], ['CYBERWARE'], ['ARCADE', 'アーケード'], ['STIMS'], ['LOTTO'], ['SOUP 3¢']];
+    const ADS = [['SYNTHCOLA', 'taste the void'], ['BELT BREW', 'brewed in no gravity'], ['ORBITAL MOTORS', 'torque for the long dark'], ['LUNA·MART', 'everything. eventually.'], ['NEUROPOP', 'upgrade tonight'], ['VANTA SOUND', 'hear everything']];
+
+    this.rooms.forEach((room, ri) => {
+      const { x0, z0, x1, z1, h } = room;
+      const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, area = w * d;
+      const col = PAL[ri % PAL.length], col2 = PAL[(ri + 2) % PAL.length];
+      if (h < 3.3) return;
+      const L = new THREE.PointLight(col, 60 + Math.min(area, 400) * 0.25, Math.max(w, d) * 0.8 + 8, 1.5);
+      this.place(L, cx, Math.min(h - 0.6, 3.6), cz);
+
+      // Neon tubes along the walls, and a lit skirting.
+      const sides: [string, number, number, number, number][] = [
+        ['n', cx, z0 + 0.06, w, 0], ['s', cx, z1 - 0.06, w, 0], ['w', x0 + 0.06, cz, d, 1], ['e', x1 - 0.06, cz, d, 1],
+      ];
+      for (const [, sx, sz, len, alongZ] of sides) {
+        const c = r() < 0.5 ? col : col2;
+        const L2 = len * (0.5 + r() * 0.4), off = (r() - 0.5) * (len - L2);
+        const y = Math.min(h - 0.35, 3.1 + r() * Math.max(0, h * 0.25));
+        const tube = new THREE.Mesh(new THREE.BoxGeometry(alongZ ? 0.07 : L2, 0.07, alongZ ? L2 : 0.07), hot(c));
+        this.place(tube, sx + (alongZ ? 0 : off), y, sz + (alongZ ? off : 0));
+        const skirt = new THREE.Mesh(new THREE.BoxGeometry(alongZ ? 0.05 : len * 0.92, 0.05, alongZ ? len * 0.92 : 0.05), hot(c, 1.6));
+        this.place(skirt, sx, 0.16, sz);
+      }
+
+      // Blade signs jutting from the walls, lit on both faces.
+      const nblade = Math.min(9, Math.max(2, Math.round((w + d) / 9)));
+      for (let i = 0; i < nblade; i++) {
+        const side = Math.floor(r() * 4);
+        const sw = 1.1 + r() * 0.9, sh = 0.55 + r() * 0.25, y = Math.min(h - 0.8, 2.9 + r() * 1.1);
+        const c = PAL[Math.floor(r() * PAL.length)];
+        const text = NAMES[Math.floor(r() * NAMES.length)];
+        let px = 0, pz = 0, yaw = 0;
+        if (side < 2) { px = x0 + 2 + r() * (w - 4); pz = side === 0 ? z0 + sw / 2 + 0.05 : z1 - sw / 2 - 0.05; yaw = side === 0 ? Math.PI / 2 : -Math.PI / 2; }
+        else { pz = z0 + 2 + r() * (d - 4); px = side === 2 ? x0 + sw / 2 + 0.05 : x1 - sw / 2 - 0.05; yaw = side === 2 ? 0 : Math.PI; }
+        if (nearDoor(px, pz, 1.4)) continue;
+        for (const flip of [0, Math.PI]) {
+          const s = this.sign(text, px, y, pz, yaw + flip, sw, sh, hex(c), 'rgba(10,4,20,0.9)');
+          (s.material as THREE.MeshBasicMaterial).color.multiplyScalar(1.7);
+          s.position.add(new THREE.Vector3(Math.sin(yaw + flip) * 0.012, 0, Math.cos(yaw + flip) * 0.012));
+        }
+        const glowbar = new THREE.Mesh(new THREE.BoxGeometry(side < 2 ? 0.05 : sw, 0.04, side < 2 ? sw : 0.05), hot(c));
+        this.place(glowbar, px, y - sh / 2 - 0.02, pz);
+      }
+
+      // Big holographic adverts on the long walls of the tall rooms.
+      if (h >= 6 && area > 300) {
+        const n = area > 700 ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const ad = ADS[Math.floor(r() * ADS.length)];
+          const c1 = PAL[Math.floor(r() * PAL.length)], c2 = PAL[Math.floor(r() * PAL.length)];
+          const cv = document.createElement('canvas');
+          cv.width = 1024; cv.height = 512;
+          const x = cv.getContext('2d')!;
+          const g = x.createLinearGradient(0, 0, 1024, 512);
+          g.addColorStop(0, hex(c1)); g.addColorStop(1, hex(c2));
+          x.fillStyle = '#05030c'; x.fillRect(0, 0, 1024, 512);
+          x.fillStyle = g; x.globalAlpha = 0.28; x.fillRect(0, 0, 1024, 512); x.globalAlpha = 1;
+          x.strokeStyle = g; x.lineWidth = 10; x.strokeRect(14, 14, 996, 484);
+          x.fillStyle = g; x.textAlign = 'center'; x.textBaseline = 'middle';
+          x.font = '800 118px ui-sans-serif, Helvetica, Arial'; x.fillText(ad[0], 512, 210);
+          x.font = '500 46px ui-monospace, Menlo, monospace'; x.fillStyle = '#ffffff'; x.fillText(ad[1].toUpperCase(), 512, 330);
+          const tex = new THREE.CanvasTexture(cv);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          const uni = { time: { value: 0 }, map: { value: tex } };
+          const mat = new THREE.ShaderMaterial({
+            uniforms: uni, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: false,
+            vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+            fragmentShader: `uniform sampler2D map; uniform float time; varying vec2 vUv;
+              void main(){
+                float band = step(0.985, fract(sin(floor(time * 2.5) * 91.7 + floor(vUv.y * 12.0)) * 43758.5));
+                vec2 uv = vUv + vec2(band * 0.04, 0.0);
+                vec4 t = texture2D(map, uv);
+                float scan = 0.82 + 0.18 * sin(vUv.y * 260.0 + time * 7.0);
+                float flick = 0.92 + 0.08 * sin(time * 19.0 + vUv.x * 3.0);
+                gl_FragColor = vec4(t.rgb * scan * flick * 1.9, 0.92);
+              }`,
+          });
+          const bw = Math.min(9, w * 0.4), bh = bw * 0.5;
+          const mesh = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), mat);
+          const north = r() < 0.5;
+          const bx = x0 + w * (0.25 + 0.5 * (i + r() * 0.4) / n);
+          this.place(mesh, bx, Math.min(h - bh / 2 - 0.4, 4 + bh / 2), north ? z0 + 0.1 : z1 - 0.1, north ? 0 : Math.PI);
+          this.anims.push((tm) => { uni.time.value = tm; });
+        }
+      }
+
+      // Hanging cables across the room, a few sagging runs.
+      if (h >= 3.5 && (w > 8 || d > 8)) {
+        const runs = Math.min(7, Math.round(Math.max(w, d) / 6));
+        for (let i = 0; i < runs; i++) {
+          const along = w >= d;
+          const t0 = (along ? z0 : x0) + 1 + r() * ((along ? d : w) - 2);
+          const a = along ? new THREE.Vector3(x0 + 0.1, h - 0.25 - r() * 0.6, t0) : new THREE.Vector3(t0, h - 0.25 - r() * 0.6, z0 + 0.1);
+          const b = along ? new THREE.Vector3(x1 - 0.1, h - 0.25 - r() * 0.6, t0 + (r() - 0.5) * 3) : new THREE.Vector3(t0 + (r() - 0.5) * 3, h - 0.25 - r() * 0.6, z1 - 0.1);
+          const mid = a.clone().lerp(b, 0.5); mid.y -= 0.6 + r() * 1.1;
+          const q1 = a.clone().lerp(mid, 0.5); q1.y -= 0.15;
+          const q2 = mid.clone().lerp(b, 0.5); q2.y -= 0.15;
+          const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, q1, mid, q2, b]), 24, 0.028 + r() * 0.02, 5), this.flat(0x0a0a10, { roughness: 0.5 }));
+          tube.castShadow = false;
+          this.scene.add(tube);
+        }
+      }
+
+      // Market stalls with a vendor each, against the walls of the busy rooms.
+      if (area >= 140 && !/bay|dock|hydro|workshop/i.test(room.name)) {
+        const n = Math.min(7, Math.round(area / 110));
+        for (let i = 0, tries = 0; i < n && tries < 60; tries++) {
+          const side = Math.floor(r() * 4);
+          let x = 0, z = 0, yaw = 0;
+          if (side < 2) { x = x0 + 3 + r() * (w - 6); z = side === 0 ? z0 + 1.7 : z1 - 1.7; yaw = side === 0 ? 0 : Math.PI; }
+          else { z = z0 + 3 + r() * (d - 6); x = side === 2 ? x0 + 1.7 : x1 - 1.7; yaw = side === 2 ? Math.PI / 2 : -Math.PI / 2; }
+          if (nearDoor(x, z, 3.2) || !this.free(x, z) || !this.free(x + Math.sin(yaw) * 1.6, z + Math.cos(yaw) * 1.6)) continue;
+          this.stall(x, z, yaw, PAL[Math.floor(r() * PAL.length)], NAMES[Math.floor(r() * NAMES.length)], h);
+          i++;
+        }
+        this.crowd(x0 + 1.5, z0 + 1.5, x1 - 1.5, z1 - 1.5, Math.round(area / 50), false);
+      } else if (area >= 140) {
+        this.crowd(x0 + 1.5, z0 + 1.5, x1 - 1.5, z1 - 1.5, Math.round(area / 110), true);
+      }
+    });
+  }
+
+  /** A neon-lit stall: counter, shelves, a canopy, a sign and someone behind it. */
+  stall(x: number, z: number, yaw: number, c: number, name: string[], h: number) {
+    const c0 = Math.cos(yaw), s0 = Math.sin(yaw);
+    const at = (lx: number, lz: number): [number, number] => [x + lx * c0 + lz * s0, z - lx * s0 + lz * c0];
+    const hexs = '#' + c.toString(16).padStart(6, '0');
+    const [bx, bz] = at(0, 0);
+    this.box(2.4, 1.0, 0.7, 0x16181f, bx, bz, { yaw });
+    const [sx, sz] = at(0, -1.3);
+    this.box(2.4, 2.3, 0.3, 0x0e0f14, sx, sz, { yaw });
+    for (const y of [0.7, 1.2, 1.7]) {
+      const [lx, lz] = at(0, -1.14);
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.035, 0.035), (() => { const m = new THREE.MeshBasicMaterial({ color: c }); m.color.multiplyScalar(2); return m; })());
+      this.place(strip, lx, y + 0.4, lz, yaw);
+    }
+    const [ax, az] = at(0, 0.15);
+    const canopy = this.box(2.8, 0.06, 1.6, 0x1c1224, ax, az, { y: 2.45, yaw, solid: false });
+    canopy.rotation.x = 0.12;
+    const [gx, gz] = at(0, 0.96);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.05, 0.05), (() => { const m = new THREE.MeshBasicMaterial({ color: c }); m.color.multiplyScalar(2.2); return m; })());
+    this.place(edge, gx, 2.4, gz, yaw);
+    const [nx, nz] = at(0, 0.97);
+    const sign = this.sign(name, nx, Math.min(h - 0.4, 2.85), nz, yaw, 2.0, 0.5, hexs, 'rgba(10,4,20,0.9)');
+    (sign.material as THREE.MeshBasicMaterial).color.multiplyScalar(1.7);
+    const [px, pz] = at(0, -0.8);
+    this.person(px, pz, yaw, this.r() < 0.5, false);
+    this.blocks.pop();
   }
 
   /** Your own ship on the pad, with the way back aboard. */
@@ -533,6 +727,7 @@ class Kit {
   }
 
   done(spawn: Place): Interior {
+    this.neon();
     // A place in the middle of a room may be under a parked ship or a table: nudge it to open floor.
     // It also wants elbow room, so you do not arrive nose to nose with someone.
     const roomy = (x: number, z: number) => {
