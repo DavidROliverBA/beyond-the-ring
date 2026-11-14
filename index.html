@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond the Ring</title>
+<style>
+  :root { --cyan: #8fdcff; --amber: #ffb866; --dim: #6f8799; --panel: rgba(6, 14, 24, 0.72); --line: rgba(143, 220, 255, 0.22); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #d6e6f2;
+    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud, #labels { position: fixed; inset: 0; pointer-events: none; }
+  body:not(.started) #hud, body:not(.started) #labels { visibility: hidden; }
+
+  .label, #aim-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 11px; color: var(--cyan);
+    letter-spacing: 0.04em; text-shadow: 0 0 4px #000, 0 0 2px #000; pointer-events: auto; cursor: pointer; opacity: 0.8; }
+  .label i { position: absolute; left: -9px; top: 13px; width: 6px; height: 6px; border: 1px solid currentColor; border-radius: 50%; }
+  .label.big i { display: none; }
+  .label.moon, .label.asteroid { color: #9fb3c2; font-size: 10px; }
+  .label.station, .label.artifact { color: #c9b8ff; }
+  .label.gate, #aim-label { color: var(--amber); }
+  .label.star { color: #ffe9a8; }
+  .label.ship, .nav-item.ship { color: #9fe8c0; }
+  body.walking #labels, body.walking #flight, body.walking .fly-only { display: none; }
+  body:not(.walking) .walk-only { display: none; }
+  #flash.dark { background: #000; }
+  .label.aim, .label.target { opacity: 1; font-weight: 700; }
+  .label.target span { border-bottom: 1px solid currentColor; }
+  .label:hover { opacity: 1; }
+  #aim-label { pointer-events: none; display: none; }
+
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px; border: 1px solid rgba(143, 220, 255, 0.45); border-radius: 50%; }
+  #crosshair::after { content: ""; position: absolute; left: 50%; top: 50%; width: 2px; height: 2px; margin: -1px; background: var(--cyan); }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; backdrop-filter: blur(6px); }
+  #loc { position: absolute; left: 16px; top: 14px; padding: 10px 14px; }
+  #loc-name { font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; }
+  #loc-sub, #loc-near { color: var(--dim); font-size: 11px; }
+
+  #flight { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 10px 18px; min-width: 300px; text-align: center; }
+  #speed { font-size: 22px; color: #fff; letter-spacing: 0.06em; }
+  #throttle { height: 4px; margin: 7px 0 6px; background: rgba(143, 220, 255, 0.15); border-radius: 2px; overflow: hidden; }
+  #throttle-fill { height: 100%; width: 0; background: var(--cyan); }
+  #throttle-fill.reverse { background: var(--amber); }
+  #mode { font-size: 11px; letter-spacing: 0.12em; color: var(--dim); }
+  #mode.auto { color: var(--amber); }
+  #hint { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); color: var(--cyan); font-size: 12px;
+    text-shadow: 0 0 6px #000; white-space: nowrap; }
+
+  #card { position: absolute; right: 16px; top: 14px; width: 300px; padding: 12px 14px; display: none; }
+  #card-name { font-size: 16px; color: #fff; letter-spacing: 0.08em; }
+  #card-sub { color: var(--amber); font-size: 11px; margin-bottom: 8px; }
+  #card-desc { color: #c3d3df; font: 13px/1.5 -apple-system, "Helvetica Neue", sans-serif; }
+  #card-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 11px; color: var(--dim); }
+  #card-dist { color: var(--cyan); white-space: nowrap; }
+
+  #nav { position: absolute; left: 16px; top: 96px; bottom: 96px; width: 216px; padding: 10px 8px; display: none; flex-direction: column; pointer-events: auto; }
+  body.nav-open #nav { display: flex; }
+  #nav h2 { margin: 0 6px 8px; font-size: 11px; font-weight: 400; letter-spacing: 0.16em; color: var(--dim); }
+  #nav-list { overflow-y: auto; flex: 1; }
+  .nav-item { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 3px; padding: 4px 8px;
+    color: var(--cyan); font: inherit; cursor: pointer; }
+  .nav-item.indent { padding-left: 22px; color: #9fb3c2; font-size: 12px; }
+  .nav-item.gate { color: var(--amber); }
+  .nav-item.station, .nav-item.artifact { color: #c9b8ff; }
+  .nav-item:hover { background: rgba(143, 220, 255, 0.14); color: #fff; }
+  #nav-any { border-top: 1px solid var(--line); margin-top: 8px; padding: 10px 6px 2px; font-size: 11px; color: var(--dim); }
+  #nav-any div { display: flex; gap: 6px; margin-top: 6px; }
+  #nav-any input { width: 70px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--line); border-radius: 3px; color: #fff; font: inherit; padding: 3px 6px; }
+  #nav-any button, #launch { background: rgba(143, 220, 255, 0.12); border: 1px solid var(--line); border-radius: 3px; color: var(--cyan); font: inherit; padding: 3px 9px; cursor: pointer; }
+  #nav-any button:hover, #launch:hover:not([disabled]) { background: rgba(143, 220, 255, 0.28); color: #fff; }
+
+  #keys { position: absolute; right: 16px; bottom: 18px; padding: 10px 14px; font-size: 11px; color: var(--dim); display: none; }
+  body.help-open #keys { display: block; }
+  #keys b { color: var(--cyan); font-weight: 400; display: inline-block; min-width: 92px; }
+  #keys-tip { position: absolute; right: 16px; bottom: 18px; font-size: 11px; color: var(--dim); }
+  body.help-open #keys-tip { display: none; }
+
+  #banner { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); text-align: center; max-width: 560px; opacity: 0; transition: opacity 1.2s; }
+  #banner.show { opacity: 1; }
+  #banner-title { font-size: 30px; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; text-shadow: 0 0 18px rgba(143, 220, 255, 0.7); }
+  #banner-text { margin-top: 10px; color: #c3d3df; font: 14px/1.5 -apple-system, "Helvetica Neue", sans-serif; text-shadow: 0 0 6px #000; }
+
+  #flash { position: fixed; inset: 0; background: radial-gradient(circle, #fff 0%, #bfe4ff 45%, #2f6fd0 100%); opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+  #flash.on { opacity: 1; }
+  #loading { position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%); color: #0a2a4a; font-size: 12px; letter-spacing: 0.1em; pointer-events: none; }
+  body:not(.started) #loading { color: var(--dim); bottom: 14%; }
+
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 2, 8, 0.55); }
+  body.started #start { display: none; }
+  #start-box { width: min(560px, 90vw); padding: 28px 32px; text-align: center; }
+  #start h1 { margin: 0; font-size: 30px; font-weight: 400; letter-spacing: 0.34em; color: #fff; text-transform: uppercase; }
+  #start p { color: #c3d3df; font: 14px/1.55 -apple-system, "Helvetica Neue", sans-serif; }
+  #start dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; text-align: left; margin: 18px auto; width: fit-content; font-size: 12px; }
+  #start dt { color: var(--cyan); }
+  #start dd { margin: 0; color: #a9bccb; }
+  #launch { font-size: 15px; letter-spacing: 0.2em; padding: 9px 30px; text-transform: uppercase; }
+  #launch[disabled] { opacity: 0.5; cursor: default; }
+  #start small { display: block; margin-top: 16px; color: var(--dim); font-size: 10px; }
+</style>
+</head>
+<body class="nav-open">
+<canvas id="view"></canvas>
+<div id="labels"><div id="aim-label"></div></div>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="loc" class="panel"><div id="loc-name"></div><div id="loc-sub"></div><div id="loc-near"></div></div>
+
+  <div id="nav" class="panel">
+    <h2 id="nav-title">DESTINATIONS</h2>
+    <div id="nav-list"></div>
+    <div id="nav-any">
+      Any of the 1,373 gates
+      <div><input id="gate-num" type="number" min="0" max="1372" placeholder="0–1372"><button id="gate-go">Go</button><button id="gate-random">Random</button></div>
+    </div>
+  </div>
+
+  <div id="card" class="panel">
+    <div id="card-name"></div><div id="card-sub"></div><div id="card-desc"></div>
+    <div id="card-foot"><span id="card-key"></span><span id="card-dist"></span></div>
+  </div>
+
+  <div id="banner"><div id="banner-title"></div><div id="banner-text"></div></div>
+  <div id="hint"></div>
+  <div id="flight" class="panel">
+    <div id="speed">0.00 c</div>
+    <div id="throttle"><div id="throttle-fill"></div></div>
+    <div id="mode">MANUAL</div>
+  </div>
+
+  <div id="keys-tip">H — keys</div>
+  <div id="keys" class="panel">
+    <div class="walk-only"><b>Mouse</b>look around</div>
+    <div class="walk-only"><b>W A S D</b>walk</div>
+    <div class="walk-only"><b>Shift</b>run</div>
+    <div class="walk-only"><b>E</b>board your ship</div>
+    <div class="walk-only"><b>Tab</b>jump to a place</div>
+    <div class="walk-only"><b>Esc</b>free the mouse</div>
+    <div class="fly-only"><b>L</b>dock at a station and go aboard</div>
+    <div class="fly-only"><b>Mouse</b>steer (click the view first)</div>
+    <div class="fly-only"><b>W / S</b>throttle up / down</div>
+    <div class="fly-only"><b>X</b>cut throttle</div>
+    <div class="fly-only"><b>A D / arrows</b>turn</div>
+    <div class="fly-only"><b>Q / E</b>roll</div>
+    <div class="fly-only"><b>F</b>fly to what you are pointing at</div>
+    <div class="fly-only"><b>G</b>fly to the nearest ring</div>
+    <div class="fly-only"><b>Tab</b>destinations</div>
+    <div class="fly-only"><b>Right mouse</b>hold to look around</div>
+    <div class="fly-only"><b>V</b>cockpit / chase view</div>
+    <div class="fly-only"><b>O</b>orbit lines</div>
+    <div class="fly-only"><b>Esc</b>free the mouse</div>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="loading"></div>
+
+<div id="start">
+  <div id="start-box" class="panel">
+    <h1>Beyond the Ring</h1>
+    <p>Sol, the ring space and every system behind its 1,373 gates. Your ship crosses the solar system in under a minute and slows by itself when there is something worth seeing.</p>
+    <dl>
+      <dt>Mouse</dt><dd>steer</dd>
+      <dt>W / S</dt><dd>throttle</dd>
+      <dt>F</dt><dd>fly to whatever is under the crosshair</dd>
+      <dt>Tab</dt><dd>destination list — click a name and the ship takes you</dd>
+      <dt>L</dt><dd>dock at Tycho, Ceres, Ganymede or Medina and walk around</dd>
+      <dt>The Ring</dt><dd>fly through the middle to jump</dd>
+    </dl>
+    <button id="launch" disabled>Charting…</button>
+    <small>An unofficial, non-commercial fan project inspired by The Expanse, the creation of James S. A. Corey. Not affiliated with or endorsed by the authors, their publishers or the makers of the television series. Distances are to scale; planets and ships are drawn far larger than life, and ships from across the story are all on show at once.</small>
+    <small>Planet maps: Solar System Scope (CC BY 4.0) and NASA/JPL/USGS. Ganymede and Callisto: Askaniy Anpilogov and others (CC BY-SA 3.0). Moon relief: NASA SVS. Surfaces: ambientCG (CC0).</small>
+  </div>
+</div>
+
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

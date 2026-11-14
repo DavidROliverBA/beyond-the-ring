@@ -1,0 +1,1107 @@
+// Places you can walk around: a small kit of rooms, doors, props and people,
+// and the four interiors built from it. Units are metres.
+
+import * as THREE from 'three';
+import { Noise, rng } from './textures';
+import { buildModel, glowSprite, playerShip } from './ships';
+import { scan, type ScanName } from './materials';
+import { PHOTOS } from './photos';
+
+export interface Point { x: number; z: number; r: number; title: string; text: string; kind: 'info' | 'exit' }
+export interface Place { name: string; x: number; z: number; yaw: number }
+export interface Interior {
+  id: string;
+  name: string;
+  blurb: string;
+  scene: THREE.Scene;
+  spawn: Place;
+  places: Place[];
+  points: Point[];
+  /** Set when the floor is the inside of a spinning drum of this radius. */
+  curveR?: number;
+  free(x: number, z: number): boolean;
+  roomAt(x: number, z: number): string;
+  tick(t: number, dt: number, cam: THREE.Vector3): void;
+}
+
+// --------------------------------------------------------------- surfaces
+
+type Surf = 'panel' | 'white' | 'deck' | 'rock' | 'grime' | 'tile' | 'dark' | 'soil' | 'fields' | 'regolith';
+const TILE: Record<Surf, number> = { panel: 6, white: 6, deck: 1.8, rock: 5, grime: 4, tile: 3, dark: 4, soil: 3, fields: 1, regolith: 14 };
+/** Scanned surface behind each kind: how much to brighten it, how metallic it is, and its v-repeat. */
+const SCANS: Partial<Record<Surf, { scan: ScanName; gain: number; metal: number; ry?: number; rough?: number }>> = {
+  panel: { scan: 'plates', gain: 1.5, metal: 0.3, rough: 2 },
+  white: { scan: 'plates', gain: 2.4, metal: 0.1, rough: 2.2 },
+  deck: { scan: 'walkway', gain: 1.7, metal: 0.35, rough: 1.6 },
+  dark: { scan: 'darkmetal', gain: 1.2, metal: 0.25, rough: 1.5 },
+  rock: { scan: 'rock', gain: 1.35, metal: 0 },
+  grime: { scan: 'concrete', gain: 1.2, metal: 0 },
+  tile: { scan: 'slab', gain: 0.38, metal: 0, ry: 2 },
+  soil: { scan: 'dirt', gain: 0.55, metal: 0 },
+  regolith: { scan: 'rock', gain: 1.25, metal: 0 },
+};
+const surfCache = new Map<Surf, THREE.Texture>();
+
+function surf(kind: Surf): THREE.Texture {
+  const hit = surfCache.get(kind);
+  if (hit) return hit;
+  const S = kind === 'fields' ? 1024 : 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const x = c.getContext('2d')!;
+  const r = rng(kind.length * 97 + kind.charCodeAt(0));
+  const speckle = (n: number, a: number) => {
+    for (let i = 0; i < n; i++) {
+      x.fillStyle = r() < 0.5 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a * 0.7})`;
+      x.fillRect(r() * S, r() * S, 1 + r() * 2, 1 + r() * 2);
+    }
+  };
+  const grid = (step: number, style: string, lw = 2) => {
+    x.strokeStyle = style;
+    x.lineWidth = lw;
+    for (let i = 0; i <= S; i += step) {
+      x.beginPath(); x.moveTo(i, 0); x.lineTo(i, S); x.stroke();
+      x.beginPath(); x.moveTo(0, i); x.lineTo(S, i); x.stroke();
+    }
+  };
+  const noiseFill = (cr: number, cg: number, cb: number, freq: number, seed: number) => {
+    const N = new Noise(seed);
+    const img = x.createImageData(S, S);
+    for (let j = 0; j < S; j++) {
+      for (let i = 0; i < S; i++) {
+        // Sample on a torus so the tile repeats without a seam.
+        const a = (i / S) * Math.PI * 2, b = (j / S) * Math.PI * 2;
+        const n = N.fbm(Math.cos(a) * freq, Math.sin(a) * freq + Math.cos(b) * freq, Math.sin(b) * freq, 5);
+        const k = 0.45 + n * 1.1, o = (j * S + i) * 4;
+        img.data[o] = cr * k; img.data[o + 1] = cg * k; img.data[o + 2] = cb * k; img.data[o + 3] = 255;
+      }
+    }
+    x.putImageData(img, 0, 0);
+  };
+  if (kind === 'panel' || kind === 'white') {
+    x.fillStyle = kind === 'panel' ? '#7b838a' : '#c6ccd1';
+    x.fillRect(0, 0, S, S);
+    speckle(1800, 0.05);
+    grid(128, 'rgba(0,0,0,0.38)', 3);
+    grid(128, 'rgba(255,255,255,0.12)', 1);
+    x.fillStyle = 'rgba(0,0,0,0.4)';
+    for (const [px, py] of [[10, 10], [118, 10], [10, 118], [118, 118], [138, 10], [246, 10], [138, 118], [246, 118], [10, 138], [118, 138], [10, 246], [118, 246], [138, 138], [246, 138], [138, 246], [246, 246]]) x.fillRect(px - 2, py - 2, 4, 4);
+    for (let i = 0; i < 14; i++) {
+      x.strokeStyle = `rgba(${r() < 0.5 ? 0 : 255},${r() < 0.5 ? 0 : 255},${r() < 0.5 ? 0 : 255},0.06)`;
+      x.lineWidth = 1;
+      x.beginPath(); x.moveTo(r() * S, r() * S); x.lineTo(r() * S, r() * S); x.stroke();
+    }
+    if (kind === 'white') { x.fillStyle = 'rgba(200,102,42,0.55)'; x.fillRect(0, 196, S, 10); }
+  } else if (kind === 'deck') {
+    x.fillStyle = '#31353a';
+    x.fillRect(0, 0, S, S);
+    x.strokeStyle = 'rgba(255,255,255,0.09)';
+    x.lineWidth = 3;
+    for (let j = 0; j < S; j += 16) {
+      for (let i = 0; i < S; i += 16) {
+        const flip = ((i + j) / 16) % 2 === 0;
+        x.beginPath(); x.moveTo(i + 3, j + (flip ? 3 : 13)); x.lineTo(i + 13, j + (flip ? 13 : 3)); x.stroke();
+      }
+    }
+    grid(128, 'rgba(0,0,0,0.5)', 4);
+    speckle(1500, 0.06);
+  } else if (kind === 'rock') {
+    noiseFill(128, 112, 98, 2.2, 5);
+    speckle(2500, 0.07);
+  } else if (kind === 'regolith') {
+    noiseFill(150, 146, 140, 3, 9);
+    speckle(4000, 0.08);
+  } else if (kind === 'grime') {
+    x.fillStyle = '#5d5b55';
+    x.fillRect(0, 0, S, S);
+    grid(128, 'rgba(0,0,0,0.4)', 3);
+    for (let i = 0; i < 18; i++) {
+      const gx = r() * S, gy = r() * S, gr = 10 + r() * 40;
+      const g = x.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      g.addColorStop(0, 'rgba(20,14,8,0.35)');
+      g.addColorStop(1, 'rgba(20,14,8,0)');
+      x.fillStyle = g;
+      x.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+    }
+    for (let i = 0; i < 20; i++) { x.fillStyle = 'rgba(120,60,20,0.12)'; x.fillRect(r() * S, r() * S, 2, 20 + r() * 60); }
+    speckle(2500, 0.07);
+  } else if (kind === 'tile') {
+    for (let j = 0; j < S; j += 64) {
+      for (let i = 0; i < S; i += 64) {
+        const v = 92 + Math.floor(r() * 26);
+        x.fillStyle = `rgb(${v + 6},${v + 2},${v - 6})`;
+        x.fillRect(i, j, 64, 64);
+      }
+    }
+    grid(64, 'rgba(0,0,0,0.45)', 2);
+    speckle(2200, 0.06);
+  } else if (kind === 'dark') {
+    x.fillStyle = '#343a41';
+    x.fillRect(0, 0, S, S);
+    for (let i = 0; i < 6; i++) {
+      const y = 12 + i * 42;
+      x.fillStyle = '#4a525b'; x.fillRect(0, y, S, 10);
+      x.fillStyle = 'rgba(255,255,255,0.08)'; x.fillRect(0, y, S, 2);
+    }
+    speckle(900, 0.05);
+  } else if (kind === 'soil') {
+    x.fillStyle = '#4a3828';
+    x.fillRect(0, 0, S, S);
+    for (let j = 0; j < S; j += 16) { x.fillStyle = 'rgba(0,0,0,0.22)'; x.fillRect(0, j, S, 5); }
+    speckle(4000, 0.09);
+  } else {
+    // A patchwork of fields, orchards, paths and ponds seen from across the drum.
+    x.fillStyle = '#4f7a3a';
+    x.fillRect(0, 0, S, S);
+    const crops = ['#6a9a3e', '#3f6a30', '#8aa84a', '#b8a84f', '#5a8a48', '#7a6a3a', '#9ab85a', '#456f3a'];
+    for (let j = 0; j < 8; j++) {
+      for (let i = 0; i < 8; i++) {
+        x.fillStyle = crops[Math.floor(r() * crops.length)];
+        x.fillRect(i * 128 + 5, j * 128 + 5, 118, 118);
+        x.fillStyle = 'rgba(0,0,0,0.08)';
+        const vertical = r() < 0.5;
+        for (let k = 8; k < 118; k += 7) vertical ? x.fillRect(i * 128 + 5 + k, j * 128 + 5, 2, 118) : x.fillRect(i * 128 + 5, j * 128 + 5 + k, 118, 2);
+        if (r() < 0.14) { x.fillStyle = '#3f7fa8'; x.beginPath(); x.ellipse(i * 128 + 64, j * 128 + 64, 34, 22, r() * 3, 0, 7); x.fill(); }
+      }
+    }
+    grid(128, '#b9b39a', 5);
+    speckle(9000, 0.05);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  surfCache.set(kind, t);
+  return t;
+}
+
+function plane(w: number, h: number, mat: THREE.Material, tile: number): THREE.Mesh {
+  const g = new THREE.PlaneGeometry(w, h);
+  const uv = g.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * w) / tile, (uv.getY(i) * h) / tile);
+  return new THREE.Mesh(g, mat);
+}
+
+function textTexture(lines: string[], color: string, bg: string, aspect: number, align: CanvasTextAlign = 'center'): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = Math.max(32, Math.round(512 / aspect));
+  const x = c.getContext('2d')!;
+  x.fillStyle = bg;
+  x.fillRect(0, 0, c.width, c.height);
+  let px = (c.height / lines.length) * 0.62;
+  const font = (p: number) => `600 ${p}px ui-monospace, Menlo, monospace`;
+  x.font = font(px);
+  const widest = Math.max(...lines.map((l) => x.measureText(l).width));
+  if (widest > c.width * 0.92) px *= (c.width * 0.92) / widest;
+  x.font = font(px);
+  x.fillStyle = color;
+  x.textAlign = align;
+  x.textBaseline = 'middle';
+  lines.forEach((l, i) => x.fillText(l, align === 'center' ? c.width / 2 : 16, ((i + 0.5) * c.height) / lines.length));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+// -------------------------------------------------------------------- kit
+
+type Side = 'n' | 's' | 'e' | 'w';
+interface Rect { x0: number; z0: number; x1: number; z1: number }
+interface Opening { side: Side; a: number; b: number; y0: number; y1: number; glass: boolean; label?: string }
+interface RoomOpts { floor: Surf; wall: Surf; ceil?: Surf; tint?: number; floorTint?: number; open?: boolean; glow?: number }
+interface Room extends Rect { name: string; h: number; o: RoomOpts; openings: Opening[] }
+interface PutOpts { y?: number; yaw?: number; solid?: boolean }
+
+const M = 0.35;
+
+class Kit {
+  scene = new THREE.Scene();
+  rooms: Room[] = [];
+  doors: Rect[] = [];
+  blocks: Rect[] = [];
+  points: Point[] = [];
+  places: Place[] = [];
+  anims: ((t: number, dt: number) => void)[] = [];
+  curveR?: number;
+  /** The light that throws shadows: which way it comes from, and how strong. It follows you about. */
+  keyFrom = new THREE.Vector3(0.22, 1, 0.14).normalize();
+  keyPower = 0.9;
+  keyColor = 0xffffff;
+  circle?: number;
+  bounds?: Rect;
+  stars?: THREE.Points;
+  private mats = new Map<string, THREE.MeshStandardMaterial>();
+  r = rng(1);
+
+  constructor(public id: string, public name: string, public blurb: string) {
+    this.r = rng(id.length * 131 + id.charCodeAt(0));
+  }
+
+  mat(kind: Surf, tint = 0xffffff): THREE.MeshStandardMaterial {
+    const key = `${kind}:${tint}`;
+    let m = this.mats.get(key);
+    if (!m) {
+      const sc = SCANS[kind];
+      if (sc) {
+        m = new THREE.MeshStandardMaterial({ ...scan(sc.scan, 1, sc.ry ?? 1), color: tint, roughness: sc.rough ?? 1, metalness: sc.metal });
+        m.color.multiplyScalar(sc.gain);
+        if (kind === 'soil') m.color.multiply(new THREE.Color(0xa08a78));
+      } else {
+        m = new THREE.MeshStandardMaterial({ map: surf(kind), color: tint, roughness: 0.82, metalness: 0.05 });
+      }
+      this.mats.set(key, m);
+    }
+    return m;
+  }
+
+  flat(color: number, o: THREE.MeshStandardMaterialParameters = {}): THREE.MeshStandardMaterial {
+    const key = `c:${color}:${JSON.stringify(o)}`;
+    let m = this.mats.get(key);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.15, ...o });
+      this.mats.set(key, m);
+    }
+    return m;
+  }
+
+  /** Put something on the floor at (x, z). In a drum this wraps the position round the hull. */
+  place<T extends THREE.Object3D>(obj: T, x: number, y: number, z: number, yaw = 0): T {
+    if (this.curveR) {
+      const R = this.curveR, th = x / R;
+      obj.position.set((R - y) * Math.sin(th), -(R - y) * Math.cos(th), z);
+      obj.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), th).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
+    } else {
+      obj.position.set(x, y, z);
+      obj.rotation.y = yaw;
+    }
+    this.scene.add(obj);
+    return obj;
+  }
+
+  room(name: string, x0: number, z0: number, x1: number, z1: number, h: number, o: RoomOpts, yaw = 0): Room {
+    const room: Room = { name, x0, z0, x1, z1, h, o, openings: [] };
+    this.rooms.push(room);
+    this.places.push({ name, x: (x0 + x1) / 2, z: (z0 + z1) / 2, yaw });
+    return room;
+  }
+
+  door(a: Room, b: Room, at: number, w = 2.6, h = 2.7) {
+    const lo = at - w / 2, hi = at + w / 2;
+    const mk = (room: Room, side: Side, label: string) => room.openings.push({ side, a: lo, b: hi, y0: 0, y1: h, glass: false, label });
+    if (a.x1 === b.x0 || b.x1 === a.x0) {
+      const [l, r] = a.x1 === b.x0 ? [a, b] : [b, a];
+      mk(l, 'e', r.name); mk(r, 'w', l.name);
+      this.doors.push({ x0: l.x1 - 0.6, x1: l.x1 + 0.6, z0: lo + M, z1: hi - M });
+    } else if (a.z1 === b.z0 || b.z1 === a.z0) {
+      const [n, s] = a.z1 === b.z0 ? [a, b] : [b, a];
+      mk(n, 's', s.name); mk(s, 'n', n.name);
+      this.doors.push({ x0: lo + M, x1: hi - M, z0: n.z1 - 0.6, z1: n.z1 + 0.6 });
+    } else {
+      throw new Error(`${a.name} and ${b.name} do not share a wall`);
+    }
+  }
+
+  window(room: Room, side: Side, a: number, b: number, y0: number, y1: number) {
+    room.openings.push({ side, a, b, y0, y1, glass: true });
+  }
+
+  private wallPiece(room: Room, side: Side, a: number, b: number, y0: number, y1: number, mat: THREE.Material, tile: number) {
+    if (b - a < 0.01 || y1 - y0 < 0.01) return;
+    const m = plane(b - a, y1 - y0, mat, tile);
+    const mid = (a + b) / 2, y = (y0 + y1) / 2;
+    if (side === 'n') m.position.set(mid, y, room.z0);
+    else if (side === 's') { m.position.set(mid, y, room.z1); m.rotation.y = Math.PI; }
+    else if (side === 'w') { m.position.set(room.x0, y, mid); m.rotation.y = Math.PI / 2; }
+    else { m.position.set(room.x1, y, mid); m.rotation.y = -Math.PI / 2; }
+    this.scene.add(m);
+  }
+
+  /** Turn the declared rooms into geometry. Call after every door and window is declared. */
+  finish() {
+    const glass = new THREE.MeshStandardMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.1, roughness: 0.05, metalness: 0.6, depthWrite: false });
+    for (const room of this.rooms) {
+      const { x0, z0, x1, z1, h, o } = room;
+      const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      const floor = plane(w, d, this.mat(o.floor, o.floorTint ?? o.tint), TILE[o.floor]);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(cx, 0, cz);
+      this.scene.add(floor);
+      if (!o.open) {
+        const ck = o.ceil ?? 'dark';
+        const ceil = plane(w, d, this.mat(ck, o.tint), TILE[ck]);
+        ceil.rotation.x = Math.PI / 2;
+        ceil.position.set(cx, h, cz);
+        this.scene.add(ceil);
+      }
+      const wm = this.mat(o.wall, o.tint), tile = TILE[o.wall];
+      for (const side of ['n', 's', 'e', 'w'] as Side[]) {
+        const [lo, hi] = side === 'n' || side === 's' ? [x0, x1] : [z0, z1];
+        const ops = room.openings.filter((q) => q.side === side).sort((p, q) => p.a - q.a);
+        let at = lo;
+        for (const q of ops) {
+          this.wallPiece(room, side, at, q.a, 0, h, wm, tile);
+          this.wallPiece(room, side, q.a, q.b, 0, q.y0, wm, tile);
+          this.wallPiece(room, side, q.a, q.b, q.y1, h, wm, tile);
+          if (q.glass) this.wallPiece(room, side, q.a, q.b, q.y0, q.y1, glass, 1);
+          if (q.label) {
+            const mid = (q.a + q.b) / 2, y = Math.min(h - 0.25, q.y1 + 0.3), e = 0.05;
+            const [sx, sz, yaw] = side === 'n' ? [mid, z0 + e, 0] : side === 's' ? [mid, z1 - e, Math.PI] : side === 'w' ? [x0 + e, mid, Math.PI / 2] : [x1 - e, mid, -Math.PI / 2];
+            this.sign(q.label.toUpperCase(), sx, y, sz, yaw, Math.min(q.b - q.a, 3.2), 0.32, '#ffd9a0', 'rgba(10,12,16,0.85)');
+          }
+          at = q.b;
+        }
+        this.wallPiece(room, side, at, hi, 0, h, wm, tile);
+      }
+      if (o.glow !== undefined) {
+        // Light strips along the ceiling.
+        const n = Math.max(1, Math.round(d / 9));
+        for (let i = 0; i < n; i++) this.strip(cx, h - 0.06, z0 + ((i + 0.5) * d) / n, Math.min(w * 0.5, 6), 0.35, o.glow);
+      }
+    }
+  }
+
+  free(x: number, z: number): boolean {
+    if (this.curveR) {
+      const C = Math.PI * 2 * this.curveR;
+      x = ((((x + C / 2) % C) + C) % C) - C / 2;
+      if (!this.bounds || z < this.bounds.z0 || z > this.bounds.z1) return false;
+    } else if (this.circle) {
+      if (x * x + z * z > this.circle * this.circle) return false;
+    } else {
+      let ok = false;
+      for (const r of this.rooms) if (x > r.x0 + M && x < r.x1 - M && z > r.z0 + M && z < r.z1 - M) { ok = true; break; }
+      if (!ok) for (const r of this.doors) if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) { ok = true; break; }
+      if (!ok) return false;
+    }
+    for (const b of this.blocks) if (x > b.x0 - 0.3 && x < b.x1 + 0.3 && z > b.z0 - 0.3 && z < b.z1 + 0.3) return false;
+    return true;
+  }
+
+  roomAt(x: number, z: number): string {
+    for (const r of this.rooms) if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return r.name;
+    return this.name;
+  }
+
+  block(x: number, z: number, w: number, d: number) {
+    this.blocks.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 });
+  }
+
+  box(w: number, h: number, d: number, mat: THREE.Material | number, x: number, z: number, o: PutOpts = {}): THREE.Mesh {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof mat === 'number' ? this.flat(mat) : mat);
+    m.castShadow = true;
+    this.place(m, x, (o.y ?? 0) + h / 2, z, o.yaw ?? 0);
+    if (o.solid !== false && (o.y ?? 0) < 1.9) {
+      const turned = Math.abs(Math.sin(o.yaw ?? 0)) > 0.7;
+      this.block(x, z, turned ? d : w, turned ? w : d);
+    }
+    return m;
+  }
+
+  cyl(r: number, h: number, mat: THREE.Material | number, x: number, z: number, o: PutOpts = {}, r2 = r): THREE.Mesh {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r, h, 16), typeof mat === 'number' ? this.flat(mat) : mat);
+    m.castShadow = true;
+    this.place(m, x, (o.y ?? 0) + h / 2, z, o.yaw ?? 0);
+    if (o.solid !== false && (o.y ?? 0) < 1.9) this.block(x, z, r * 2, r * 2);
+    return m;
+  }
+
+  sign(text: string | string[], x: number, y: number, z: number, yaw: number, w: number, h: number, color = '#8fdcff', bg = 'rgba(0,0,0,0)') {
+    const lines = Array.isArray(text) ? text : [text];
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: textTexture(lines, color, bg, w / h), transparent: true }));
+    return this.place(m, x, y, z, yaw);
+  }
+
+  /** A real light. Use sparingly; `strip` is free. */
+  lamp(x: number, y: number, z: number, color: number, power: number, reach: number) {
+    const l = new THREE.PointLight(color, power * 0.6, reach, 1.6);
+    this.place(l, x, y, z);
+    this.strip(x, y + 0.12, z, 0.5, 0.5, color);
+  }
+
+  strip(x: number, y: number, z: number, w: number, d: number, color: number) {
+    const mat = new THREE.MeshBasicMaterial({ color });
+    mat.color.multiplyScalar(1.7);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), mat);
+    this.place(m, x, y, z);
+  }
+
+  crates(x: number, z: number, n: number) {
+    const cols = [0x8a5a3a, 0x4a6a7a, 0x7a7468, 0xb08a2e, 0x55634a];
+    for (let i = 0; i < n; i++) {
+      const s = 1 + this.r() * 0.8, ox = (this.r() - 0.5) * 3.5, oz = (this.r() - 0.5) * 3.5;
+      this.box(s * 1.2, s, s, cols[Math.floor(this.r() * cols.length)], x + ox, z + oz, { yaw: this.r() < 0.5 ? 0 : Math.PI / 2 });
+      if (this.r() < 0.4) this.box(s, s * 0.8, s * 0.8, cols[Math.floor(this.r() * cols.length)], x + ox, z + oz, { y: s, solid: false });
+    }
+  }
+
+  table(x: number, z: number, seats = 3) {
+    this.cyl(0.08, 0.95, 0x2d3238, x, z, { solid: false });
+    this.cyl(0.55, 0.06, 0x3a3f46, x, z, { y: 0.95 });
+    for (let i = 0; i < seats; i++) {
+      const a = (i / seats) * Math.PI * 2 + this.r();
+      this.cyl(0.2, 0.6, 0x55504a, x + Math.cos(a) * 1.0, z + Math.sin(a) * 1.0, { solid: false });
+    }
+  }
+
+  console(x: number, z: number, yaw: number, lines: string[], color = '#7fe0ff') {
+    this.box(1.6, 0.9, 0.7, 0x2a2f36, x, z, { yaw });
+    const sx = Math.sin(yaw) * 0.2, sz = Math.cos(yaw) * 0.2;
+    const s = this.sign(lines, x + sx, 1.45, z + sz, yaw, 1.5, 0.85, color, 'rgba(4,14,22,0.92)');
+    s.rotation.x = this.curveR ? 0 : -0.25;
+  }
+
+  person(x: number, z: number, yaw = this.r() * 6.28, belter = false) {
+    const g = new THREE.Group();
+    const cloth = [0x4a5a6a, 0x6a4a3a, 0x3a4a3a, 0x5a5a62, 0x7a6a4a, 0x2f3a4a, 0x6a3a3a, 0x8a8478][Math.floor(this.r() * 8)];
+    const skin = [0xc99a7a, 0x8a5a3a, 0xe0b898, 0x6a452c, 0xb5825a][Math.floor(this.r() * 5)];
+    const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.62, 3, 8), this.flat(0x25282d));
+    legs.position.y = 0.48;
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.42, 3, 8), this.flat(cloth));
+    torso.position.y = 1.18;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), this.flat(skin));
+    head.position.y = 1.64;
+    g.add(legs, torso, head);
+    for (const s of [1, -1]) {
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.5, 2, 6), this.flat(cloth));
+      arm.position.set(s * 0.27, 1.12, 0);
+      g.add(arm);
+    }
+    if (belter) g.scale.set(0.88, 1.15, 0.88);
+    this.place(g, x, 0, z, yaw);
+    this.block(x, z, 0.3, 0.3);
+    const phase = this.r() * 6;
+    this.anims.push((t) => { torso.rotation.z = Math.sin(t * 0.8 + phase) * 0.03; head.rotation.y = Math.sin(t * 0.37 + phase) * 0.5; });
+  }
+
+  crowd(x0: number, z0: number, x1: number, z1: number, n: number, belter = true) {
+    for (let i = 0, tries = 0; i < n && tries < n * 20; tries++) {
+      const x = x0 + this.r() * (x1 - x0), z = z0 + this.r() * (z1 - z0);
+      if (!this.free(x, z)) continue;
+      this.person(x, z, undefined, belter && this.r() < 0.8);
+      i++;
+    }
+  }
+
+  /** A reading post. Walk up to it and its text appears. */
+  placard(x: number, z: number, yaw: number, title: string, text: string) {
+    this.box(0.5, 1.05, 0.25, 0x20252b, x, z, { yaw });
+    const s = this.sign(['◆ ' + title.toUpperCase()], x + Math.sin(yaw) * 0.14, 1.25, z + Math.cos(yaw) * 0.14, yaw, 0.9, 0.3, '#8fdcff', 'rgba(4,18,28,0.95)');
+    void s;
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.12), new THREE.MeshBasicMaterial({ color: 0x8fdcff }));
+    this.place(gem, x, 1.75, z);
+    this.anims.push((t) => { gem.rotateY(0.03); gem.scale.setScalar(1 + Math.sin(t * 3) * 0.12); });
+    this.points.push({ x, z, r: 3.2, title, text, kind: 'info' });
+  }
+
+  /** Your own ship on the pad, with the way back aboard. */
+  parkShip(x: number, z: number, yaw: number) {
+    const S = 15;
+    const { group, plume } = playerShip();
+    plume.visible = false;
+    group.scale.setScalar(S);
+    this.place(group, x, 3.5, z, yaw);
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    const at = (lx: number, lz: number): [number, number] => [x + lx * c + lz * s, z - lx * s + lz * c];
+    for (const [lx, lz] of [[0, -8], [3.4, 6], [-3.4, 6]]) {
+      const [px, pz] = at(lx, lz);
+      this.cyl(0.16, 2.3, 0x2d3238, px, pz, { solid: false });
+      this.cyl(0.5, 0.1, 0x2d3238, px, pz, { solid: false });
+    }
+    this.block(x, z, 5, 22);
+    const [rx, rz] = at(0, 12.5);
+    const ramp = this.box(2, 0.12, 5, 0x3a3f46, rx, rz, { y: 0.9, yaw, solid: false });
+    ramp.rotation.x = this.curveR ? 0 : 0.36;
+    const [ex, ez] = at(0, 15.5);
+    this.strip(ex, 0.03, ez, 2.4, 2.4, 0x2f6f4f);
+    this.points.push({ x: ex, z: ez, r: 3, title: 'Your ship', text: 'Fuelled, cleared and waiting. Press E to board and undock.', kind: 'exit' });
+    return at;
+  }
+
+  starfield(n = 2200) {
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const y = this.r() * 2 - 1, a = this.r() * 6.283, q = Math.sqrt(1 - y * y);
+      pos.set([q * Math.cos(a) * 5000, y * 5000, q * Math.sin(a) * 5000], i * 3);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: false, fog: false }));
+    this.stars.frustumCulled = false;
+    this.scene.add(this.stars);
+  }
+
+  done(spawn: Place): Interior {
+    // A place in the middle of a room may be under a parked ship or a table: nudge it to open floor.
+    // It also wants elbow room, so you do not arrive nose to nose with someone.
+    const roomy = (x: number, z: number) => {
+      if (!this.free(x, z)) return false;
+      for (let i = 0; i < 8; i++) if (!this.free(x + Math.cos(i * 0.785) * 2.4, z + Math.sin(i * 0.785) * 2.4)) return false;
+      return true;
+    };
+    for (const pl of this.places) {
+      let ok = roomy(pl.x, pl.z), fallback: [number, number] | null = null;
+      for (let i = 0; i < 400 && !ok; i++) {
+        const a = i * 2.4, d = 0.5 + i * 0.08;
+        const x = pl.x + Math.cos(a) * d, z = pl.z + Math.sin(a) * d;
+        if (roomy(x, z)) { pl.x = x; pl.z = z; ok = true; } else if (!fallback && this.free(x, z)) fallback = [x, z];
+      }
+      if (!ok && !this.free(pl.x, pl.z) && fallback) [pl.x, pl.z] = fallback;
+    }
+    // Shadows: everything solid receives them; props, people and plants cast them.
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !(m.material instanceof THREE.MeshStandardMaterial)) return;
+      const mat = m.material;
+      if (mat.transparent || mat.wireframe) { m.castShadow = false; return; }
+      m.receiveShadow = true;
+      const shell = m.geometry.type === 'PlaneGeometry' || m.geometry.type === 'CircleGeometry' || mat.side === THREE.BackSide;
+      if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+      const size = m.geometry.boundingSphere!.radius * Math.max(m.scale.x, m.scale.y, m.scale.z);
+      m.castShadow = !shell && size < 40;
+    });
+    const key = new THREE.DirectionalLight(this.keyColor, this.keyPower);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    const E = 46;
+    Object.assign(key.shadow.camera, { left: -E, right: E, top: E, bottom: -E, near: 1, far: 220 });
+    key.shadow.bias = -0.0004;
+    key.shadow.normalBias = 0.05;
+    this.scene.add(key, key.target);
+    const up = new THREE.Vector3();
+    return {
+      id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR,
+      free: (x, z) => this.free(x, z),
+      roomAt: (x, z) => this.roomAt(x, z),
+      tick: (t, dt, cam) => {
+        for (const a of this.anims) a(t, dt);
+        this.stars?.position.copy(cam);
+        if (this.curveR) {
+          // In the drum the light comes from the axis, straight overhead wherever you stand.
+          up.set(-cam.x, -cam.y, 0).normalize();
+          key.target.position.copy(cam).addScaledVector(up, -1.7);
+          key.position.copy(key.target.position).addScaledVector(up, 110);
+        } else {
+          key.target.position.set(cam.x, 0, cam.z);
+          key.position.copy(key.target.position).addScaledVector(this.keyFrom, 110);
+        }
+      },
+    };
+  }
+}
+
+// ------------------------------------------------------------------ Tycho
+
+function tycho(): Interior {
+  const k = new Kit('tycho', 'Tycho Station', 'Shipyard to the Belt. Clean corridors, careful engineers, and a view of whatever is being built next.');
+  k.scene.background = new THREE.Color(0x000004);
+  k.scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x3a3f46, 0.5));
+  k.starfield();
+
+  const bay = k.room('Docking bay 7', -22, 0, 22, 52, 14, { floor: 'deck', wall: 'panel', glow: 0xfff2d8 }, Math.PI);
+  const cor = k.room('Ring corridor', -3, 52, 3, 96, 3.6, { floor: 'white', wall: 'white', ceil: 'white', glow: 0xf2f8ff });
+  const bar = k.room('Blauwe Blome', 3, 56, 25, 74, 4, { floor: 'tile', wall: 'panel', tint: 0xc9a98a, glow: 0xff9a5a }, -Math.PI / 2);
+  const work = k.room('Engineering workshop', -29, 56, -3, 80, 6.5, { floor: 'deck', wall: 'panel', glow: 0xe8f2ff }, Math.PI / 2);
+  const ops = k.room('Operations', 3, 76, 23, 94, 4, { floor: 'white', wall: 'panel', tint: 0xaab6c2, glow: 0x9fd0ff }, -Math.PI / 2);
+  const gal = k.room('Yard gallery', -20, 96, 20, 114, 9, { floor: 'white', wall: 'white', glow: 0xdfe8f2 }, Math.PI);
+  k.door(bay, cor, 0, 3.2);
+  k.door(cor, bar, 65);
+  k.door(work, cor, 68);
+  k.door(cor, ops, 85);
+  k.door(cor, gal, 0, 3.2);
+  k.window(bay, 'n', -17, 17, 1.5, 11.5);
+  k.window(gal, 's', -18, 18, 0.9, 8);
+  k.finish();
+
+  // Docking bay.
+  k.parkShip(0, 20, 0);
+  for (const [x, z] of [[-16, 8], [16, 10], [-16, 44], [15, 42], [-17, 26]]) k.crates(x, z, 4);
+  for (const x of [-19, 19]) { k.cyl(1.3, 5, 0x9aa3ab, x, 34); k.cyl(1.3, 5, 0x9aa3ab, x, 30.5); }
+  k.box(2.2, 2.6, 3.4, 0xc8662a, 12, 30, { yaw: 0.4 });
+  k.box(1.2, 1.2, 1.2, 0x30363d, 12, 30, { y: 2.6, solid: false });
+  k.sign('BAY 7', -21.9, 9, 26, Math.PI / 2, 10, 3, '#c8662a');
+  k.sign(['TYCHO MANUFACTURING', '& ENGINEERING CONCERN'], 21.9, 9, 26, -Math.PI / 2, 14, 3, '#dfe8f2');
+  k.sign('MAG BOOTS ON BEYOND THIS LINE', 0, 0.02, 4, 0, 14, 0.9, '#ffd24a').rotation.x = -Math.PI / 2;
+  for (const [x, z] of [[-12, 14], [12, 14], [-12, 40], [12, 40]]) k.lamp(x, 12.5, z, 0xfff2d8, 240, 46);
+  k.crowd(-18, 30, 18, 50, 5);
+  k.placard(6, 47, Math.PI, 'Tycho Station',
+    'A sphere half a kilometre across with two habitat rings turning in opposite directions around it, and drives big enough to move the whole yard wherever the work is. Tycho is owned by an Earth corporation and run, in practice, for the Belt. You are standing in one of the bays let into the sphere.');
+  k.placard(-6, 47, Math.PI, 'What you can see outside',
+    'Through the bay door: the Rocinante on a holding tether. She is a Martian Corvette-class frigate, about 46 metres from nose to drive cone. Tycho refitted her after her first battles and has been her home port ever since.');
+  const roci = buildModel('corvette');
+  roci.scale.setScalar(46);
+  roci.position.set(26, 14, -70);
+  roci.rotation.set(0.1, 2.2, 0.2);
+  k.scene.add(roci);
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.2);
+  sun.position.set(-300, 200, -400);
+  k.scene.add(sun);
+
+  // Corridor.
+  k.sign(['← WORKSHOP', 'BAR · OPS →'], -2.95, 2.3, 60, Math.PI / 2, 2.6, 0.7, '#c8662a', 'rgba(10,12,16,0.8)');
+  k.lamp(0, 3.3, 62, 0xf2f8ff, 18, 16);
+  k.lamp(0, 3.3, 78, 0xf2f8ff, 18, 16);
+  k.lamp(0, 3.3, 91, 0xf2f8ff, 18, 16);
+  k.placard(2.4, 74.5, -Math.PI / 2, 'Spin gravity',
+    'The floor under you is the inside of a ring. It turns, and you are pressed outward against it; "down" is away from the hub. Pour a drink and the stream bends sideways as it falls. Belters learn to pour off-centre before they learn to walk.');
+  k.crowd(-2, 54, 2, 94, 4);
+
+  // The bar.
+  k.box(9, 1.1, 0.8, 0x4a3324, 19, 58.2);
+  k.box(9, 2.4, 0.4, 0x2a2f36, 19, 56.4, { solid: false });
+  for (let i = 0; i < 16; i++) k.box(0.1, 0.3, 0.1, [0x7fe0a0, 0xffb347, 0x8fdcff, 0xff7a7a][i % 4], 15.2 + i * 0.5, 56.6, { y: 1.3 + (i % 2) * 0.6, solid: false });
+  for (let i = 0; i < 6; i++) k.cyl(0.2, 0.75, 0x55504a, 15.5 + i * 1.4, 59.5, { solid: false });
+  for (const [x, z] of [[8, 62], [8, 69], [14, 70], [20, 68], [14, 64]]) k.table(x, z);
+  k.sign('BLAUWE BLOME', 14, 3.2, 73.9, Math.PI, 7, 1, '#6fa8ff');
+  k.sign(['FUNGAL WHISKEY', 'REAL COFFEE (ASK)', 'RED KIBBLE · RICE'], 24.9, 2.2, 66, -Math.PI / 2, 3.4, 1.4, '#ffb347', 'rgba(10,6,4,0.85)');
+  k.lamp(12, 3.5, 65, 0xff9a5a, 60, 18);
+  k.lamp(20, 3.5, 60, 0x6fa8ff, 40, 14);
+  k.crowd(5, 58, 23, 72, 9);
+  k.placard(5.5, 60, Math.PI / 2, 'Blauwe Blome',
+    'The bar everyone on Tycho ends up in. Engineers off shift, ship crews waiting on a refit, and the occasional OPA officer pretending to be neither. The whiskey is grown in a vat and nobody mentions it.');
+
+  // Workshop.
+  const cone = k.cyl(3.2, 4.6, k.flat(0x8a9198, { metalness: 0.8, roughness: 0.3 }), -16, 68, { y: 1.2 }, 1.2);
+  void cone;
+  k.box(4.5, 1.2, 4.5, 0x30363d, -16, 68, { solid: false });
+  for (const z of [58.5, 77.5]) { k.box(8, 0.95, 1.2, 0x55504a, -18, z); k.console(-24, z, z < 60 ? 0 : Math.PI, ['REACTION MASS', 'FEED 99.2%', 'COIL TEMP OK']); }
+  k.box(1, 4, 1, 0xc8662a, -26, 68);
+  k.box(5, 0.5, 0.5, 0xc8662a, -24, 68, { y: 4, solid: false });
+  k.crates(-8, 76, 3);
+  k.lamp(-16, 6, 68, 0xe8f2ff, 160, 26);
+  k.crowd(-27, 58, -5, 78, 4);
+  k.placard(-8, 62, -Math.PI / 2, 'The Epstein drive',
+    'A fusion drive efficient enough to burn for weeks instead of minutes. Its inventor tested it on his own yacht, could not reach the cut-off under the acceleration, and is still out there somewhere. Mars got the patent; everyone else got the solar system. This bell is from a small freighter.');
+
+  // Operations.
+  for (let i = 0; i < 4; i++) k.console(7 + i * 4, 78, 0, [['DOCK QUEUE', 'BAY 7  HELD', 'BAY 3  FREE'], ['RING A  0.31G', 'RING B  0.31G', 'SPIN NOMINAL'], ['TRAFFIC', 'CERES  11 SHIPS', 'PALLAS  4 SHIPS'], ['YARD', 'HULL 14  62%', 'WELD CREW  C']][i]);
+  const holo = buildModel('tycho');
+  holo.scale.setScalar(1.6);
+  holo.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.material = new THREE.MeshBasicMaterial({ color: 0x4fc8ff, wireframe: true, transparent: true, opacity: 0.5 }); });
+  holo.position.set(13, 1.9, 87);
+  k.scene.add(holo);
+  k.anims.push((_t, dt) => { holo.rotation.y += dt * 0.3; holo.userData.anim?.(dt); });
+  k.cyl(1.2, 0.8, 0x20252b, 13, 87);
+  k.sign(['TYCHO OPERATIONS', 'ALL BERTHS UNDER POSITIVE CONTROL'], 13, 3, 93.9, Math.PI, 9, 1.2, '#7fe0ff', 'rgba(4,14,22,0.9)');
+  k.lamp(13, 3.5, 85, 0x9fd0ff, 60, 18);
+  k.crowd(5, 80, 21, 92, 4);
+  k.placard(5.5, 90, Math.PI / 2, 'The biggest job',
+    'Tycho\'s engineers spun up Ceres and Eros, which is to say they gave gravity to rocks. Their largest single contract was the Nauvoo: a generation ship two kilometres long, ordered by the Mormon church to carry its people to another star over a hundred years. It never made that trip. You can visit it; it is called Medina Station now.');
+
+  // Yard gallery, looking out on a hull under construction.
+  for (const x of [-12, -4, 4, 12]) k.box(4, 0.5, 0.9, 0x6a7078, x, 108);
+  k.box(36, 1.0, 0.12, 0x9aa3ab, 0, 113.2, { solid: false });
+  k.lamp(0, 8.4, 104, 0xdfe8f2, 70, 30);
+  k.placard(-15, 100, Math.PI / 2, 'The yard',
+    'Hulls are assembled in vacuum inside a cage of gantries. Welding crews work in shifts around the clock; the blue-white flicker is theirs. A hull this size takes years.');
+  k.placard(15, 100, -Math.PI / 2, 'Who works here',
+    'Mostly Belters: tall, long-boned people raised in low gravity who cannot comfortably visit the planets their employers come from. They build the ships. Until recently they were not allowed to own any with guns.');
+  const hull = buildModel('hauler');
+  hull.scale.setScalar(520);
+  hull.position.set(40, -30, 420);
+  hull.rotation.y = 1.1;
+  hull.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && (m.material as THREE.Material).type === 'MeshStandardMaterial' && k.r() < 0.45) m.material = new THREE.MeshStandardMaterial({ color: 0x6a7078, wireframe: true }); });
+  k.scene.add(hull);
+  const cage = new THREE.Group();
+  for (let i = 0; i < 7; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(120, 2, 4, 4), new THREE.MeshStandardMaterial({ color: 0xc8662a, roughness: 0.6 }));
+    ring.position.z = -240 + i * 80;
+    ring.rotation.z = Math.PI / 4;
+    cage.add(ring);
+  }
+  cage.position.copy(hull.position);
+  cage.rotation.y = 1.1 + Math.PI / 2;
+  k.scene.add(cage);
+  const sparks: THREE.Sprite[] = [];
+  for (let i = 0; i < 9; i++) {
+    const s = glowSprite(0xbfe0ff, 26);
+    s.position.set(40 + (k.r() - 0.5) * 380, -30 + (k.r() - 0.5) * 90, 420 + (k.r() - 0.5) * 300);
+    k.scene.add(s);
+    sparks.push(s);
+  }
+  k.anims.push((t) => sparks.forEach((s, i) => (s.material.opacity = Math.sin(t * (7 + i)) * Math.sin(t * 1.3 + i * 2) > 0.45 ? 1 : 0)));
+  k.crowd(-18, 98, 18, 106, 5);
+
+  return k.done({ name: 'Docking bay 7', x: 0, z: 38, yaw: Math.PI });
+}
+
+// ------------------------------------------------------------------ Ceres
+
+function ceres(): Interior {
+  const k = new Kit('ceres', 'Ceres Station', 'Six million people in tunnels cut through a spinning rock. Loud, crowded, and short of water.');
+  k.scene.background = new THREE.Color(0x030405);
+  k.scene.fog = new THREE.FogExp2(0x241c16, 0.012);
+  k.scene.add(new THREE.HemisphereLight(0xc9b8a0, 0x2a241e, 0.55));
+  k.starfield();
+
+  const dock = k.room('Dock 14', -18, 0, 18, 40, 12, { floor: 'deck', wall: 'grime', glow: 0xffe2b8 }, Math.PI);
+  const tun = k.room('Customs tunnel', -2.5, 40, 2.5, 60, 3.2, { floor: 'grime', wall: 'rock', ceil: 'rock', glow: 0xffd9a0 });
+  const mkt = k.room('The Medina', -22, 60, 22, 104, 8, { floor: 'tile', wall: 'rock', ceil: 'rock' }, Math.PI);
+  const tube = k.room('Tube station', -46, 72, -22, 88, 5, { floor: 'tile', wall: 'grime', glow: 0xdfe8f2 }, Math.PI / 2);
+  const frog = k.room('The Blue Frog', 22, 62, 42, 80, 3.6, { floor: 'grime', wall: 'grime', tint: 0x8a8ab0 }, -Math.PI / 2);
+  const helix = k.room('Star Helix station house', 22, 84, 42, 102, 3.6, { floor: 'tile', wall: 'panel', tint: 0xa8b0b8, glow: 0xdfe8f2 }, -Math.PI / 2);
+  const hydro = k.room('Hydroponics', -16, 104, 16, 130, 6, { floor: 'grime', wall: 'grime' }, Math.PI);
+  k.door(dock, tun, 0);
+  k.door(tun, mkt, 0);
+  k.door(tube, mkt, 80, 4);
+  k.door(mkt, frog, 71);
+  k.door(mkt, helix, 93);
+  k.door(mkt, hydro, 0, 3);
+  k.window(dock, 'n', -14, 14, 2, 10);
+  k.finish();
+
+  // Dock.
+  k.parkShip(0, 16, 0);
+  for (const [x, z] of [[-13, 8], [13, 9], [-13, 32], [13, 30], [-14, 20]]) k.crates(x, z, 5);
+  k.sign('DOCK 14', -17.9, 8, 20, Math.PI / 2, 9, 2.6, '#ffb347');
+  k.sign(['CERES PORT AUTHORITY', 'DECLARE ALL WATER'], 17.9, 8, 20, -Math.PI / 2, 12, 2.6, '#dfe8f2');
+  for (const [x, z] of [[-10, 12], [10, 12], [0, 32]]) k.lamp(x, 11, z, 0xffe2b8, 420, 40);
+  k.crowd(-16, 26, 16, 38, 6);
+  const out = buildModel('hauler');
+  out.scale.setScalar(300);
+  out.position.set(-120, 40, -420);
+  out.rotation.y = 0.8;
+  k.scene.add(out);
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.1);
+  sun.position.set(300, 200, -400);
+  k.scene.add(sun);
+  k.placard(6, 36, Math.PI, 'Ceres Station',
+    'The largest body in the Belt and its busiest port. Tycho\'s engineers spent the better part of a decade spinning the whole dwarf planet up until the tunnels inside had about a third of a g. Around six million people live here, and up to a million more are passing through at any time.');
+  k.placard(-6, 36, Math.PI, 'Ice',
+    'Ceres once had water of its own and sold it. Now every litre is hauled in: ice cut from Saturn\'s rings, carried here by ships like the Canterbury, and metered out. On Ceres the price of water is the news.');
+
+  k.sign(['CUSTOMS', 'HAVE TERMINALS READY'], 2.45, 2.2, 50, -Math.PI / 2, 3, 0.8, '#ffb347', 'rgba(10,8,4,0.8)');
+  k.lamp(0, 2.9, 50, 0xffd9a0, 30, 14);
+
+  // The Medina: market stalls under the rock.
+  const stalls: [number, number, string, number, string][] = [
+    [-15, 66, 'NOODLES', 0xb5432a, '#ffb347'], [-15, 96, 'RED KIBBLE', 0x8a5a2a, '#ff7a5a'], [15, 66, 'TEA · REAL LEAF', 0x3a6a4a, '#7fe0a0'],
+    [-5, 76, 'HAND TERMINALS', 0x2f4a7a, '#8fdcff'], [6, 84, 'AIR FILTERS', 0x55504a, '#dfe8f2'], [-8, 92, 'FUNGAL CURRY', 0x8a7a2a, '#ffd24a'],
+    [14, 98, 'VAT-GROWN', 0x6a3a5a, '#ff9ad0'], [-14, 84, 'WATER 3 SCRIP/L', 0x2a5a7a, '#6fd0ff'],
+  ];
+  for (const [x, z, label, col, neon] of stalls) {
+    k.box(3.6, 1, 1.4, 0x3a342e, x, z);
+    for (const sx of [-1.7, 1.7]) k.box(0.1, 2.9, 0.1, 0x2d2a26, x + sx, z - 0.6, { solid: false });
+    const awn = k.box(4.2, 0.08, 2.6, col, x, z, { y: 2.9, solid: false });
+    awn.rotation.x = 0.18;
+    k.sign(label, x, 2.45, z + 0.72, 0, 3.4, 0.5, neon, 'rgba(8,6,4,0.8)');
+    k.sign(label, x, 2.45, z - 0.72, Math.PI, 3.4, 0.5, neon, 'rgba(8,6,4,0.8)');
+    for (let i = 0; i < 5; i++) k.box(0.4, 0.3, 0.4, [0xc9a23a, 0x8a3a2a, 0x4a7a4a, 0xdfe8f2][i % 4], x - 1.3 + i * 0.65, z, { y: 1, solid: false });
+    k.person(x + (k.r() - 0.5), z - 1.3, 0, true);
+  }
+  k.cyl(2.2, 0.7, 0x4a443c, 0, 70);
+  const trunk = k.cyl(0.18, 3.6, 0x4a3a2a, 0, 70, { y: 0.7, solid: false });
+  void trunk;
+  for (let i = 0; i < 7; i++) {
+    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8 + k.r() * 0.6, 0), k.flat(0x4a6a3a, { flatShading: true }));
+    k.place(leaf, (k.r() - 0.5) * 2.4, 4 + k.r() * 1.6, 70 + (k.r() - 0.5) * 2.4);
+  }
+  for (let i = 0; i < 5; i++) {
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 44, 8), k.flat(i % 2 ? 0x6a4a3a : 0x4a5a62, { metalness: 0.5 }));
+    pipe.rotation.z = Math.PI / 2;
+    k.place(pipe, 0, 7.2 - (i % 2) * 0.5, 64 + i * 9);
+  }
+  k.sign(['WATER RATION TODAY', '11.5 L / PERSON', 'NEXT HAULER: DELAYED'], 0, 5.2, 103.9, Math.PI, 9, 2.4, '#6fd0ff', 'rgba(2,10,18,0.9)');
+  k.sign('PINKWATER SECURITY — NO', -21.9, 3, 66, Math.PI / 2, 5, 0.6, '#ff7a5a');
+  k.sign('OPA', -21.9, 4.2, 96, Math.PI / 2, 3, 1.6, '#c8662a');
+  k.sign('ROSSE BUURT ↓ 3 LEVELS', 21.9, 4.6, 77, -Math.PI / 2, 5.5, 0.6, '#ff9ad0');
+  for (const [x, z, c] of [[-10, 70, 0xffb070], [10, 72, 0xffd9a0], [-10, 90, 0xffc890], [10, 94, 0xffb070], [0, 82, 0xffe2b8]] as const) k.lamp(x, 5.6, z, c, 75, 24);
+  k.crowd(-20, 62, 20, 102, 26);
+  k.placard(3.5, 63, Math.PI, 'The Medina',
+    'The market level where most of Ceres passes through at least once a day. Food here is grown in vats and on fungal racks: kibble, rice, noodles, curry that has never met an animal. The tree is real and has its own water allowance.');
+  k.placard(-3.5, 100, Math.PI, 'Up and down',
+    'Ceres spins, so "down" is outward toward the surface, where gravity is strongest. The governor and the money live out there. The poor live inward, nearer the axis, where the pull is weak, the Coriolis is strong enough to make you stumble, and the air is whatever is left.');
+
+  // Tube station.
+  k.box(22, 1.2, 4, 0x1c1f23, -34, 86.4, { solid: true });
+  const car = new THREE.Mesh(new THREE.CapsuleGeometry(1.5, 14, 6, 14), k.flat(0xb8bec4, { metalness: 0.6, roughness: 0.3 }));
+  car.rotation.z = Math.PI / 2;
+  k.place(car, -34, 2.3, 86.3);
+  for (let i = 0; i < 6; i++) k.box(1.4, 0.8, 0.06, k.flat(0xffe9b8, { emissive: 0xffe9b8 }), -39.5 + i * 2.2, 84.75, { y: 2.2, solid: false });
+  k.sign(['TUBE — SPINWARD', 'GOVERNOR\'S QUARTER 4 MIN', 'DOCKS 2 MIN · ROSSE BUURT 6 MIN'], -34, 3.6, 72.1, 0, 10, 1.6, '#dfe8f2', 'rgba(6,8,12,0.9)');
+  for (const x of [-42, -34, -26]) k.box(2.4, 0.45, 0.6, 0x55504a, x, 74);
+  k.lamp(-34, 4.6, 79, 0xdfe8f2, 110, 22);
+  k.crowd(-45, 74, -24, 83, 7);
+  k.placard(-24, 75, -Math.PI / 2, 'The tube',
+    'Pressurised trains run through the rock between the districts. A ride is free; the station takes it out of you in air tax instead. Hold the rail when it starts: the car accelerates along the spin, and for a moment you weigh rather more than you are used to.');
+
+  // The Blue Frog.
+  k.box(0.8, 1.1, 10, 0x2a2440, 40, 71);
+  for (let i = 0; i < 6; i++) k.cyl(0.2, 0.75, 0x3a3648, 38.8, 67 + i * 1.6, { solid: false });
+  for (let i = 0; i < 14; i++) k.box(0.1, 0.3, 0.1, [0x6fa8ff, 0x7fe0a0, 0xff7ad0][i % 3], 41.7, 66.5 + i * 0.65, { y: 1.3 + (i % 2) * 0.5, solid: false });
+  for (const [x, z] of [[27, 65], [27, 71], [27, 77], [33, 68], [33, 75]]) k.table(x, z);
+  k.sign('THE BLUE FROG', 32, 2.9, 62.1, 0, 6, 0.9, '#4f8fff');
+  k.sign(['TONIGHT', 'HALF-PRICE BOURBON', '(IT IS NOT BOURBON)'], 32, 2, 79.9, Math.PI, 4, 1.4, '#ff7ad0', 'rgba(10,4,14,0.85)');
+  k.lamp(32, 3.2, 70, 0x4f6fff, 55, 18);
+  k.lamp(38, 3.2, 76, 0xff5ab0, 28, 12);
+  k.crowd(24, 64, 38, 78, 10);
+  k.placard(24, 74, Math.PI / 2, 'The Blue Frog',
+    'A port bar: cheap, dim, and the right place to find a ship\'s crew or lose a detective. The house bourbon is distilled from a fungus. Regulars claim to prefer it.');
+
+  // Star Helix.
+  for (const [x, z] of [[27, 88], [33, 88], [27, 96], [33, 96]]) k.console(x, z, Math.PI, ['CASE FILE', 'STATUS: OPEN', 'ASSIGNED: —']);
+  for (let i = 0; i < 9; i++) k.cyl(0.05, 3.6, k.flat(0x8a9198, { metalness: 0.8 }), 38, 85 + i * 0.5, { solid: false });
+  k.block(38, 87, 0.3, 5);
+  k.box(1.8, 0.4, 0.7, 0x55504a, 40.5, 86);
+  k.sign(['STAR HELIX SECURITY', 'CERES STATION DETACHMENT'], 32, 2.9, 101.9, Math.PI, 8, 1, '#dfe8f2', 'rgba(8,12,18,0.9)');
+  k.sign(['MISSING PERSONS', '— 41 OPEN —'], 22.1, 2.2, 97, Math.PI / 2, 3, 1, '#ffb347', 'rgba(10,8,4,0.85)');
+  k.lamp(32, 3.3, 92, 0xdfe8f2, 60, 18);
+  k.crowd(24, 86, 36, 100, 5, false);
+  k.placard(24, 86, Math.PI / 2, 'Star Helix Security',
+    'Ceres has no police of its own. An Earth corporation holds the contract to keep order, and hires locally. Its officers are Belters paid by Earth to arrest Belters, and most of them have made a kind of peace with that.');
+
+  // Hydroponics.
+  for (let row = 0; row < 4; row++) {
+    const x = -10.5 + row * 7;
+    k.box(0.3, 3.6, 18, 0x2d3238, x, 118);
+    for (const y of [0.6, 1.7, 2.8]) k.box(1.5, 0.08, 18, 0x3a4048, x, 118, { y, solid: false });
+    for (let i = 0; i < 9; i++) {
+      for (const y of [1, 2.1, 3.2]) {
+        const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), k.flat([0x3f7a3a, 0x5a9a48, 0x2f6a30][(i + row) % 3], { flatShading: true }));
+        leaf.scale.set(1.8, 0.7, 1);
+        k.place(leaf, x, y, 110 + i * 2);
+      }
+    }
+    k.strip(x, 3.75, 118, 1.6, 18, 0xff5ad0);
+  }
+  for (const x of [-13.5, 13.5]) k.cyl(1.4, 4.5, k.flat(0x4a6a8a, { metalness: 0.6, roughness: 0.3 }), x, 127);
+  k.lamp(-6, 5.4, 114, 0xff7ad8, 110, 22);
+  k.lamp(6, 5.4, 122, 0xff7ad8, 110, 22);
+  k.placard(0, 107, Math.PI, 'Air and food',
+    'Every breath on Ceres has been through a plant or a machine first. Racks like these scrub carbon dioxide and grow part of the station\'s food under light tuned to what leaves actually use, which is why the room is pink. A failed harvest here is an air problem before it is a food problem.');
+
+  return k.done({ name: 'Dock 14', x: 0, z: 33, yaw: Math.PI });
+}
+
+// ----------------------------------------------------------------- Medina
+
+function medina(): Interior {
+  const R = 250, L = 1000;
+  const k = new Kit('medina', 'Medina Station', 'Inside the drum: two kilometres of farmland rolled into a tube, with a line of light for a sun.');
+  k.curveR = R;
+  k.bounds = { x0: 0, x1: 0, z0: -L / 2 + 12, z1: L / 2 - 12 };
+  k.scene.background = new THREE.Color(0x8fa9bd);
+  k.scene.fog = new THREE.FogExp2(0x9db5c8, 0.0011);
+  k.scene.add(new THREE.HemisphereLight(0xffffff, 0x8fa9bd, 0.55));
+  k.keyPower = 1.5;
+  k.keyColor = 0xfff2d8;
+  for (const z of [-300, 0, 300]) {
+    const l = new THREE.PointLight(0xfff2d8, 0.45, 0, 0);
+    l.position.set(0, 0, z);
+    k.scene.add(l);
+  }
+  const tex = surf('fields').clone();
+  tex.repeat.set(6, 4);
+  tex.needsUpdate = true;
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 128, 1, true).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 0.95 }));
+  k.scene.add(drum);
+  const sunTube = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, L * 0.94, 12).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }));
+  k.scene.add(sunTube);
+  for (let i = 0; i < 9; i++) {
+    const s = glowSprite(0xfff2d0, 120, 0.5);
+    s.position.z = -420 + i * 105;
+    (s.material as THREE.SpriteMaterial).fog = false;
+    k.scene.add(s);
+  }
+  for (const s of [1, -1]) {
+    const cap = new THREE.Mesh(new THREE.CircleGeometry(R, 96), k.mat('panel', 0x9aa6b0));
+    cap.position.z = (s * L) / 2;
+    if (s > 0) cap.rotation.y = Math.PI;
+    k.scene.add(cap);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(34, 46, 26, 24).rotateX(Math.PI / 2), k.flat(0x6a7480, { metalness: 0.5 }));
+    hub.position.z = s * (L / 2 - 13);
+    k.scene.add(hub);
+    for (let i = 0; i < 6; i++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(5, R * 2, 3), k.flat(0x7a8590, { metalness: 0.4 }));
+      spoke.rotation.z = (i * Math.PI) / 6;
+      spoke.position.z = s * (L / 2 - 4);
+      k.scene.add(spoke);
+    }
+  }
+
+  // Trees, scattered in groves.
+  const N = 520;
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.35, 3, 6).translate(0, 1.5, 0), k.flat(0x5a4632), N);
+  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.4, 0).translate(0, 4.6, 0), k.flat(0x3f7a3a, { flatShading: true }), N);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), zAxis = new THREE.Vector3(0, 0, 1);
+  const C = Math.PI * 2 * R;
+  for (let i = 0; i < N; i++) {
+    const grove = Math.floor(k.r() * 26);
+    const gx = (((grove * 197) % 100) / 100 - 0.5) * C, gz = (((grove * 61) % 100) / 100 - 0.5) * (L - 80);
+    const x = gx + (k.r() - 0.5) * 70, z = THREE.MathUtils.clamp(gz + (k.r() - 0.5) * 70, -L / 2 + 20, L / 2 - 20);
+    const th = x / R, s = 0.7 + k.r() * 0.9;
+    p.set(R * Math.sin(th), -R * Math.cos(th), z);
+    q.setFromAxisAngle(zAxis, th);
+    sc.set(s, s * (0.8 + k.r() * 0.6), s);
+    m.compose(p, q, sc);
+    trunks.setMatrixAt(i, m);
+    crowns.setMatrixAt(i, m);
+    crowns.setColorAt(i, new THREE.Color().setHSL(0.27 + k.r() * 0.08, 0.4, 0.3 + k.r() * 0.15));
+  }
+  trunks.frustumCulled = crowns.frustumCulled = false;
+  k.scene.add(trunks, crowns);
+
+  // Low buildings in clusters; they were laid out as a town and never demolished.
+  const lit = k.flat(0xffe9b8, { emissive: 0xffe9b8, emissiveIntensity: 0.9 });
+  for (let c = 0; c < 16; c++) {
+    const cx = c === 0 ? 0 : (k.r() - 0.5) * C, cz = c === 0 ? -430 : (k.r() - 0.5) * (L - 140);
+    for (let i = 0; i < 6; i++) {
+      const w = 7 + k.r() * 8, d = 7 + k.r() * 8, h = 3.5 + Math.floor(k.r() * 3) * 3;
+      const x = cx + (k.r() - 0.5) * 60, z = cz + (k.r() - 0.5) * 60;
+      if (c === 0 && Math.abs(x) < 16 && Math.abs(z + 440) < 34) continue;
+      k.box(w, h, d, [0xd9d4c8, 0xc8bfae, 0xb8c2c8, 0xe2d9c4][Math.floor(k.r() * 4)], x, z);
+      k.box(w + 0.6, 0.3, d + 0.6, 0x7a6a5a, x, z, { y: h, solid: false });
+      for (let f = 0; f < h / 3 - 0.5; f++) k.box(w * 0.7, 0.9, d + 0.08, lit, x, z, { y: 1.3 + f * 3, solid: false });
+    }
+  }
+
+  // The lift from the docks comes down a spoke at the bow end.
+  const spoke = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, R, 12), k.flat(0x8a96a0, { metalness: 0.5 }));
+  spoke.position.set(0, -R / 2, -452);
+  k.scene.add(spoke);
+  k.box(9, 4, 7, 0x6a7480, 0, -452);
+  k.sign(['LIFT TO DOCKS', 'AND COMMAND'], 0, 3, -448.4, 0, 6, 1.2, '#ffd9a0', 'rgba(10,12,16,0.85)');
+  k.strip(0, 0.05, -444, 3, 3, 0x2f6f4f);
+  k.points.push({ x: 0, z: -444, r: 3.5, title: 'Lift to the docks', text: 'Your ship is berthed at the bow. Press E to ride up the spoke and undock.', kind: 'exit' });
+
+  k.placard(8, -436, Math.PI, 'The drum',
+    'You are standing on the inside of a cylinder about half a kilometre across. It turns, and the turning holds you to the floor. Look up: that is not sky, it is more ground, with people on it looking up at you. The bright line along the axis is the sun.');
+  k.placard(-8, -436, Math.PI, 'From Nauvoo to Medina',
+    'Built at Tycho as the Nauvoo, a ship meant to carry a Mormon colony to another star across a century of travel: hence the farmland. Commandeered before it ever left, refitted as the warship Behemoth, flown through the Ring, and finally parked here as Medina Station.');
+  k.placard(12, -410, -Math.PI / 2, 'Thirteen hundred doors',
+    'Medina sits near the centre of the ring space, within sight of every gate. Whoever holds this station decides who goes to which sun, and in what order. Ships that go through too close together have a way of not coming out the other side.');
+  k.placard(-12, -380, Math.PI / 2, 'The farms',
+    'The soil was shipped up from Earth and Ganymede for a voyage of generations. It now feeds the station and a good share of the traffic passing through. The orchards are older than most of the people tending them.');
+  for (let i = 0; i < 26; i++) {
+    const x = (k.r() - 0.5) * 60, z = -440 + k.r() * 90;
+    if (k.free(x, z)) k.person(x, z, undefined, k.r() < 0.6);
+  }
+  k.places.push(
+    { name: 'Bow lift', x: 0, z: -438, yaw: Math.PI },
+    { name: 'Mid-drum', x: 60, z: 0, yaw: Math.PI },
+    { name: 'Far side of the drum', x: C / 2, z: -200, yaw: Math.PI },
+    { name: 'Stern end', x: -40, z: 440, yaw: 0 },
+  );
+  return k.done({ name: 'Bow lift', x: 0, z: -438, yaw: Math.PI });
+}
+
+// --------------------------------------------------------------- Ganymede
+
+async function ganymede(): Promise<Interior> {
+  const k = new Kit('ganymede', 'Ganymede', 'An agricultural dome on the breadbasket of the outer planets, with Jupiter filling a quarter of the sky.');
+  const R = 60;
+  k.circle = R - 2.5;
+  k.scene.background = new THREE.Color(0x000004);
+  k.scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x4a4238, 0.5));
+  k.keyFrom.set(500, 700, 300).normalize();
+  k.keyPower = 2.6;
+  k.keyColor = 0xfff6e6;
+  k.starfield(3000);
+
+  const ground = plane(R * 2, R * 2, k.mat('soil'), TILE.soil);
+  ground.geometry.dispose();
+  ground.geometry = new THREE.CircleGeometry(R, 64);
+  const uv = ground.geometry.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 40, uv.getY(i) * 40);
+  ground.rotation.x = -Math.PI / 2;
+  k.scene.add(ground);
+  const outside = plane(6000, 6000, k.mat('regolith', 0xb8b4ac), TILE.regolith);
+  outside.rotation.x = -Math.PI / 2;
+  outside.position.y = -0.3;
+  k.scene.add(outside);
+  for (let i = 0; i < 40; i++) {
+    const a = k.r() * 6.283, d = 110 + k.r() * 900, s = 8 + k.r() * 50;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), k.flat(0x9a968e, { flatShading: true, roughness: 1 }));
+    rock.position.set(Math.cos(a) * d, -s * 0.45, Math.sin(a) * d);
+    rock.scale.y = 0.5 + k.r() * 0.5;
+    k.scene.add(rock);
+  }
+  for (const [x, z, r] of [[-190, -120, 55], [170, -210, 70], [40, -330, 60], [-320, 140, 80]]) {
+    const other = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 10, 0, 6.283, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.22, roughness: 0.1, emissive: 0x2a4a3a }));
+    other.position.set(x, 0, z);
+    k.scene.add(other);
+  }
+
+  // The dome.
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 20, 0, 6.283, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.07, side: THREE.BackSide, roughness: 0.05, depthWrite: false }));
+  k.scene.add(glass);
+  const frame = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(R, 3)), new THREE.LineBasicMaterial({ color: 0xaab8c4, transparent: true, opacity: 0.55 }));
+  k.scene.add(frame);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.8, 6, 64).rotateX(Math.PI / 2), k.flat(0x8a9198, { metalness: 0.5 }));
+  k.scene.add(rim);
+
+  // Crops in long rows either side of a central path.
+  const rows: [number, number, number][] = [];
+  for (let z = -52; z <= 18; z += 2.4) {
+    const half = Math.sqrt(Math.max(0, 54 * 54 - z * z));
+    for (const s of [1, -1]) if (half > 6) rows.push([s * (2.5 + (half - 2.5) / 2), z, half - 2.5]);
+  }
+  const crop = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.9 }), rows.length);
+  const m = new THREE.Matrix4();
+  rows.forEach(([x, z, len], i) => {
+    const tall = 0.5 + ((i * 7) % 5) * 0.18;
+    m.makeScale(len, tall, 1.1).setPosition(x, tall / 2, z);
+    crop.setMatrixAt(i, m);
+    crop.setColorAt(i, new THREE.Color().setHSL(0.24 + ((i * 13) % 7) * 0.012, 0.55, 0.26 + ((i * 5) % 4) * 0.035));
+  });
+  k.scene.add(crop);
+  for (const z of [-40, -22, -4, 14]) {
+    const half = Math.sqrt(54 * 54 - z * z);
+    k.box(half * 2, 0.25, 0.25, 0x8a9198, 0, z, { y: 4.2, solid: false });
+    k.strip(0, 4.1, z, half * 2 - 4, 0.3, 0xff9ae0);
+    for (const s of [1, -1]) k.cyl(0.12, 4.2, 0x8a9198, s * (half - 1), z, { solid: false });
+  }
+
+  // Pad, control hut, tanks.
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(15, 40), k.mat('deck'));
+  const puv = pad.geometry.getAttribute('uv');
+  for (let i = 0; i < puv.count; i++) puv.setXY(i, (puv.getX(i) * 30) / TILE.deck, (puv.getY(i) * 30) / TILE.deck);
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.set(0, 0.02, 38);
+  k.scene.add(pad);
+  k.parkShip(0, 34, 0);
+  k.box(9, 3.6, 6, 0xc9ced3, -30, 27);
+  k.box(9.6, 0.3, 6.6, 0x6a7078, -30, 27, { y: 3.6, solid: false });
+  k.sign(['AGRICULTURAL DOME 7', 'MARIUS REGIO'], -30, 2.6, 23.95, Math.PI, 7, 1, '#7fe0a0', 'rgba(4,14,8,0.9)');
+  k.console(-24, 30, Math.PI / 2, ['MIRROR ARRAY', 'INSOLATION 104%', 'DOME 0.98 ATM']);
+  for (const x of [26, 31, 36]) k.cyl(2, 6, k.flat(0x9aa3ab, { metalness: 0.6, roughness: 0.3 }), x, 26);
+  k.crowd(-20, -30, 20, 30, 8, false);
+  k.lamp(0, 5, 26, 0xfff2d8, 90, 26);
+
+  // Jupiter, and the mirrors that stand in for a nearer sun.
+  const jt = await new THREE.TextureLoader().loadAsync(PHOTOS.jupiter.color[1]);
+  jt.colorSpace = THREE.SRGBColorSpace;
+  const jup = new THREE.Mesh(new THREE.SphereGeometry(560, 64, 32), new THREE.MeshStandardMaterial({ map: jt, roughness: 1, fog: false }));
+  jup.position.set(-900, 1250, -1900);
+  jup.rotation.z = 0.3;
+  k.scene.add(jup);
+  k.anims.push((_t, dt) => { jup.rotation.y += dt * 0.01; });
+  for (let i = 0; i < 9; i++) {
+    const mir = glowSprite(0xffffff, 60 + (i % 3) * 20, 0.95);
+    mir.position.set(300 + i * 130 - (i % 2) * 60, 1500 + (i % 3) * 90, -200 + i * 70);
+    k.scene.add(mir);
+  }
+
+  k.placard(5, 22, 0, 'The breadbasket',
+    'Ganymede feeds the outer planets. Hundreds of domes like this one grow soy, rice and wheat on a moon with no air, under glass, in sunlight a twenty-fifth as strong as Earth\'s. When Ganymede has a bad year, the Belt goes hungry.');
+  k.placard(-5, 22, 0, 'The mirrors',
+    'Look up and to the right: those hard white points are orbital mirrors, each one kilometres across, turned to pour gathered sunlight onto the domes. Lose a mirror and a dome goes dark. Drop one and it does worse.');
+  k.placard(4, -8, -Math.PI / 2, 'Why babies are born here',
+    'Ganymede is the only moon with a magnetic field of its own, which shelters the surface from the worst of Jupiter\'s radiation. That makes it the safest place beyond Mars to carry a child, and Belter families cross the system to do it.');
+  k.placard(-4, -34, Math.PI / 2, 'A sixth of a sixth',
+    'Gravity here is about a seventh of Earth\'s. Crops grow tall and thin, water arcs lazily out of the irrigation heads, and a dropped tool takes a full second and a half to reach the soil.');
+  k.places.push({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 }, { name: 'Centre of the dome', x: 0, z: -4, yaw: 0 }, { name: 'Far edge', x: 0, z: -54, yaw: 0 });
+  return k.done({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 });
+}
+
+const cache = new Map<string, Interior>();
+
+export async function buildInterior(id: string): Promise<Interior> {
+  let it = cache.get(id);
+  if (!it) {
+    it = id === 'tycho' ? tycho() : id === 'ceres' ? ceres() : id === 'medina' ? medina() : await ganymede();
+    cache.set(id, it);
+  }
+  return it;
+}

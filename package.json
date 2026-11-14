@@ -1,0 +1,17 @@
+{
+  "name": "expanse-explorer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --port=5180 ./index.html",
+    "build": "bun build ./index.html --outdir dist --minify",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2"
+  }
+}
