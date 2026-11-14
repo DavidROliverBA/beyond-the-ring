@@ -20,79 +20,101 @@ def band(faces, m, y0, y1, pred=lambda c: True):
 
 
 def corvette():
-    """Martian Corvette-class light frigate: a tapering armoured wedge around one big drive."""
+    """Martian Corvette-class frigate (the Rocinante): a flat chisel prow over a spiked railgun frame,
+    a raised armoured crew block, a boxy striped engineering section and one big ribbed drum drive."""
     s = Ship('corvette', 7)
+    flat = lambda *a: s.loft(list(a), 'gun', cell=0.03, smooth=False)
+
+    # Main hull: dark gunmetal, flat-topped, a low wedge prow forward.
     hull = [
-        (0.500, 0.028, 0.024, 0.011, 0.010),
-        (0.465, 0.046, 0.036, 0.017, 0.015),
-        (0.370, 0.072, 0.054, 0.025, 0.021),
-        (0.180, 0.100, 0.070, 0.032, 0.026),
-        (-0.050, 0.118, 0.080, 0.036, 0.028),
-        (-0.260, 0.124, 0.084, 0.036, 0.028),
-        (-0.360, 0.112, 0.078, 0.034, 0.028),
-        (-0.420, 0.090, 0.066, 0.030, 0.026),
+        (0.52, 0.060, 0.010, 0.008, 0.006, -0.040),
+        (0.46, 0.090, 0.028, 0.018, 0.010, -0.028),
+        (0.30, 0.125, 0.050, 0.030, 0.020, -0.010),
+        (0.10, 0.145, 0.068, 0.040, 0.030, 0.000),
+        (-0.15, 0.150, 0.078, 0.044, 0.034, 0.000),
+        (-0.40, 0.140, 0.084, 0.050, 0.040, 0.000),
     ]
-    sides, caps = s.loft(hull, 'hull', cell=0.024)
-    band(sides, 'trim', 0.215, 0.262)
-    band(sides, 'trim', -0.335, -0.31, lambda c: c.z > 0.02)
-    band(sides, 'hull2', -0.42, -0.37)
-    band(sides, 'hull2', 0.44, 0.5)
-    s.plate(sides, accents=[('hull2', 0.2)])
+    sides, caps = flat(*hull)
+    top = [f for f in sides if f.calc_center_median().z > 0.045 and abs(f.normal.x) < 0.5]
+    s.paint(top, 'lgrey')
+    for f in top:  # the red panel on the prow roof
+        c = f.calc_center_median()
+        if c.y > 0.33 and abs(c.x) < 0.045:
+            f.material_index = kit.NAMES.index('mred')
+    band(sides, 'trim', -0.18, -0.15, lambda c: c.z > 0.0)
+    s.plate(sides, accents=[('hull2', 0.18)], merge=0.55)
     s.paint(caps, 'dark')
 
-    # Dorsal spine and the command blister forward of it.
-    sp, _ = s.loft([(0.14, 0.03, 0.006, 0.004, 0, 0.068), (0.06, 0.05, 0.016, 0.01, 0, 0.078), (-0.2, 0.056, 0.02, 0.012, 0, 0.086), (-0.34, 0.046, 0.016, 0.01, 0, 0.082), (-0.39, 0.03, 0.006, 0.004, 0, 0.07)], 'hull2', cell=0.022)
-    s.plate(sp, merge=0.5)
-    bl, _ = s.loft([(0.30, 0.02, 0.004, 0.003, 0, 0.058), (0.26, 0.03, 0.012, 0.008, 0, 0.066), (0.19, 0.032, 0.013, 0.008, 0, 0.072), (0.15, 0.022, 0.005, 0.003, 0, 0.07)], 'hull', cell=0.016)
-    s.plate(bl, inset=0.002, depth=0.001)
-    s.windows((-0.02, 0.285, 0.0735), (0.02, 0.285, 0.0735), 5, (0, 0.6, 0.8), s=0.003, skip=0)
-    # Ventral keel with the railgun Tycho fitted.
-    kl, _ = s.loft([(0.22, 0.012, 0.006, 0.003, 0.004, -0.072), (0.12, 0.022, 0.014, 0.004, 0.008, -0.082), (-0.18, 0.024, 0.016, 0.004, 0.008, -0.09), (-0.3, 0.014, 0.008, 0.003, 0.004, -0.084)], 'hull2', cell=0.02)
-    s.plate(kl, merge=0.5)
-    s.cyl(0.0065, 0.0065, 0.36, (0, 0.3, -0.098), 'dark', segs=10)
-    s.cyl(0.009, 0.009, 0.03, (0, 0.47, -0.098), 'hull2', segs=10)
-    for y in (0.2, 0.3, 0.4):
-        s.box(0.012, 0.01, 0.02, (0, y, -0.088), 'hull2')
+    # Raised crew block: angled front with the cockpit glazing, light panelled roof, red edge stripes.
+    cb, cbc = s.loft([(0.17, 0.05, 0.006, 0.004, 0.004, 0.078), (0.12, 0.09, 0.040, 0.025, 0.012, 0.100),
+                      (-0.06, 0.098, 0.044, 0.028, 0.012, 0.104), (-0.12, 0.09, 0.038, 0.022, 0.012, 0.100)], 'hull', cell=0.026, smooth=False)
+    s.paint([f for f in cb if f.calc_center_median().z > 0.12], 'lgrey')
+    for f in cb:
+        c = f.calc_center_median()
+        if c.z > 0.12 and 0.07 < abs(c.x) < 0.085:
+            f.material_index = kit.NAMES.index('mred')
+    s.plate(cb, inset=0.002, depth=0.001, merge=0.4)
+    s.paint(cbc, 'dark')
+    s.windows((-0.03, 0.158, 0.088), (0.03, 0.158, 0.088), 4, (0, 0.6, 0.8), s=0.0035, skip=0)
 
+    # Engineering section: boxy, pale with red and white stripes, wider than the hull behind the crew block.
+    en, enc = s.loft([(-0.14, 0.13, 0.070, 0.040, 0.035, 0.012), (-0.18, 0.152, 0.092, 0.050, 0.045, 0.006),
+                      (-0.38, 0.152, 0.092, 0.050, 0.045, 0.006), (-0.40, 0.14, 0.084, 0.048, 0.040, 0.004)], 'lgrey', cell=0.028, smooth=False)
+    for f in en:
+        c = f.calc_center_median()
+        if (0.025 < abs(c.x) < 0.04 or 0.075 < abs(c.x) < 0.09) and c.z > 0.07:
+            f.material_index = kit.NAMES.index('mred')
+        elif abs(c.x) > 0.14 and c.z > -0.02 and -0.35 < c.y < -0.2:
+            f.material_index = kit.NAMES.index('hull2')
+    s.plate(en, inset=0.002, depth=0.0012, merge=0.4)
+    s.paint(enc, 'dark')
+    # Machinery door on each flank, a grille above the aft hull.
     for sx in (1, -1):
-        # Shoulder sponsons carrying the aft PDCs and reaction-mass tanks.
-        sh, _ = s.loft([(-0.02, 0.012, 0.03, 0.006, 0.006), (-0.1, 0.022, 0.046, 0.01, 0.01), (-0.3, 0.024, 0.05, 0.01, 0.01), (-0.4, 0.016, 0.036, 0.008, 0.008)], 'hull', cell=0.022, matrix=T((sx * 0.128, 0, 0)))
-        band(sh, 'trim', -0.2, -0.17)
-        s.plate(sh, merge=0.5, accents=[('hull2', 0.25)])
-        s.cyl(0.013, 0.013, 0.2, (sx * 0.15, -0.2, -0.028), 'pale', segs=12)
-        s.cyl(0.013, 0.013, 0.2, (sx * 0.15, -0.2, 0.028), 'pale', segs=12)
-        # Guns: six point-defence cannons.
-        s.pdc((sx * 0.062, 0.2, 0.069), 1)
-        s.pdc((sx * 0.138, -0.24, 0.05), 1)
-        s.pdc((sx * 0.07, -0.02, -0.08), -1)
-        # Torpedo tubes in the bow.
-        s.cyl(0.0085, 0.0085, 0.05, (sx * 0.02, 0.487, -0.003), 'dark', segs=10)
-        s.cyl(0.0105, 0.0105, 0.012, (sx * 0.02, 0.5, -0.003), 'hull2', segs=10)
-        # Manoeuvring thrusters.
-        s.rcs((sx * 0.076, 0.36, 0), (sx, 0, 0))
-        s.rcs((sx * 0.151, -0.3, 0), (sx, 0, 0))
-        s.rcs((sx * 0.05, 0.38, 0.052), (0, 0, 1), s=0.006)
-        s.rcs((sx * 0.06, -0.33, -0.079), (0, 0, -1), s=0.006)
-        s.lamp((sx * 0.153, -0.06, 0), 'green' if sx > 0 else 'red')
-        # Airlock and cargo door.
-        s.box(0.003, 0.05, 0.04, (sx * 0.1195, -0.02, -0.005), 'hull2')
-        s.box(0.004, 0.018, 0.026, (sx * 0.12, 0.06, 0.0), 'dark')
-        # Small steering drives round the main bell.
-        for sz in (1, -1):
-            s.bell(0.016, (sx * 0.072, -0.44, sz * 0.046), name=f'drive_small_{sx}_{sz}')
+        s.box(0.004, 0.09, 0.05, (sx * 0.1535, -0.27, 0.0), 'dark')
+        s.box(0.005, 0.06, 0.03, (sx * 0.1535, -0.27, 0.0), 'trim')
 
-    # Engineering section and the main drive.
-    en, _ = s.loft([(-0.415, 0.088, 0.064, 0.03, 0.026), (-0.445, 0.094, 0.068, 0.03, 0.026), (-0.462, 0.08, 0.058, 0.026, 0.022)], 'hull2', cell=0.02)
-    s.plate(en, merge=0.3)
-    s.cyl(0.05, 0.05, 0.03, (0, -0.455, 0), 'dark', segs=20)
-    s.bell(0.062, (0, -0.458, 0), name='drive_main', length=0.07)
-    # Sensors and comms.
-    s.mast((0, 0.5, 0.006), 0.07, axis=(0, 1, 0))
-    s.mast((0.012, 0.495, -0.008), 0.04, axis=(0.2, 1, -0.1))
-    s.mast((0, -0.3, 0.1), 0.05)
-    s.dish((0.03, -0.26, 0.108), 0.016, aim=(0.3, 0.2, 1))
-    s.box(0.02, 0.03, 0.008, (-0.02, -0.12, 0.108), 'dark')
-    s.lamp((0, -0.36, 0.1), 'window', 0.003)
+    # Dorsal gun tower behind the crew block.
+    t, tc = s.loft([(-0.13, 0.04, 0.020, 0.010, 0.006, 0.108), (-0.15, 0.052, 0.034, 0.014, 0.006, 0.118), (-0.23, 0.052, 0.034, 0.014, 0.006, 0.118), (-0.25, 0.04, 0.020, 0.010, 0.006, 0.108)], 'hull', cell=0.03, smooth=False)
+    s.plate(t, inset=0.002, depth=0.0012, merge=0.4)
+    s.paint(tc, 'dark')
+    s.pdc((0, -0.19, 0.152), 1, s=0.015)
+
+    # Railgun along the roof of the prow, and the spiked torpedo/rail frame beneath it.
+    s.cyl(0.011, 0.011, 0.30, (0, 0.30, 0.060), 'steel', segs=12)
+    s.cyl(0.015, 0.015, 0.03, (0, 0.46, 0.060), 'dark', segs=12)
+    s.box(0.16, 0.30, 0.008, (0, 0.40, -0.052), 'hull2', rot=(-0.05, 0, 0))
+    for x in (-0.055, 0, 0.055):
+        s.cyl(0.0045, 0.0035, 0.20, (x, 0.58, -0.050), 'dark', segs=6)
+        s.cyl(0.007, 0.007, 0.03, (x, 0.50, -0.050), 'hull2', segs=8)
+
+    # Shoulder sponsons forward, carrying the PDC stalks.
+    for sx in (1, -1):
+        sp = s.box(0.05, 0.18, 0.07, (sx * 0.14, 0.20, -0.012), 'gun')
+        s.plate(sp, inset=0.002, depth=0.001, merge=0.0)
+        # Six PDCs: two high at the shoulders, two low on the flanks, plus the tower and one under the tail.
+        s.strut((sx * 0.13, 0.26, 0.04), (sx * 0.17, 0.26, 0.085), r=0.005)
+        s.pdc((sx * 0.17, 0.26, 0.085), 1, s=0.013)
+        s.strut((sx * 0.14, -0.08, -0.06), (sx * 0.175, -0.08, -0.11), r=0.005)
+        s.pdc((sx * 0.175, -0.08, -0.11), -1, s=0.013)
+        s.rcs((sx * 0.172, 0.32, 0.0), (sx, 0, 0), s=0.007)
+        s.rcs((sx * 0.153, -0.34, 0.0), (sx, 0, 0), s=0.007)
+        s.lamp((sx * 0.172, 0.06, 0.0), 'green' if sx > 0 else 'red', 0.004)
+    s.strut((0, -0.20, -0.07), (0, -0.20, -0.125), r=0.005)
+    s.pdc((0, -0.20, -0.125), -1, s=0.013)
+    s.mast((0.02, 0.12, 0.125), 0.06, axis=(0.1, 0.3, 1))
+    s.dish((-0.04, -0.06, 0.148), 0.016, aim=(-0.3, 0.2, 1))
+
+    # Drum drive: a wide ribbed barrel, hollow at the back, on a short collar.
+    s.cyl(0.108, 0.108, 0.02, (0, -0.41, 0), 'dark', segs=8)
+    drum = [(0.0, -0.42), (0.104, -0.42), (0.112, -0.43), (0.112, -0.545), (0.100, -0.555), (0.088, -0.555), (0.084, -0.50), (0.05, -0.47), (0.0, -0.47)]
+    s.lathe(drum, (0, 0, 0), 'navy2', segs=24)
+    for y in (-0.445, -0.475, -0.505, -0.535):
+        s.hoop(0.112, 0.003, 0.004, y, m='navy', segs=24)
+    for k in range(8):
+        a = k / 8 * math.tau + 0.2
+        s.box(0.018, 0.012, 0.03, (math.cos(a) * 0.118, -0.55, math.sin(a) * 0.118), 'hull2', rot=(0, -a, 0))
+    s.cyl(0.05, 0.05, 0.0005, (0, -0.485, 0), 'glow', segs=20)
+    s.empty('drive_main', (0, -0.555, 0), 0.09)
     return s
 
 
