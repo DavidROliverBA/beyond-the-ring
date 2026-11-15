@@ -70,7 +70,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Phase C: platform
 
-12. **Hosting on Cloudflare Pages** (section 3). Set up early, since it only needs a build; redeploys on each push to `main`.
+12. **Hosting on Cloudflare Pages** (section 3), once the visuals are worth showing. Config (`wrangler.toml`) is already in the repo.
 13. **WebGPU spike, last** (section 1), then migrate or shelve.
 
 ### Backlog (not scheduled)
