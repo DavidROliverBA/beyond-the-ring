@@ -9,7 +9,9 @@ const SKIN = [0xf0c8a8, 0xd9a47c, 0xb97d56, 0x8d5a3b, 0x6a4129, 0x4a2c1c, 0xe3b4
 const HAIR = [0x15110e, 0x2a1d14, 0x4a3320, 0x7a5a36, 0xb9a070, 0x8a8a8a, 0x2a2a30];
 const NEON_HAIR = [0xff2d95, 0x2df0ff, 0x8a5cff, 0x4dff9a, 0xffb02d];
 const NEON = [0xff2d95, 0x2df0ff, 0xffb02d, 0x8a5cff, 0x4dff9a, 0xff5a3c];
-const CLOTH = [0x15171c, 0x1f232b, 0x2b2f38, 0x3a3f4a, 0x4a3a3a, 0x2e3b36, 0x403a2a, 0x5a5f66, 0x241a2e, 0x1a2a38];
+const STREET = [0x15171c, 0x1f232b, 0x2b2f38, 0x3a3f4a, 0x4a3a3a, 0x2e3b36, 0x403a2a, 0x5a5f66, 0x241a2e, 0x1a2a38];
+/** Everyday clothes for the calmer districts: nothing lit, plenty of colour. */
+const CIVIL = [0x4f7a4a, 0x3d6a8a, 0x8a5a3a, 0xa8a090, 0x5a4a6a, 0x9a4a3a, 0x33506a, 0xc9b58a, 0x6a6f76, 0x2f3a44, 0x7a8a5a, 0xb0803a];
 const WORK = [0x8a5a2a, 0x59636b, 0x7a7468, 0x3f5a6a, 0x6a2f2a];
 
 const body = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.12 });
@@ -48,7 +50,8 @@ export interface Person {
   height: number;
 }
 
-export function buildPerson(r: Rand, belter = false): Person {
+export function buildPerson(r: Rand, belter = false, plain = false): Person {
+  const CLOTH = plain ? CIVIL : STREET;
   const tall = belter ? 1.13 : 1;
   const H = (1.62 + r() * 0.22) * tall;     // body height, metres
   const k = H / 1.74;                        // scale from the 1.74 m template
@@ -60,8 +63,8 @@ export function buildPerson(r: Rand, belter = false): Person {
   const trouser = outfit === 0 ? base : pick(r, CLOTH);
   const shirt = pick(r, CLOTH);
   const boot = pick(r, [0x0c0d10, 0x1a1512, 0x24262b]);
-  const hairC = r() < 0.22 ? pick(r, NEON_HAIR) : pick(r, HAIR);
-  const hairStyle = pick(r, ['short', 'short', 'long', 'shaved', 'mohawk', 'bun', 'hood']);
+  const hairC = r() < 0.22 && !plain ? pick(r, NEON_HAIR) : pick(r, HAIR);
+  const hairStyle = pick(r, plain ? ['short', 'short', 'long', 'long', 'shaved', 'bun'] : ['short', 'short', 'long', 'shaved', 'mohawk', 'bun', 'hood']);
 
   const group = new THREE.Group();
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0, cast = true) => {
@@ -93,6 +96,11 @@ export function buildPerson(r: Rand, belter = false): Person {
     trim.push(bit(box(0.2 * w, 0.015, 0.015), accent, [0, 0.54, 0.1]));
   }
   if (outfit === 5) trim.push(bit(box(0.25 * w, 0.02, 0.012), accent, [0, 0.2, 0.125]));                      // belt light
+  if (plain) {
+    trim.length = 0;
+    // A striped jumper on some.
+    if (outfit === 1 || outfit === 5) for (const y of [0.16, 0.26, 0.36]) trunk.push(bit(cyl(0.2 * w, 0.2 * w, 0.045, 14), shirt, [0, y, 0], [1.14, 1, 0.66], [0, 0, 0], 1.25));
+  }
   const torso = add(merge(trunk), body, 0, 0.93, 0);
   torso.userData.base = 0.93;
   group.add(torso);
@@ -125,6 +133,7 @@ export function buildPerson(r: Rand, belter = false): Person {
   if (gear < 0.34) hl.push(bit(box(0.034, 0.03, 0.012), accent, [r() < 0.5 ? 0.036 : -0.036, 0.122, 0.097]));
   else if (gear < 0.5) hl.push(bit(box(0.17, 0.028, 0.012), accent, [0, 0.125, 0.093], [1, 1, 1], [0, 0, 0], 0.95));
   else if (gear < 0.62) hl.push(bit(box(0.01, 0.07, 0.012), accent, [0.084 * (r() < 0.5 ? 1 : -1), 0.03, 0.04]));
+  if (plain) hl.length = 0;
   head.add(add(merge(hg), body, 0, 0, 0));
   if (hl.length) head.add(add(merge(hl), glow, 0, 0, 0, false));
   group.add(head);
@@ -149,6 +158,7 @@ export function buildPerson(r: Rand, belter = false): Person {
       parts.push(bit(ball(0.036, 8, 6), skin, [0, -0.6, 0.075], [1, 1.2, 0.8]));
       if (r() < 0.3 || outfit === 1) lit.push(bit(box(0.012, 0.15, 0.012), accent, [side * 0.036, -0.45, 0.04], [1, 1, 1], [-0.22, 0, 0]));
     }
+    if (plain) lit.length = 0;
     g.add(add(merge(parts), body));
     if (lit.length) g.add(add(merge(lit), glow, 0, 0, 0, false));
     group.add(g);

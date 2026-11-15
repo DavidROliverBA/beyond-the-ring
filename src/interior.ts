@@ -7,6 +7,7 @@ import { buildModel, glowSprite, playerShip } from './ships';
 import { scan, type ScanName } from './materials';
 import { PHOTOS } from './photos';
 import { buildPerson } from './people';
+import { buildConcourse, terraceFront } from './concourse';
 
 export interface Point { x: number; z: number; r: number; title: string; text: string; kind: 'info' | 'exit' }
 export interface Place { name: string; x: number; z: number; yaw: number }
@@ -242,7 +243,7 @@ function textTexture(lines: string[], color: string, bg: string, aspect: number,
 type Side = 'n' | 's' | 'e' | 'w';
 interface Rect { x0: number; z0: number; x1: number; z1: number }
 interface Opening { side: Side; a: number; b: number; y0: number; y1: number; glass: boolean; label?: string }
-interface RoomOpts { floor: Surf; wall: Surf; ceil?: Surf; tint?: number; floorTint?: number; open?: boolean; glow?: number }
+interface RoomOpts { floor: Surf; wall: Surf; ceil?: Surf; tint?: number; floorTint?: number; open?: boolean; glow?: number; /** Daylit and quiet: the neon pass leaves it alone. */ calm?: boolean }
 interface Room extends Rect { name: string; h: number; o: RoomOpts; openings: Opening[] }
 interface PutOpts { y?: number; yaw?: number; solid?: boolean }
 
@@ -265,6 +266,10 @@ class Kit {
   bounds?: Rect;
   stars?: THREE.Points;
   floors: THREE.Mesh[] = [];
+  /** People built from here on wear everyday clothes with nothing lit. */
+  plainPeople = false;
+  /** Called every frame with where you are and the light that follows you. */
+  onCam: ((cam: THREE.Vector3, key: THREE.DirectionalLight) => void)[] = [];
   private mats = new Map<string, THREE.MeshStandardMaterial>();
   r = rng(1);
 
@@ -387,7 +392,7 @@ class Kit {
       floor.rotation.x = -Math.PI / 2;
       floor.position.set(cx, 0, cz);
       this.scene.add(floor);
-      this.floors.push(floor);
+      if (!o.calm) this.floors.push(floor);
       if (!o.open) {
         const ck = o.ceil ?? 'dark';
         const ceil = plane(w, d, this.mat(ck, o.tint), TILE[ck]);
@@ -515,7 +520,7 @@ class Kit {
   }
 
   person(x: number, z: number, yaw = this.r() * 6.28, belter = false, walk = false) {
-    const p = buildPerson(this.r, belter);
+    const p = buildPerson(this.r, belter, this.plainPeople);
     const g = p.group;
     const phase = this.r() * 6;
     const fx = Math.sin(yaw), fz = Math.cos(yaw), A = 2.4;
@@ -605,7 +610,7 @@ class Kit {
       const { x0, z0, x1, z1, h } = room;
       const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, area = w * d;
       const col = PAL[ri % PAL.length], col2 = PAL[(ri + 2) % PAL.length];
-      if (h < 3.3) return;
+      if (h < 3.3 || room.o.calm) return;
       const L = new THREE.PointLight(col, 60 + Math.min(area, 400) * 0.25, Math.max(w, d) * 0.8 + 8, 1.5);
       this.place(L, cx, Math.min(h - 0.6, 3.6), cz);
 
@@ -834,6 +839,7 @@ class Kit {
       roomAt: (x, z) => this.roomAt(x, z),
       tick: (t, dt, cam) => {
         for (const a of this.anims) a(t, dt);
+        for (const f of this.onCam) f(cam, key);
         this.stars?.position.copy(cam);
         if (this.curveR) {
           // In the drum the light comes from the axis, straight overhead wherever you stand.
@@ -990,7 +996,8 @@ function ceres(): Interior {
   const k = new Kit('ceres', 'Ceres Station', 'Six million people in tunnels cut through a spinning rock. Loud, crowded, and short of water.');
   k.scene.background = new THREE.Color(0x030405);
   k.scene.fog = new THREE.FogExp2(0x241c16, 0.012);
-  k.scene.add(new THREE.HemisphereLight(0xc9b8a0, 0x2a241e, 0.55));
+  const hemi = new THREE.HemisphereLight(0xc9b8a0, 0x2a241e, 0.55);
+  k.scene.add(hemi);
   k.starfield();
 
   const dock = k.room('Dock 14', -18, 0, 18, 40, 12, { floor: 'deck', wall: 'grime', glow: 0xffe2b8 }, Math.PI);
@@ -1006,6 +1013,10 @@ function ceres(): Interior {
   k.door(mkt, frog, 71);
   k.door(mkt, helix, 93);
   k.door(mkt, hydro, 0, 3);
+  const CW = 8, CZ0 = 130, CZ1 = 310, CH = 3.6;
+  const con = k.room('The Concourse', -CW, CZ0, CW, CZ1, CH, { floor: 'grime', wall: 'white', open: true, calm: true, floorTint: 0xb9bdc1 }, Math.PI);
+  k.places[k.places.length - 1].z = CZ0 + 9;
+  k.door(hydro, con, 0, 3.4);
   k.window(dock, 'n', -14, 14, 2, 10);
   k.finish();
 
@@ -1128,6 +1139,64 @@ function ceres(): Interior {
   k.lamp(6, 5.4, 122, 0xff7ad8, 110, 22);
   k.placard(0, 107, Math.PI, 'Air and food',
     'Every breath on Ceres has been through a plant or a machine first. Racks like these scrub carbon dioxide and grow part of the station\'s food under light tuned to what leaves actually use, which is why the room is pink. A failed harvest here is an air problem before it is a food problem.');
+
+  // The Concourse: a residential street under a sky-lit vault, housing terraced up both walls.
+  {
+    const planters: [number, number, number][] = [], bikes: [number, number, number][] = [];
+    for (let z = CZ0 + 12, i = 0; z < CZ1 - 8; z += 13, i++) {
+      const x = (i % 2 ? 1 : -1) * 4.7, L = 4 + k.r() * 2.5;
+      k.box(1.5, 0.55, L, k.mat('grime', 0xc9ccce), x, z);
+      planters.push([x, z, L]);
+      if (i % 3 === 1) k.box(0.55, 0.45, 2.2, 0x6a5a48, -x * 1.2, z + 2);
+      if (i % 4 === 2) for (let b = 0; b < 3; b++) bikes.push([x - Math.sign(x) * 1.25, z - 1 + b * 0.7, Math.PI / 2 + (k.r() - 0.5) * 0.3]);
+    }
+    k.scene.add(buildConcourse(k.r, { W: CW, z0: CZ0, z1: CZ1, wallH: CH, planters, bikes }));
+    // The gutter down the middle, and a band of darker paving each side of it.
+    for (const [x, w, c] of [[0, 0.45, 0x2f3438], [-2.2, 0.12, 0x6f757a], [2.2, 0.12, 0x6f757a]] as const) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, CZ1 - CZ0 - 2), k.flat(c, { roughness: 0.6 }));
+      k.place(m, x, 0.011, (CZ0 + CZ1) / 2);
+    }
+    const SHOPS = ['BAKERY', 'TEA HOUSE', 'REPAIRS', 'CLINIC', 'LAUNDRY', 'GREENGROCER', 'TOOLS', 'BOOKS · USED', 'TAILOR', 'NOODLE BAR', 'SCHOOL 14', 'AIR & FILTERS'];
+    for (let z = CZ0 + 7, i = 0; z < CZ1 - 6; z += 12.4, i++) {
+      for (const sd of [-1, 1]) k.sign(SHOPS[(i * 2 + (sd > 0 ? 1 : 0)) % SHOPS.length], sd * (CW - 0.1), 3.05, z + (sd > 0 ? 3.1 : 0), -sd * Math.PI / 2, 3.2, 0.42, sd > 0 ? '#ffe2b8' : '#dfeeff', 'rgba(24,30,36,0.9)');
+    }
+    // Public screens set into the first terrace.
+    const SCREENS: [number, number, string[], string][] = [
+      [1, CZ0 + 30, ['CERES TRANSIT', 'mind the spin · hold the rail'], '#9fe0ff'], [-1, CZ0 + 62, ['WATER BOARD', 'ration today 11.5 L'], '#ffd27a'],
+      [1, CZ0 + 104, ['LUNA·MART', 'everything. eventually.'], '#b8ffcf'], [-1, CZ0 + 140, ['CONCOURSE NEWS', 'next hauler: delayed'], '#ffb0a0'],
+    ];
+    for (const [sd, z, lines, col] of SCREENS) {
+      const x = sd * (terraceFront(CW, 1) - 1.75), frame = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.4, 7.4), k.flat(0x1c2228, { roughness: 0.4 }));
+      k.place(frame, x + sd * 0.2, CH + 2.9, z);
+      const scr = k.sign(lines, x, CH + 2.9, z, -sd * Math.PI / 2, 7, 4, col, 'rgba(14,20,30,0.96)');
+      (scr.material as THREE.MeshBasicMaterial).color.multiplyScalar(1.25);
+    }
+    k.sign(['THE CONCOURSE', 'LEVEL 3 · SPINWARD'], 0, CH + 4.5, CZ0 + 0.1, 0, 14, 3, '#2a3a46');
+    k.plainPeople = true;
+    k.crowd(-CW + 1, CZ0 + 14, -1.2, CZ1 - 6, 22, true);
+    k.crowd(1.2, CZ0 + 14, CW - 1, CZ1 - 6, 22, true);
+    // Knots of people stopped under each screen.
+    for (const [sd, z] of SCREENS) k.crowd(sd * 2, z - 4, sd * 6.5, z + 4, 5, true);
+    k.plainPeople = false;
+    k.placard(3.2, CZ0 + 5, Math.PI, 'The Concourse',
+      'Most of Ceres does not live in the docks or the market. It lives on streets like this one: homes stacked in terraces up the curve of the rock, shops underneath, and a ceiling of light panels made up to look like a sky nobody here has ever stood under. The plants are real and are counted in the air budget.');
+    k.placard(-3.2, CZ0 + 44, Math.PI, 'Living on the curve',
+      'The street is level because it follows the spin; the terraces climb because the wall does. Homes higher up the curve are a little lighter underfoot and a little cheaper. Belters raised here grow tall and slight, and find a planet\'s full gravity hard to bear.');
+    // Daylight in here, the dark of the tunnels everywhere else: blend as you walk through the door.
+    const dayFog = new THREE.Color(0xbfd0df), daySky = new THREE.Color(0xe8f1fb), dayKey = new THREE.Color(0xfff6e8);
+    let base: { fog: THREE.Color; dens: number; hemi: number; sky: THREE.Color; key: number; keyC: THREE.Color } | null = null;
+    k.onCam.push((cam, key) => {
+      const fog = k.scene.fog as THREE.FogExp2;
+      base ??= { fog: fog.color.clone(), dens: fog.density, hemi: hemi.intensity, sky: hemi.color.clone(), key: key.intensity, keyC: key.color.clone() };
+      const u = Math.min(1, Math.max(0, (cam.z - (CZ0 - 3)) / 8)), b = u * u * (3 - 2 * u);
+      fog.color.lerpColors(base.fog, dayFog, b);
+      fog.density = base.dens + (0.0068 - base.dens) * b;
+      hemi.intensity = base.hemi + (1.1 - base.hemi) * b;
+      hemi.color.lerpColors(base.sky, daySky, b);
+      key.intensity = base.key + (2.1 - base.key) * b;
+      key.color.lerpColors(base.keyC, dayKey, b);
+    });
+  }
 
   return k.done({ name: 'Dock 14', x: 0, z: 33, yaw: Math.PI });
 }

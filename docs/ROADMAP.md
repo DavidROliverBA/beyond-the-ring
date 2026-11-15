@@ -62,6 +62,8 @@ Each step is a shippable change. Steps may be split into smaller commits.
 5. **Hero ships and stations.** Hull panels, normal and roughness maps, weathering, windows with emissive interiors. Start with the Rocinante, Donnager and docked ships. Update the in-code fallback `corvette()` in `src/ships.ts` (still the old shape).
 6. **Photo mode (optional).** Stills refined with `three-gpu-pathtracer` (WebGL 2, progressive). Untested at true scale; treat as an experiment.
 
+**Ceres concourse (2026-11-15):** new walkable street on Ceres (`src/concourse.ts`), reached through Hydroponics: vaulted sky-panel ceiling with ribs, seven terraces of housing each side, shopfronts, planters, bikes, public screens, a plain-clothes crowd, and daylight that blends in as you walk through the door. First pass; next would be more relief on the housing, softer shadows and denser street life.
+
 ### Phase B: walking inside stations
 
 7. **Collision and movement.** 2D wall-segment and circle test with slide along walls, acceleration and deceleration, steps and ramps, crouch under pipes. No library needed for generated boxes.

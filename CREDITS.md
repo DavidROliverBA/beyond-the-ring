@@ -13,7 +13,7 @@ What this project does and does not use:
 - It uses **names and ideas** from the books and series (ships, stations, places, the ring gates) so that fans can find the things they know.
 - It contains **no** footage, stills, artwork, logos, music, sound, design drawings or text taken from the books, the series or any licensed game.
 - The descriptive text in the game is newly written for this project.
-- The ship and station models are new, built by script (see `tools/blender`). They are impressions made from memory, not copies of the production designs. The Rocinante model was reshaped by eye from publicly shared promotional stills and fan-wiki images of the ship as a visual reference only; no image, texture, logo or marking from the show is used, and the hand-built mesh is original to this project.
+- The ship and station models are new, built by script (see `tools/blender`). They are impressions made from memory, not copies of the production designs. The Rocinante model was reshaped by eye from publicly shared promotional stills and fan-wiki images of the ship as a visual reference only; no image, texture, logo or marking from the show is used, and the hand-built mesh is original to this project. The Ceres concourse (a street under a vaulted ceiling with terraced housing) was likewise laid out with a publicly shared still as a visual reference for proportion and mood only; its geometry, textures, signs and brand names are all original to this project.
 
 If you are a rights holder and would like something changed or removed, please open an issue on this repository and it will be dealt with promptly.
 
