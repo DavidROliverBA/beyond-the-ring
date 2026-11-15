@@ -8,11 +8,12 @@ A fan-made 3D explorer of the solar system of *The Expanse*. Fly from Earth to t
 
 ## What is in it
 
-- **Sol**, with distances to scale: the Sun, the planets and their main moons, Ceres, the Belt, and the Ring out past Uranus. The real bodies use photographic maps from NASA missions.
+- **Sol at true scale**, sizes as well as distances: the Sun, the planets and their main moons, Ceres, the Belt, and the Ring out past Uranus. Most of space is empty, so use the destination list to get about. The real bodies use photographic maps from NASA missions.
+- **Traffic**: several hundred ships fly routes between the ports, burning out, flipping at the half-way point and burning to a stop. From far off each is only a glint.
 - **The ring space**, with Medina Station, the Ring Station and all 1,373 gates.
 - **Systems beyond the gates**: Ilus, Laconia, Adro, Tecoma and a generated system for every other gate.
 - **Ships to visit**: the Rocinante, the Donnager, the Canterbury, the Agatha King, the Razorback, the Guy Molinari, the Anubis and more.
-- **Four places to dock and explore on foot**: Tycho Station, Ceres Station, Medina Station's drum and an agricultural dome on Ganymede.
+- **Four places to dock and explore on foot**: Tycho Station, Ceres Station, Medina Station's drum and an agricultural dome on Ganymede. Ceres has neon-lit tunnels and the Concourse, a daylit street of terraced housing under a vaulted ceiling.
 
 | | |
 |---|---|
@@ -20,6 +21,7 @@ A fan-made 3D explorer of the solar system of *The Expanse*. Fly from Earth to t
 | ![MCRN Donnager](docs/donnager.jpg) | ![The Canterbury](docs/canterbury.jpg) |
 | ![Tycho Station](docs/tycho.jpg) | ![Docking bay, Tycho](docs/tycho-bay.jpg) |
 | ![The market on Ceres](docs/ceres-market.jpg) | ![Inside Medina's drum](docs/medina-drum.jpg) |
+| ![The Concourse on Ceres](docs/ceres-concourse.jpg) | ![The dome on Ganymede](docs/ganymede-dome.jpg) |
 
 ## Running it
 
@@ -70,14 +72,17 @@ To jump, fly through the middle of a ring.
 - TypeScript and [three.js](https://threejs.org), with no framework. `src/main.ts` holds flight, docking, walking and the display.
 - `src/data.ts` describes Sol by hand and generates every other system from its gate number.
 - `src/photos.ts` and `assets/tex` hold the photographic planet maps; `src/textures.ts` paints every other world in code.
-- `src/interior.ts` is a small kit of rooms, props and people, and the four interiors made from it.
+- `src/interior.ts` is a small kit of rooms, props and people, and the four interiors made from it. `src/concourse.ts` builds the Ceres street and `src/people.ts` the crowd.
+- `src/traffic.ts` flies the ships on their routes.
 - The ship and station models are built by script in [Blender](https://www.blender.org). To rebuild them:
 
   ```sh
   blender -b -P tools/blender/build.py -- all
   ```
 
-Scale is honest for distances and generous for everything else: planets and ships are drawn far larger than life so that you can find them, and ships from different points in the story are all on show at once.
+Everything is its true size: a ship is tens or hundreds of metres long in a system billions of kilometres across. Ships from different points in the story are all on show at once.
+
+What comes next is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Accuracy
 
