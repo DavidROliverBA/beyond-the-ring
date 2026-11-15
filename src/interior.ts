@@ -605,8 +605,9 @@ class Kit {
           const uni = { time: { value: 0 }, map: { value: tex } };
           const mat = new THREE.ShaderMaterial({
             uniforms: uni, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: false,
-            vertexShader: '#include <logdepthbuf_pars_vertex>\nvarying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);\n#include <logdepthbuf_vertex>\n}',
-            fragmentShader: `#include <logdepthbuf_pars_fragment>
+            vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);\n#include <logdepthbuf_vertex>\n}',
+            fragmentShader: `#include <common>
+              #include <logdepthbuf_pars_fragment>
               uniform sampler2D map; uniform float time; varying vec2 vUv;
               void main(){
                 #include <logdepthbuf_fragment>
