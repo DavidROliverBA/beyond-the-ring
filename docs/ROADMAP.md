@@ -4,7 +4,7 @@ Ordered plan for Beyond the Ring. Written 2026-11-15 from research (sources at t
 
 ## 1. WebGPU: when, and is it worth it?
 
-**Recommendation: not now. Spike it after the content work (step 6 below), as a time-boxed experiment with a go/no-go gate.** Today the limit on realism is content (textures, lighting, models), not the renderer. WebGPU is a renderer change, and it costs this project more than most because of the true-scale depth work.
+**Decision (2026-11-15): do the spike test only, and last, after everything else in the order below. Migrate only if the go/no-go gate passes.** Today the limit on realism is content (textures, lighting, models), not the renderer. WebGPU is a renderer change, and it costs this project more than most because of the true-scale depth work.
 
 ### Pros
 
@@ -70,8 +70,8 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Phase C: platform
 
-12. **WebGPU spike** (section 1), then migrate or shelve.
-13. **Hosting** (section 3), when the visuals are worth showing.
+12. **Hosting on Cloudflare Pages** (section 3). Set up early, since it only needs a build; redeploys on each push to `main`.
+13. **WebGPU spike, last** (section 1), then migrate or shelve.
 
 ### Backlog (not scheduled)
 
@@ -97,9 +97,9 @@ A static site: `bun run build` makes a `dist/` of 73 files and about 97 MB. The 
 | **here.now** (used for other sites) | Per the owner's account | Unknown for a 97 MB site. | Possible; check terms. |
 | **Self-host on the Mac** | Free | Needs a tunnel and the Mac to stay on. | Only for sharing a private link. |
 
-### Recommendation
+### Decision
 
-**Cloudflare Pages**, deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
+**Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
 
 ### Things to settle before going public
 
