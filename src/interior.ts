@@ -183,6 +183,37 @@ function plane(w: number, h: number, mat: THREE.Material, tile: number): THREE.M
   return new THREE.Mesh(g, mat);
 }
 
+// Soft darkening where surfaces meet: the cheap stand-in for ambient occlusion, which the
+// log-depth renderer cannot do as a screen pass. A fade along wall bases and ceiling edges,
+// and a blob of shade under everything that stands on the floor.
+let fadeTex: THREE.CanvasTexture | undefined, blobTex: THREE.CanvasTexture | undefined;
+const shadeMat = (map: THREE.Texture, opacity: number) =>
+  new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: map, transparent: true, opacity, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+function fade(): THREE.CanvasTexture {
+  if (!fadeTex) {
+    const c = document.createElement('canvas');
+    c.width = 4; c.height = 64;
+    const x = c.getContext('2d')!;
+    const g = x.createLinearGradient(0, 0, 0, 64); // canvas top = plane top = the far edge
+    g.addColorStop(0, '#000'); g.addColorStop(1, '#fff'); // opaque at the bottom (the junction)
+    x.fillStyle = g; x.fillRect(0, 0, 4, 64);
+    fadeTex = new THREE.CanvasTexture(c);
+  }
+  return fadeTex;
+}
+function blob(): THREE.CanvasTexture {
+  if (!blobTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d')!;
+    const g = x.createRadialGradient(32, 32, 2, 32, 32, 32);
+    g.addColorStop(0, '#fff'); g.addColorStop(0.5, '#777'); g.addColorStop(1, '#000');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    blobTex = new THREE.CanvasTexture(c);
+  }
+  return blobTex;
+}
+
 function textTexture(lines: string[], color: string, bg: string, aspect: number, align: CanvasTextAlign = 'center'): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -318,6 +349,32 @@ class Kit {
     else if (side === 'w') { m.position.set(room.x0, y, mid); m.rotation.y = Math.PI / 2; }
     else { m.position.set(room.x1, y, mid); m.rotation.y = -Math.PI / 2; }
     this.scene.add(m);
+    if (mat.transparent) return;
+    // Shade where the wall meets the floor, and where it meets the ceiling.
+    const strip = (atTop: boolean) => {
+      const hh = Math.min(0.9, room.h * 0.12);
+      const g = new THREE.PlaneGeometry(b - a, hh);
+      if (atTop) { const uv = g.getAttribute('uv'); for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i)); }
+      const s = new THREE.Mesh(g, shadeMat(fade(), atTop ? 0.5 : 0.7));
+      s.position.copy(m.position); s.rotation.copy(m.rotation);
+      s.position.y = atTop ? y1 - hh / 2 : y0 + hh / 2;
+      s.translateZ(0.012);
+      s.renderOrder = 1;
+      this.scene.add(s);
+    };
+    if (y0 < 0.01) strip(false);
+    if (y1 > room.h - 0.01 && !room.o.open) strip(true);
+  }
+
+  /** A soft patch of shade on the floor under something standing there. */
+  contact(x: number, z: number, w: number, d: number, yaw = 0, opacity = 0.55) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), shadeMat(blob(), opacity));
+    m.rotation.x = -Math.PI / 2;
+    const g = new THREE.Group();
+    g.add(m);
+    m.position.y = 0.02;
+    m.renderOrder = 1;
+    this.place(g, x, 0, z, yaw);
   }
 
   /** Turn the declared rooms into geometry. Call after every door and window is declared. */
@@ -395,6 +452,7 @@ class Kit {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof mat === 'number' ? this.flat(mat) : mat);
     m.castShadow = true;
     this.place(m, x, (o.y ?? 0) + h / 2, z, o.yaw ?? 0);
+    if (!o.y && Math.min(w, d) > 0.25 && h > 0.2) this.contact(x, z, w * 1.35 + 0.25, d * 1.35 + 0.25, o.yaw ?? 0, h > 0.6 ? 0.55 : 0.35);
     if (o.solid !== false && (o.y ?? 0) < 1.9) {
       const turned = Math.abs(Math.sin(o.yaw ?? 0)) > 0.7;
       this.block(x, z, turned ? d : w, turned ? w : d);
@@ -406,6 +464,7 @@ class Kit {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(r2, r, h, 16), typeof mat === 'number' ? this.flat(mat) : mat);
     m.castShadow = true;
     this.place(m, x, (o.y ?? 0) + h / 2, z, o.yaw ?? 0);
+    if (!o.y && r > 0.12 && h > 0.2) this.contact(x, z, r * 2.8 + 0.2, r * 2.8 + 0.2, 0, 0.5);
     if (o.solid !== false && (o.y ?? 0) < 1.9) this.block(x, z, r * 2, r * 2);
     return m;
   }
@@ -463,6 +522,7 @@ class Kit {
     // Walkers pace a short beat along the way they face, so long as the whole beat is open floor.
     const beat = walk && !this.curveR && [-1, -0.5, 0, 0.5, 1].every((s) => this.free(x + fx * A * s, z + fz * A * s));
     this.place(g, x, 0, z, yaw);
+    if (!beat) this.contact(x, z, 1.0, 1.0, 0, 0.5);
     if (!beat) {
       this.block(x, z, 0.3, 0.3);
       this.anims.push((t) => p.pose(t, false));

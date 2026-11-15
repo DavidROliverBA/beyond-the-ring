@@ -53,6 +53,8 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Phase A: photorealism on the current renderer (WebGL)
 
+**Status 2026-11-15:** interiors already use ambientCG PBR scans (colour, normal, roughness) and an environment map, so step 1 was largely in place. Done since: fixed a hologram-shader error that had broken interior rendering , and added a stand-in for step 3 (wall-base and ceiling-edge shade, plus contact shadows under props and people). Screen-space AO is not possible with the current log-depth renderer, which is another cost of the WebGPU question. Not started: steps 2 (per-room environments, atmosphere), 4 to 11.
+
 1. **PBR material pipeline.** Real texture sets (colour, normal, roughness, ambient occlusion) from ambientCG and Poly Haven (confirm Poly Haven's licence page and add to `CREDITS.md`). KTX2 compression. Convert interior and ship materials to `MeshPhysicalMaterial` where it helps (wet floors, glass, clearcoat paint). Tune the tone-mapping curve.
 2. **Image-based lighting.** A small HDR environment per interior and per space scene, so metals reflect something. Sun-only lighting in open space (hard light, deep shadow, no fill). Atmosphere shader for planets and a night side with city lights.
 3. **Ambient occlusion and contact shadows.** Runtime AO first (cheap trial of N8AO or realism-effects). Bake corner AO for the static parts of interiors.
