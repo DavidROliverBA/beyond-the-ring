@@ -1032,9 +1032,40 @@ addEventListener('wheel', (e) => {
 
 const STEER = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'KeyX', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
+// Photo mode: time stands still, the HUD goes, the mouse still looks around.
+let photo = false, saveShot = false;
+function setPhoto(on: boolean) {
+  photo = on;
+  document.body.classList.toggle('photo', on);
+  if (!on) renderer.toneMappingExposure = 1;
+  keys.clear();
+}
+function savePicture() {
+  const d = new Date(), p2 = (n: number) => String(n).padStart(2, '0');
+  const name = `beyond-the-ring-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.png`;
+  // Called straight after a draw, before the browser clears the canvas.
+  canvas.toBlob((b) => {
+    if (!b) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, 'image/png');
+}
+
 addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
   if (e.metaKey || e.ctrlKey) return;
+  if (started && !busy && e.code === 'KeyP') { setPhoto(!photo); return; }
+  if (photo) {
+    if (e.code === 'BracketRight') renderer.toneMappingExposure = Math.min(4, renderer.toneMappingExposure * 1.15);
+    else if (e.code === 'BracketLeft') renderer.toneMappingExposure = Math.max(0.25, renderer.toneMappingExposure / 1.15);
+    else if (e.code === 'Enter') saveShot = true;
+    else if (e.code === 'Escape') return;
+    e.preventDefault();
+    return;
+  }
   keys.add(e.code);
   if (walk) {
     if (e.code === 'Tab' || e.code === 'KeyN') {
@@ -1565,7 +1596,9 @@ if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...wal
 function frame(now: number) {
   requestAnimationFrame(frame);
   if (FRAMES && last) { FRAMES.push(now - last); if (FRAMES.length > 5000) FRAMES.shift(); }
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const realDt = Math.min(0.05, (now - last) / 1000);
+  // In photo mode the world stops; only the camera moves.
+  const dt = photo ? 0 : realDt;
   last = now;
   clock += dt;
   if (!space) return;
@@ -1574,7 +1607,14 @@ function frame(now: number) {
     updateHud(dt);
     look.update(dt, walk.id, walkCam, null, walkCam.aspect);
     draw(walk.scene, walkCam);
+    if (saveShot) { saveShot = false; savePicture(); }
     return;
+  }
+  if (photo) {
+    // Look around freely without steering the ship.
+    lookYaw -= mdx * 0.003;
+    lookPitch = clamp(lookPitch - mdy * 0.003, -1.4, 1.4);
+    mdx = mdy = 0;
   }
   if (!busy && started) step(dt);
   lodTick();
@@ -1615,6 +1655,7 @@ function frame(now: number) {
   updateHud(dt);
   look.update(dt, 'space', camera, space.things.find((t) => t.kind === 'star')?.pos ?? null, camera.aspect);
   draw(scene, camera);
+  if (saveShot) { saveShot = false; savePicture(); }
 }
 
 // ------------------------------------------------------------------- boot

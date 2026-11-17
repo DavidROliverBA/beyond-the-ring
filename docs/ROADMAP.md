@@ -60,7 +60,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 3. **Ambient occlusion and contact shadows.** Runtime AO first (cheap trial of N8AO or realism-effects). Bake corner AO for the static parts of interiors.
 4. **Baked interior lighting.** Move interior layouts into Blender (kit exists), bake lighting with Cycles into lightmaps, export GLB. Keep runtime lights only for neon and signs. This is a rebuild of the interiors from generated code to authored assets, so do one room as a trial (a Tycho corridor) before committing the rest.
 5. **Hero ships and stations.** Hull panels, normal and roughness maps, weathering, windows with emissive interiors. Start with the Rocinante, Donnager and docked ships. Update the in-code fallback `corvette()` in `src/ships.ts` (still the old shape).
-6. **Photo mode (optional).** Stills refined with `three-gpu-pathtracer` (WebGL 2, progressive). Untested at true scale; treat as an experiment.
+6. **Photo mode.** *Done 2026-11-17:* P freezes time and hides the HUD, the mouse still looks around, [ and ] set exposure, Enter saves a PNG; works in flight and on foot. Path-traced stills (`three-gpu-pathtracer`) not attempted: untested at true scale and the log-depth patch is WebGL-shader specific.
 
 **Ceres concourse (2026-11-15):** new walkable street on Ceres (`src/concourse.ts`), reached through Hydroponics: vaulted sky-panel ceiling with ribs, seven terraces of housing each side, shopfronts, planters, bikes, public screens, a plain-clothes crowd, and daylight that blends in as you walk through the door. First pass; next would be more relief on the housing, softer shadows and denser street life.
 
