@@ -547,12 +547,15 @@ class Kit {
   /** A person with a skeleton (trial): paces `beat` metres along `yaw` if that line is open floor,
    *  otherwise stands. `lope` blends in the low-gravity Belter stride. Falls back to the old people. */
   walker(x: number, z: number, yaw: number, beat: number, belter = true, lope = 0) {
-    const fx = Math.sin(yaw), fz = Math.cos(yaw);
-    const open = beat > 0 && !this.curveR && Array.from({ length: Math.ceil(beat) + 1 }, (_, i) => Math.min(i, beat)).every((d) => this.free(x + fx * d, z + fz * d));
-    const w = buildWalker(this.r, x, z, yaw, { belter, lope, beat: open ? beat : 0, plain: this.plainPeople });
-    if (!w) return this.person(x, z, yaw, belter, open);
+    const fx = Math.sin(yaw), fz = Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw);
+    // A walker paces a loop of two lanes 0.9 m apart; use whichever side is open floor.
+    const clear = (off: number) => Array.from({ length: Math.ceil(beat) + 1 }, (_, i) => Math.min(i, beat))
+      .every((d) => this.free(x + fx * d + sx * off, z + fz * d + sz * off));
+    const side = beat > 0 && !this.curveR && clear(0) ? ([1, -1] as const).find((s) => clear(s * 0.9) && clear(s * 0.45)) : undefined;
+    const w = buildWalker(this.r, x, z, yaw, { belter, lope, beat: side ? beat : 0, lane: side, plain: this.plainPeople });
+    if (!w) return this.person(x, z, yaw, belter, !!side);
     this.scene.add(w.group);
-    if (!open) { this.block(x, z, 0.3, 0.3); this.contact(x, z, 1.0, 1.0, 0, 0.5); }
+    if (!side) { this.block(x, z, 0.3, 0.3); this.contact(x, z, 1.0, 1.0, 0, 0.5); }
     this.anims.push((_t, dt) => w.update(dt));
   }
 
@@ -1189,8 +1192,9 @@ function ceres(): Interior {
     // Trial: people with skeletons near the door, beside the older block people further in.
     // Ceres spins to about a third of a g, so Belters lope and visitors half-lope.
     for (let i = 0; i < 8; i++) {
-      const sd = i % 2 ? 1 : -1, belter = k.r() < 0.7;
-      k.walker(sd * (1.6 + k.r() * 1.8), CZ0 + 10 + i * 3.2, sd > 0 ? 0 : Math.PI, 10 + k.r() * 8, belter, belter ? 0.6 : 0.3);
+      // Those heading back towards the door start at the far end of their line.
+      const sd = i % 2 ? 1 : -1, belter = k.r() < 0.7, beat = 10 + k.r() * 8, z = CZ0 + 10 + i * 3.2;
+      k.walker(sd * (1.6 + k.r() * 1.8), sd > 0 ? z : z + beat, sd > 0 ? 0 : Math.PI, beat, belter, belter ? 0.6 : 0.3);
     }
     k.walker(-0.9, CZ0 + 12, Math.PI / 2, 0, true);
     k.walker(0.9, CZ0 + 12, -Math.PI / 2, 0, false);

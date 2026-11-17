@@ -33,10 +33,8 @@ J = {
     'pelvis': ((0, 0, 0.95), 0.150, 0.105, None),
     'waist':  ((0, 0, 1.08), 0.135, 0.095, 'pelvis'),
     'chest':  ((0, 0, 1.28), 0.165, 0.105, 'waist'),
-    'neck':   ((0, 0.005, 1.47), 0.052, 0.052, 'chest'),
-    'jaw':    ((0, -0.010, 1.56), 0.068, 0.080, 'neck'),
-    'skull':  ((0, 0.000, 1.645), 0.088, 0.100, 'jaw'),
-    'crown':  ((0, 0.010, 1.735), 0.040, 0.040, 'skull'),
+    'neck':   ((0, 0.010, 1.48), 0.045, 0.046, 'chest'),
+    'nape':   ((0, 0.004, 1.585), 0.044, 0.046, 'neck'),
 }
 for s, n in ((1, 'L'), (-1, 'R')):
     J.update({
@@ -69,6 +67,17 @@ bpy.ops.object.modifier_apply(modifier='skin')
 bpy.ops.object.modifier_apply(modifier='sub')
 bpy.ops.object.shade_smooth()
 
+# Cut the body along level lines where clothes start and stop (boot tops, cuffs, hem, neckline),
+# so each edge is a straight seam instead of the ragged outline of whole faces.
+SEAMS = (0.13, 0.93, 1.04, 1.455)
+bm = bmesh.new()
+bm.from_mesh(me)
+for z in SEAMS:
+    geo = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    bmesh.ops.bisect_plane(bm, geom=geo, plane_co=(0, 0, z), plane_no=(0, 0, 1))
+bm.to_mesh(me)
+bm.free()
+
 # ------------------------------------------------------------------ materials by region
 MATS = {
     'skin':     ((0.78, 0.56, 0.42), 0.45),
@@ -93,8 +102,6 @@ def region(c):
         return 'boots'
     if abs(x) > 0.19 and z < 0.93:
         return 'skin'  # hands
-    if z > 1.665 or (z > 1.56 and y > 0.035) or (z > 1.6 and abs(x) > 0.075 and y > -0.02):
-        return 'hair'
     if z > 1.455:
         return 'skin'
     if z > 1.04 or abs(x) > 0.19:
@@ -111,13 +118,13 @@ rig = bpy.data.objects.new('Rig', arm_data)
 sc.collection.objects.link(rig)
 bpy.context.view_layer.objects.active = rig
 bpy.ops.object.mode_set(mode='EDIT')
-P = lambda k: Vector(J[k][0])
+P = lambda k: Vector((0, 0.01, 1.76)) if k == 'crown' else Vector(J[k][0])
 BONES = [  # bone, head joint, tail joint, parent bone
     ('hips', 'pelvis', 'waist', None),
     ('spine', 'waist', 'chest', 'hips'),
     ('chest', 'chest', 'neck', 'spine'),
-    ('neck', 'neck', 'jaw', 'chest'),
-    ('head', 'jaw', 'crown', 'neck'),
+    ('neck', 'neck', 'nape', 'chest'),
+    ('head', 'nape', 'crown', 'neck'),
 ]
 for n in 'LR':
     BONES += [
@@ -144,6 +151,70 @@ body.select_set(True)
 rig.select_set(True)
 bpy.context.view_layer.objects.active = rig
 bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+
+# ------------------------------------------------------------------ face
+# Small pieces stuck onto the head and moved by the head bone only: nose, ears, eyes, brows.
+# The head is built from shapes rather than grown with the body: a skull, a jaw and chin, and a
+# hair cap cut from a slightly larger skull, with the hairline higher at the front.
+SKULL_C, SKULL_R = Vector((0, 0.004, 1.655)), Vector((0.084, 0.098, 0.106))
+front = SKULL_C.y - SKULL_R.y   # face plane (it looks along -Y)
+side = SKULL_R.x
+eye_m = bpy.data.materials.new('eyes')
+eye_m.use_nodes = True
+eye_m.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.02, 0.02, 0.025, 1)
+eye_m.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.2
+
+
+def feature(loc, scale, mat, segs=(10, 6), rot=(0, 0, 0)):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=segs[0], ring_count=segs[1], radius=1, location=loc, rotation=rot)
+    ob = bpy.context.active_object
+    ob.scale = scale
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    bpy.ops.object.shade_smooth()
+    ob.data.materials.append(mat)
+    vg = ob.vertex_groups.new(name='head')
+    vg.add(range(len(ob.data.vertices)), 1.0, 'REPLACE')
+    return ob
+
+
+skin_m, hair_m = bpy.data.materials['skin'], bpy.data.materials['hair']
+def hair_cap(r):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=14, radius=1, location=SKULL_C)
+    ob = bpy.context.active_object
+    ob.scale = SKULL_R * 1.045
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    hb = bmesh.new()
+    hb.from_mesh(ob.data)
+    cut = [v for v in hb.verts if (v.co.z + SKULL_C.z) - SKULL_C.z < 0.012 - 0.5 * v.co.y]
+    bmesh.ops.delete(hb, geom=cut, context='VERTS')
+    hb.to_mesh(ob.data)
+    hb.free()
+    bpy.ops.object.shade_smooth()
+    ob.data.materials.append(hair_m)
+    vg = ob.vertex_groups.new(name='head')
+    vg.add(range(len(ob.data.vertices)), 1.0, 'REPLACE')
+    return ob
+
+
+parts = [
+    feature(SKULL_C, SKULL_R, skin_m, segs=(24, 14)),                                                        # skull
+    feature((0, -0.024, 1.586), (0.060, 0.060, 0.050), skin_m, segs=(16, 10)),                               # jaw and chin
+    hair_cap(1),
+    feature((0, front - 0.002, 1.626), (0.011, 0.016, 0.022), skin_m, rot=(0.35, 0, 0)),                      # nose
+    feature((0, front + 0.014, 1.597), (0.019, 0.007, 0.0045), skin_m),                                            # lips
+]
+for s in (1, -1):
+    parts += [
+        feature((s * (side - 0.004), 0.006, 1.635), (0.008, 0.017, 0.026), skin_m),                            # ear
+        feature((s * 0.031, front + 0.006, 1.650), (0.0085, 0.006, 0.0085), eye_m, segs=(8, 6)),               # eye
+        feature((s * 0.032, front + 0.006, 1.674), (0.017, 0.006, 0.0045), hair_m, segs=(8, 4), rot=(0, s * 0.12, 0)),  # brow
+    ]
+bpy.ops.object.select_all(action='DESELECT')
+for ob in parts:
+    ob.select_set(True)
+body.select_set(True)
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.join()
 
 # ------------------------------------------------------------------ clips
 D = math.radians
@@ -273,3 +344,13 @@ if PREVIEW:
                 sc.frame_set(f)
                 sc.render.filepath = os.path.join(PREVIEW, f'{view}_{clip}_{i}.png')
                 bpy.ops.render.render(write_still=True)
+    # Close-ups: the face, and the clothing seams.
+    for t in rig.animation_data.nla_tracks:
+        t.mute = t.name != 'idle'
+    sc.frame_set(0)
+    for name, aim, loc, scale in (('face', (0, 0, 1.63), (0.9, -2.6, 1.75), 0.55), ('seams', (0, 0, 1.0), (1.4, -4.0, 1.2), 1.7)):
+        cam.data.ortho_scale = scale
+        cam.location = Vector(loc)
+        cam.rotation_euler = (Vector(aim) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+        sc.render.filepath = os.path.join(PREVIEW, f'close_{name}.png')
+        bpy.ops.render.render(write_still=True)

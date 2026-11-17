@@ -15,6 +15,11 @@ const pick = <T,>(r: Rand, a: T[]): T => a[Math.floor(r() * a.length)];
 
 let file: GLTF | null = null;
 
+/** With ?debug in the address, walkers report where they are and what they're doing (for tests). */
+const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+const debugList: { name: string; get: () => { x: number; z: number; yaw: number; state: string; leg: number } }[] = [];
+if (DEBUG) (globalThis as unknown as { __walkers: typeof debugList }).__walkers = debugList;
+
 /** Load the body once at start-up. If it fails, interiors keep the old people. */
 export async function loadPeople() {
   try {
@@ -29,6 +34,9 @@ export const peopleReady = () => !!file;
 const WALK = { stride: 1.45, period: 1.08 };
 const LOPE = { stride: 2.35, period: 1.5 };
 const FADE = 0.5;
+/** Gap between the two lanes a walker paces, the share of turns that start from a standstill,
+ *  and how much they slow down in the turn. */
+const LANE = 0.9, STOP_P = 0.4, TURN_PACE = 0.65;
 
 export interface Walker {
   group: THREE.Group;
@@ -41,6 +49,8 @@ export interface WalkerOpts {
   lope?: number;
   /** Distance to pace each way. 0 stands still. */
   beat?: number;
+  /** Which side the return lane is on: 1 or -1 (towards the walker's left or right). */
+  lane?: 1 | -1;
   plain?: boolean;
 }
 
@@ -93,14 +103,22 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   const beat = o.beat ?? 0;
   if (beat <= 0) return { group, update: (dt) => mixer.update(dt) };
 
-  // Pace a line: walk to the far end, ease to a stop, stand a moment, turn round, set off again.
+  // Pace a loop of two lanes: walk to the far end, U-turn in a small arc onto the next lane,
+  // walk back, U-turn again. Now and then stop at the end, stand a while, then step off into the turn.
+  const lane = (o.lane ?? 1) * LANE;
+  const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); // turning +rotation.y swings towards here
   const start = new THREE.Vector3(x, 0, z);
-  let dir = 1, travelled = 0, state: 'stand' | 'turn' | 'walk' | 'stop' = 'stand', wait = r() * 3, turned = 0, mustTurn = false;
+  const turnR = Math.abs(lane) / 2;
+  const turnSpin = Math.sign(lane);
+  let leg = 0, turned = 0, wait = r() * 3, pendingTurn = false, willStop = r() < STOP_P;
+  let state: 'stand' | 'turn' | 'walk' | 'stop' = 'stand';
+  const pace = (f: number) => { walk.setEffectiveTimeScale(f / period); lope.setEffectiveTimeScale(f / period); };
   const go = () => {
     // Fade from standing into the stride. Both gait clips restart together so they stay in step.
     walk.reset(); lope.reset();
     walk.weight = 1 - k; lope.weight = k;
-    walk.setEffectiveTimeScale(1 / period); lope.setEffectiveTimeScale(1 / period);
+    pace(1);
     walk.play().fadeIn(FADE); lope.play().fadeIn(FADE);
     idle.fadeOut(FADE);
     state = 'walk';
@@ -111,38 +129,46 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
     idle.fadeIn(FADE);
     state = 'stop';
   };
+  const startTurn = () => { state = 'turn'; turned = 0; pace(TURN_PACE); };
   // How far you travel while the stride fades out, so the stop lands on the end mark.
   const stopDist = (speed * FADE) / 2;
+  const v = new THREE.Vector3();
+  const along = () => v.copy(group.position).sub(start).dot(fwd);
+  const left = () => (leg === 0 ? beat - along() : along());
 
   const update = (dt: number) => {
     mixer.update(dt);
     // Move only as much as the legs are walking: no gliding while the stride fades in or out.
-    const g = walk.getEffectiveWeight() + lope.getEffectiveWeight();
-    const step = speed * Math.min(1, g) * dt;
-    if (state === 'walk' || state === 'stop') {
-      travelled += step;
+    const g = Math.min(1, walk.getEffectiveWeight() + lope.getEffectiveWeight());
+    const step = speed * g * dt * (state === 'turn' ? TURN_PACE : 1);
+    if (state !== 'stand') {
       group.position.x += Math.sin(group.rotation.y) * step;
       group.position.z += Math.cos(group.rotation.y) * step;
     }
-    if (state === 'walk' && travelled >= beat - stopDist) halt();
-    else if (state === 'stop' && g < 0.01) { state = 'stand'; wait = 1.5 + r() * 3.5; mustTurn = true; }
-    else if (state === 'stand' && (wait -= dt) <= 0) {
-      if (mustTurn) { state = 'turn'; turned = 0; } else go();
-    }
-    else if (state === 'turn') {
-      const a = Math.min(Math.PI - turned, dt * 3.2);
-      group.rotation.y += a;
+    if (state === 'walk') {
+      // Begin the turn (or the stop) early enough that the arc ends on the line's end mark.
+      if (left() <= turnR + (willStop ? stopDist : 0)) { if (willStop) halt(); else startTurn(); }
+    } else if (state === 'stop') {
+      if (g < 0.01) { state = 'stand'; wait = 1.5 + r() * 3.5; pendingTurn = true; }
+    } else if (state === 'stand') {
+      if ((wait -= dt) <= 0) { go(); if (pendingTurn) startTurn(); pendingTurn = false; }
+    } else {
+      const a = Math.min(Math.PI - turned, step / turnR);
+      group.rotation.y += a * turnSpin;
       turned += a;
-      if (turned >= Math.PI - 1e-3) {
-        dir = -dir; travelled = 0;
-        // Correct drift so the walker paces the same line for ever.
-        const end = dir > 0 ? 0 : beat;
-        group.position.set(start.x + Math.sin(yaw) * end, 0, start.z + Math.cos(yaw) * end);
-        group.rotation.y = dir > 0 ? yaw : yaw + Math.PI;
-        go();
+      if (turned >= Math.PI - 1e-4) {
+        // Square up on the new lane so small errors never add up.
+        leg ^= 1;
+        group.rotation.y = yaw + leg * Math.PI;
+        const a0 = along();
+        group.position.copy(start).addScaledVector(fwd, a0).addScaledVector(side, leg ? lane : 0);
+        pace(1);
+        willStop = r() < STOP_P;
+        state = 'walk';
       }
     }
   };
+  if (DEBUG) debugList.push({ name: `w${debugList.length}`, get: () => ({ x: group.position.x, z: group.position.z, yaw: group.rotation.y, state, leg }) });
   // Start some already walking.
   if (r() < 0.6) go();
   return { group, update };
