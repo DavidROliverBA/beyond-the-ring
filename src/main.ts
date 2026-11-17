@@ -13,6 +13,7 @@ import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './texture
 import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
 import { loadPeople } from './skinned';
+import { createLook } from './look';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
 type V3 = THREE.Vector3;
@@ -47,9 +48,14 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
 const renderPass = new RenderPass(scene, camera);
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.4, 1.0);
+// Render, bloom, then the lens: sun rays and ghosts from the bloom's bright image, tone mapping, film finish.
+const look = createLook(bloom);
 composer.addPass(renderPass);
 composer.addPass(bloom);
+composer.addPass(look.rays);
+composer.addPass(look.lens);
 composer.addPass(new OutputPass());
+composer.addPass(look.finish);
 function draw(s: THREE.Scene, c: THREE.Camera) {
   renderPass.scene = s;
   renderPass.camera = c;
@@ -1546,6 +1552,7 @@ let clock = 0;
 const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
+if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null }) });
 
 function frame(now: number) {
@@ -1558,6 +1565,7 @@ function frame(now: number) {
   if (walk) {
     walkStep(dt);
     updateHud(dt);
+    look.update(dt, walk.id, walkCam, null, walkCam.aspect);
     draw(walk.scene, walkCam);
     return;
   }
@@ -1598,6 +1606,7 @@ function frame(now: number) {
   space.tick(clock, dt);
   updateLabels();
   updateHud(dt);
+  look.update(dt, 'space', camera, space.things.find((t) => t.kind === 'star')?.pos ?? null, camera.aspect);
   draw(scene, camera);
 }
 
