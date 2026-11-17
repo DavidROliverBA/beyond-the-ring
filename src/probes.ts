@@ -46,8 +46,6 @@ export class Bounce {
   private primed = false;
   /** True once every probe has been filled in. */
   done = false;
-  /** Time spent and probes filled so far (for tests). */
-  stats = { ms: 0, probes: 0, calls: 0 };
 
   /** `aim` sets the lights as they are when you stand at a spot (they follow you about), and
    *  `skip` lists what should not be in the probes' pictures: people, who move, and fake shade.
@@ -86,6 +84,9 @@ export class Bounce {
   /** How many probes there are, and how many pictures are still to take (for tests). */
   get count(): number { return this.jobs.reduce((s, j) => s + j.n, 0); }
   get left(): number { return this.jobs.reduce((s, j) => s + Math.max(0, this.bounces + 1 - j.pass) * j.n - j.next, 0); }
+
+  /** Switch the bounce light off and on (for before-and-after tests). */
+  show(on: boolean) { for (const j of this.jobs) j.grid.visible = on; }
 
   /** Make the (empty) probe textures, so shaders compiled from now on already count on them. */
   prime(renderer: THREE.WebGLRenderer) {
@@ -144,7 +145,6 @@ export class Bounce {
         // Settle on as many probes per go as fit the time allowed (each go has a fixed cost
         // too, so never fewer than two).
         const t2 = performance.now(), each = (t2 - t1) / count;
-        this.stats.ms += t2 - t1; this.stats.probes += count; this.stats.calls++;
         this.per = Math.max(2, Math.min(64, Math.floor((ms * 0.8) / Math.max(each, 0.05))));
         if (t2 - t0 + each * 2 > ms) return false;
       }

@@ -68,7 +68,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 **Status 2026-11-17 (branch `skinned-people`):** every person in every interior is now one shared skinned body (`tools/blender/person.py`) with idle, walk and lope clips, coloured per person in one draw call. Walkers pace two-lane loops with walking U-turns and occasional stops; the lope blend follows each station's gravity; animation runs less often with distance and only people within 25 m cast shadows. Frame rate is the same or slightly better than the old block people. Still to do from step 8: avoidance, queueing, conversations, glancing at the player, doors, impostors. Known: heads blow out directly under the strong neon room lights (a lighting issue, same on the old people).
 
-7. **Collision and movement.** 2D wall-segment and circle test with slide along walls, acceleration and deceleration, steps and ramps, crouch under pipes. No library needed for generated boxes.
+7. **Collision and movement.** *Done 2026-11-17:* eased acceleration and stopping, sliding along walls, short hops so running can't pass through thin obstacles, people are solid. Steps, ramps and crouching wait for interiors that have them (step 10).
 8. **Instanced, behaving crowds.** One shared skinned model with per-person animation state, impostors at distance. Behaviours: lane walking with avoidance, queueing at stalls, paired conversations, glancing at the player, doors in and out.
 9. **Spin-gravity physics.** Floor curving up with distance on Ceres and Medina, Coriolis drift when running, reduced gravity and longer strides near the axis. Our own design; no standard technique found.
 10. **Layout and wear.** Corridors that feed plazas, service ducts, stairs and railings, wayfinding signs, trash, clutter with purpose. Neon pass for Medina's drum and Ganymede's dome.
@@ -81,6 +81,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Backlog (not scheduled)
 
+- **Bug found 2026-11-17: Earth's night side renders almost as bright as the day side**, with day colours, although the city lights correctly appear only there. Turning the Sun's light and the ambient light to zero in the page doesn't darken it, and neither the atmosphere shell nor the camera look is the cause. Investigate with the space-lighting work (Phase A step 2): check the surface shader output and the cloud deck.
 - **Sound.** Parked at the owner's request. When revisited: synthesised or CC0 audio only, Web Audio positional sound with a convolver reverb per room, footsteps per material, ventilation and crowd murmur layers.
 - Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).
 - Hand-flying and hand-walking test pass by a person, not only headless Playwright.
@@ -105,7 +106,9 @@ A static site: `bun run build` makes a `dist/` of 73 files and about 97 MB. The 
 
 ### Decision
 
-**Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
+**Live since 2026-11-17 on here.now** (David's personal account): https://silken-marvel-d95y.here.now/. Cloudflare Pages was dropped because the only Cloudflare login available was tied to a work email. Republish after changes: `bun run build && ~/.claude/skills/here-now/scripts/publish.sh dist --slug silken-marvel-d95y --client claude-code`. Tested before going live in Chromium, WebKit and Firefox (headless).
+
+Earlier plan, kept for reference: **Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
 
 ### Things to settle before going public
 

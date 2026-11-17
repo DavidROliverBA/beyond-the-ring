@@ -49,7 +49,7 @@ In order of payoff for effort:
 1. **Camera look pass.** Sun god rays where planets and ships cross the sun, lens ghosts and a halo, a lens-dirt texture and a starburst that turns with the camera. Make our own dirt and starburst textures by script. Fits our current `EffectComposer` (WebGL). The occlusion pass needs care with our log-depth patch and true-scale cameras.
 2. **Film finish.** Light grain, vignette and a colour grade per place: cold blue for open space, warm for Ceres, green for Medina. Can be one pass.
 3. **Cinematic tour mode.** Scripted shot lists per system (Sol arrival, Saturn rings, the ring gate, docking at Tycho) with timed captions and fades. Could become the start-screen background and a source for article pictures. Doesn't need GreenSock: a small keyframe timeline of our own will do.
-4. **Lightning on the night side.** Flipbook flashes on cloud decks, seen from orbit. Cheap and very alive. We'd draw our own sprite sheet by script.
+4. **Lightning on the night side.** *Done 2026-11-17 (`src/lightning.ts`).* Flipbook flashes on cloud decks, seen from orbit. Cheap and very alive. We'd draw our own sprite sheet by script.
 5. **Photo mode.** Hide the HUD, pause, adjust exposure and depth of field, save a PNG. Pairs with the roadmap's path-tracer idea.
 
 Things not to copy: Phong materials, the skybox (our star field is better), flat-image close-ups.

@@ -28,6 +28,8 @@ export interface Interior {
   curveR?: number;
   free(x: number, z: number): boolean;
   roomAt(x: number, z: number): string;
+  /** Push a point out of anyone standing or walking there (flat interiors only). */
+  clearOfPeople(x: number, z: number, r: number): [number, number];
   tick(t: number, dt: number, cam: THREE.Vector3): void;
   /** Bounce light, where the browser can do it (see probes.ts). */
   bounce?: Bounce;
@@ -928,6 +930,14 @@ class Kit {
       id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR, bounce,
       free: (x, z) => this.free(x, z),
       roomAt: (x, z) => this.roomAt(x, z),
+      clearOfPeople: (x, z, r) => {
+        if (this.curveR) return [x, z];
+        for (const f of this.folk) {
+          const p = f.w.group.position, dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz), min = r + 0.28;
+          if (d < min && d > 1e-4) { x = p.x + (dx / d) * min; z = p.z + (dz / d) * min; }
+        }
+        return [x, z];
+      },
       tick: (t, dt, cam) => {
         // People near you animate every frame; further off, every 2nd, 4th or 8th frame, catching
         // up on the time they skipped. Only those close by cast shadows.

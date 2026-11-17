@@ -90,6 +90,6 @@ For us:
 2. ~~`compileAsync` when docking and at start-up~~ done 2026-11-17 (`warm()` in `src/main.ts`): the 175 ms freeze on first turning round in Ceres is gone; the work now happens behind the docking fade.
 3. Light probe grid in interiors, starting with the Concourse.
 4. UltraHDR environments per place.
-5. Camera look pass (god rays, lens ghosts, grade) from the Above the Clouds study.
+5. ~~Camera look pass~~ done 2026-11-17 (`src/look.ts`): quarter-resolution god rays and lens ghosts from the bloom's bright image, dirt and a turning starburst, per-place grade, vignette, grain; about 1 ms a frame.
 6. Ship viewer with physical glass and TAA.
 7. Spike: Takram atmosphere for Earth at true scale.
