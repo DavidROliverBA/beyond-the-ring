@@ -1,5 +1,7 @@
 # Beyond the Ring
 
+**Play it in the browser:** https://silken-marvel-d95y.here.now/
+
 A fan-made 3D explorer of the solar system of *The Expanse*. Fly from Earth to the Ring, through it into the ring space, and on to the systems behind its 1,373 gates. Visit the ships, dock at the stations and walk around inside them. It runs in a web browser.
 
 ![Earth from orbit](docs/earth.jpg)

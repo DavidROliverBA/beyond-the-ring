@@ -105,7 +105,9 @@ A static site: `bun run build` makes a `dist/` of 73 files and about 97 MB. The 
 
 ### Decision
 
-**Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
+**Live since 2026-11-17 on here.now** (David's personal account): https://silken-marvel-d95y.here.now/. Cloudflare Pages was dropped because the only Cloudflare login available was tied to a work email. Republish after changes: `bun run build && ~/.claude/skills/here-now/scripts/publish.sh dist --slug silken-marvel-d95y --client claude-code`. Tested before going live in Chromium, WebKit and Firefox (headless).
+
+Earlier plan, kept for reference: **Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
 
 ### Things to settle before going public
 
