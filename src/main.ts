@@ -14,6 +14,7 @@ import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel
 import { buildInterior, type Interior, type Point } from './interior';
 import { loadPeople } from './skinned';
 import { createLook } from './look';
+import { addLightning } from './lightning';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
 type V3 = THREE.Vector3;
@@ -474,6 +475,11 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
     const deck = new THREE.Mesh(new THREE.SphereGeometry(R * 1.012, 96, 48), lod.clouds);
     tilt.add(deck);
     ctx.spin.push({ o: deck, r: (b.spin ?? 0.02) * 1.4 });
+    // Storms flicker on the night side of any planet with weather.
+    if (b.kind === 'planet' && pos.lengthSq() > 0) {
+      const seed = [...b.id].reduce((h, ch) => h * 31 + ch.charCodeAt(0), 7) >>> 0;
+      ctx.anim.push(addLightning(deck, R * 1.012, pos.clone().negate().normalize(), rng(seed % 100000), 70));
+    }
   }
   if (maps) applyMaps(lod, maps);
   if (photo) await showPhoto(lod, false);
@@ -1553,6 +1559,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip }) });
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null }) });
 
 function frame(now: number) {
