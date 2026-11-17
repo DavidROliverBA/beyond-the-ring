@@ -12,6 +12,7 @@ import {
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
 import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
+import { loadPeople } from './skinned';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
 type V3 = THREE.Vector3;
@@ -1560,7 +1561,7 @@ async function boot() {
   const want = decodeURIComponent(location.hash.slice(1));
   const id = want === 'slow' || /^sys:\d+$/.test(want) ? want : 'sol';
   loadingEl.textContent = 'Fitting out the fleet…';
-  await loadModels();
+  await Promise.all([loadModels(), loadPeople()]);
   // The stand-in ship made at start-up gives way to the proper model.
   scene.remove(shipModel);
   ({ group: shipModel, plume } = playerShip());

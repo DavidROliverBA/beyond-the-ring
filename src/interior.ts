@@ -7,6 +7,7 @@ import { buildModel, glowSprite, playerShip } from './ships';
 import { scan, type ScanName } from './materials';
 import { PHOTOS } from './photos';
 import { buildPerson } from './people';
+import { buildWalker } from './skinned';
 import { buildConcourse, terraceFront } from './concourse';
 
 export interface Point { x: number; z: number; r: number; title: string; text: string; kind: 'info' | 'exit' }
@@ -541,6 +542,18 @@ class Kit {
       g.rotation.y = yaw + (v >= 0 ? 0 : Math.PI);
       p.pose(t, true);
     });
+  }
+
+  /** A person with a skeleton (trial): paces `beat` metres along `yaw` if that line is open floor,
+   *  otherwise stands. `lope` blends in the low-gravity Belter stride. Falls back to the old people. */
+  walker(x: number, z: number, yaw: number, beat: number, belter = true, lope = 0) {
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const open = beat > 0 && !this.curveR && Array.from({ length: Math.ceil(beat) + 1 }, (_, i) => Math.min(i, beat)).every((d) => this.free(x + fx * d, z + fz * d));
+    const w = buildWalker(this.r, x, z, yaw, { belter, lope, beat: open ? beat : 0, plain: this.plainPeople });
+    if (!w) return this.person(x, z, yaw, belter, open);
+    this.scene.add(w.group);
+    if (!open) { this.block(x, z, 0.3, 0.3); this.contact(x, z, 1.0, 1.0, 0, 0.5); }
+    this.anims.push((_t, dt) => w.update(dt));
   }
 
   crowd(x0: number, z0: number, x1: number, z1: number, n: number, belter = true) {
@@ -1173,6 +1186,15 @@ function ceres(): Interior {
     }
     k.sign(['THE CONCOURSE', 'LEVEL 3 · SPINWARD'], 0, CH + 4.5, CZ0 + 0.1, 0, 14, 3, '#2a3a46');
     k.plainPeople = true;
+    // Trial: people with skeletons near the door, beside the older block people further in.
+    // Ceres spins to about a third of a g, so Belters lope and visitors half-lope.
+    for (let i = 0; i < 8; i++) {
+      const sd = i % 2 ? 1 : -1, belter = k.r() < 0.7;
+      k.walker(sd * (1.6 + k.r() * 1.8), CZ0 + 10 + i * 3.2, sd > 0 ? 0 : Math.PI, 10 + k.r() * 8, belter, belter ? 0.6 : 0.3);
+    }
+    k.walker(-0.9, CZ0 + 12, Math.PI / 2, 0, true);
+    k.walker(0.9, CZ0 + 12, -Math.PI / 2, 0, false);
+    k.places.push({ name: 'Concourse entrance', x: 0, z: CZ0 + 2, yaw: Math.PI });
     k.crowd(-CW + 1, CZ0 + 14, -1.2, CZ1 - 6, 22, true);
     k.crowd(1.2, CZ0 + 14, CW - 1, CZ1 - 6, 22, true);
     // Knots of people stopped under each screen.

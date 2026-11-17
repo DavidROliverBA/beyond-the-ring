@@ -55,6 +55,7 @@ Colour, normal and roughness maps from [ambientCG](https://ambientcg.com) by Len
 ## Software
 
 - [three.js](https://threejs.org) — MIT licence. Rendering, post-processing and model loading.
+  - The skinned people's clip blending (`src/skinned.ts`) follows the three.js example [webgl_animation_skinning_blending](https://threejs.org/examples/#webgl_animation_skinning_blending) (MIT). The body and its clips are our own, made by `tools/blender/person.py`.
 - [Bun](https://bun.sh) — MIT licence. Development server and bundler.
 - [TypeScript](https://www.typescriptlang.org) — Apache 2.0 licence.
 - [Blender](https://www.blender.org) — GPL. Used as a tool to build the models in `assets/models`; the models themselves are original to this project.
