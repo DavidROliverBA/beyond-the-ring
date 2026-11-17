@@ -52,6 +52,8 @@ Colour, normal and roughness maps from [ambientCG](https://ambientcg.com) by Len
 | `slab_*` | Concrete034 |
 | `dirt_*` | Ground054 |
 
+`hull_*` and `windows.jpg` in the same folder are not from ambientCG: they are this project's own work, painted by `tools/blender/hulltex.py` (hull panel seams, hatches, vents, fasteners, dirt and scuffs; and the small lit rooms seen through ship windows), and fall under the project's MIT licence.
+
 ## Software
 
 - [three.js](https://threejs.org) — MIT licence. Rendering, post-processing and model loading.
@@ -59,6 +61,7 @@ Colour, normal and roughness maps from [ambientCG](https://ambientcg.com) by Len
 - [Bun](https://bun.sh) — MIT licence. Development server and bundler.
 - [TypeScript](https://www.typescriptlang.org) — Apache 2.0 licence.
 - [Blender](https://www.blender.org) — GPL. Used as a tool to build the models in `assets/models`; the models themselves are original to this project.
+- [glTF-Transform](https://gltf-transform.dev) by Don McCurdy — MIT licence. Used as a tool (through `bunx`) to pack the models, with [meshoptimizer](https://meshoptimizer.org) by Arseny Kapitonenko (MIT), whose decoder ships with three.js and unpacks them in the browser.
 
 ## Made with
 
