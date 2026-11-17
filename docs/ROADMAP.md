@@ -66,6 +66,8 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Phase B: walking inside stations
 
+**Status 2026-11-17 (branch `skinned-people`):** every person in every interior is now one shared skinned body (`tools/blender/person.py`) with idle, walk and lope clips, coloured per person in one draw call. Walkers pace two-lane loops with walking U-turns and occasional stops; the lope blend follows each station's gravity; animation runs less often with distance and only people within 25 m cast shadows. Frame rate is the same or slightly better than the old block people. Still to do from step 8: avoidance, queueing, conversations, glancing at the player, doors, impostors. Known: heads blow out directly under the strong neon room lights (a lighting issue, same on the old people).
+
 7. **Collision and movement.** 2D wall-segment and circle test with slide along walls, acceleration and deceleration, steps and ramps, crouch under pipes. No library needed for generated boxes.
 8. **Instanced, behaving crowds.** One shared skinned model with per-person animation state, impostors at distance. Behaviours: lane walking with avoidance, queueing at stalls, paired conversations, glancing at the player, doors in and out.
 9. **Spin-gravity physics.** Floor curving up with distance on Ceres and Medina, Coriolis drift when running, reduced gravity and longer strides near the axis. Our own design; no standard technique found.

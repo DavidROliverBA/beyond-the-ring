@@ -7,8 +7,11 @@ import { buildModel, glowSprite, playerShip } from './ships';
 import { scan, type ScanName } from './materials';
 import { PHOTOS } from './photos';
 import { buildPerson } from './people';
-import { buildWalker } from './skinned';
+import { buildWalker, peopleReady, type Walker } from './skinned';
 import { buildConcourse, terraceFront } from './concourse';
+
+/** How much each station's spin gravity turns a walk into the Belter lope (0 walk, 1 full lope). */
+const LOPE: Record<string, number> = { ceres: 0.6, tycho: 0.5, medina: 0.5, ganymede: 0.8 };
 
 export interface Point { x: number; z: number; r: number; title: string; text: string; kind: 'info' | 'exit' }
 export interface Place { name: string; x: number; z: number; yaw: number }
@@ -271,6 +274,8 @@ class Kit {
   plainPeople = false;
   /** Called every frame with where you are and the light that follows you. */
   onCam: ((cam: THREE.Vector3, key: THREE.DirectionalLight) => void)[] = [];
+  /** Skinned people, animated more often the nearer they are to you (see tick). */
+  folk: { w: Walker; acc: number; i: number; stand?: { shadow: THREE.Group; rect: Rect } }[] = [];
   private mats = new Map<string, THREE.MeshStandardMaterial>();
   r = rng(1);
 
@@ -380,7 +385,7 @@ class Kit {
     g.add(m);
     m.position.y = 0.02;
     m.renderOrder = 1;
-    this.place(g, x, 0, z, yaw);
+    return this.place(g, x, 0, z, yaw);
   }
 
   /** Turn the declared rooms into geometry. Call after every door and window is declared. */
@@ -521,6 +526,7 @@ class Kit {
   }
 
   person(x: number, z: number, yaw = this.r() * 6.28, belter = false, walk = false) {
+    if (peopleReady()) return this.walker(x, z, yaw, walk ? 4 + this.r() * 6 : 0, belter);
     const p = buildPerson(this.r, belter, this.plainPeople);
     const g = p.group;
     const phase = this.r() * 6;
@@ -546,17 +552,25 @@ class Kit {
 
   /** A person with a skeleton (trial): paces `beat` metres along `yaw` if that line is open floor,
    *  otherwise stands. `lope` blends in the low-gravity Belter stride. Falls back to the old people. */
-  walker(x: number, z: number, yaw: number, beat: number, belter = true, lope = 0) {
+  walker(x: number, z: number, yaw: number, beat: number, belter = true, lope?: number) {
     const fx = Math.sin(yaw), fz = Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw);
     // A walker paces a loop of two lanes 0.9 m apart; use whichever side is open floor.
     const clear = (off: number) => Array.from({ length: Math.ceil(beat) + 1 }, (_, i) => Math.min(i, beat))
       .every((d) => this.free(x + fx * d + sx * off, z + fz * d + sz * off));
     const side = beat > 0 && !this.curveR && clear(0) ? ([1, -1] as const).find((s) => clear(s * 0.9) && clear(s * 0.45)) : undefined;
-    const w = buildWalker(this.r, x, z, yaw, { belter, lope, beat: side ? beat : 0, lane: side, plain: this.plainPeople });
-    if (!w) return this.person(x, z, yaw, belter, !!side);
-    this.scene.add(w.group);
-    if (!side) { this.block(x, z, 0.3, 0.3); this.contact(x, z, 1.0, 1.0, 0, 0.5); }
-    this.anims.push((_t, dt) => w.update(dt));
+    // How much of the low-gravity lope to blend in: Belters raised to it, visitors half way.
+    const g = LOPE[this.id] ?? 0.4;
+    const w = buildWalker(this.r, x, z, yaw, { belter, lope: lope ?? (belter ? g : g * 0.5), beat: side ? beat : 0, lane: side, plain: this.plainPeople, street: !this.plainPeople });
+    if (!w) return;
+    let stand: { shadow: THREE.Group; rect: Rect } | undefined;
+    if (side) this.scene.add(w.group);
+    else {
+      this.place(w.group, x, 0, z, yaw);
+      const shadow = this.contact(x, z, 1.0, 1.0, 0, 0.5);
+      this.block(x, z, 0.3, 0.3);
+      stand = { shadow, rect: this.blocks[this.blocks.length - 1] };
+    }
+    this.folk.push({ w, acc: 0, i: this.folk.length, stand });
   }
 
   crowd(x0: number, z0: number, x1: number, z1: number, n: number, belter = true) {
@@ -629,6 +643,16 @@ class Kit {
       if (h < 3.3 || room.o.calm) return;
       const L = new THREE.PointLight(col, 60 + Math.min(area, 400) * 0.25, Math.max(w, d) * 0.8 + 8, 1.5);
       this.place(L, cx, Math.min(h - 0.6, 3.6), cz);
+      // Nobody stands right under it: a tall Belter's head would be a hand's breadth from the bulb.
+      for (const f of this.folk) {
+        const p = f.w.group.position, dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+        if (!f.stand || d >= 1.8) continue;
+        const ux = d > 0.01 ? dx / d : 1, uz = d > 0.01 ? dz / d : 0, nx = cx + ux * 1.9, nz = cz + uz * 1.9;
+        if (!this.free(nx, nz)) continue;
+        p.x = nx; p.z = nz;
+        f.stand.shadow.position.x = nx; f.stand.shadow.position.z = nz;
+        Object.assign(f.stand.rect, { x0: nx - 0.15, x1: nx + 0.15, z0: nz - 0.15, z1: nz + 0.15 });
+      }
 
       // Neon tubes along the walls, and a lit skirting.
       const sides: [string, number, number, number, number][] = [
@@ -849,11 +873,22 @@ class Kit {
     key.shadow.normalBias = 0.05;
     this.scene.add(key, key.target);
     const up = new THREE.Vector3();
+    let frame = 0;
     return {
       id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR,
       free: (x, z) => this.free(x, z),
       roomAt: (x, z) => this.roomAt(x, z),
       tick: (t, dt, cam) => {
+        // People near you animate every frame; further off, every 2nd, 4th or 8th frame, catching
+        // up on the time they skipped. Only those close by cast shadows.
+        frame++;
+        for (const f of this.folk) {
+          f.acc += dt;
+          const d2 = f.w.group.position.distanceToSquared(cam);
+          const every = d2 < 400 ? 1 : d2 < 2025 ? 2 : d2 < 8100 ? 4 : 8;
+          f.w.body.castShadow = d2 < 625;
+          if ((frame + f.i) % every === 0) { f.w.update(f.acc); f.acc = 0; }
+        }
         for (const a of this.anims) a(t, dt);
         for (const f of this.onCam) f(cam, key);
         this.stars?.position.copy(cam);
@@ -1189,12 +1224,11 @@ function ceres(): Interior {
     }
     k.sign(['THE CONCOURSE', 'LEVEL 3 · SPINWARD'], 0, CH + 4.5, CZ0 + 0.1, 0, 14, 3, '#2a3a46');
     k.plainPeople = true;
-    // Trial: people with skeletons near the door, beside the older block people further in.
-    // Ceres spins to about a third of a g, so Belters lope and visitors half-lope.
+    // Walkers near the door, pacing the street both ways.
     for (let i = 0; i < 8; i++) {
       // Those heading back towards the door start at the far end of their line.
       const sd = i % 2 ? 1 : -1, belter = k.r() < 0.7, beat = 10 + k.r() * 8, z = CZ0 + 10 + i * 3.2;
-      k.walker(sd * (1.6 + k.r() * 1.8), sd > 0 ? z : z + beat, sd > 0 ? 0 : Math.PI, beat, belter, belter ? 0.6 : 0.3);
+      k.walker(sd * (1.6 + k.r() * 1.8), sd > 0 ? z : z + beat, sd > 0 ? 0 : Math.PI, beat, belter);
     }
     k.walker(-0.9, CZ0 + 12, Math.PI / 2, 0, true);
     k.walker(0.9, CZ0 + 12, -Math.PI / 2, 0, false);

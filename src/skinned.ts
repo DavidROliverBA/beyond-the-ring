@@ -1,4 +1,4 @@
-// People with a skeleton (trial, 2026-11-17). One body made in Blender (tools/blender/person.py)
+// People with a skeleton (2026-11-17). One body made in Blender (tools/blender/person.py)
 // with three clips: idle, walk and lope. The clips are blended by weight and faded into one
 // another, after the three.js "skinning blending" example (MIT). Two rules keep it believable:
 //   - walk and lope are both one-second cycles, so they can be mixed by weight and stay in step;
@@ -7,8 +7,9 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import personGlb from '../assets/models/person.glb';
-import { CIVIL, HAIR, SKIN, WORK } from './people';
+import { CIVIL, HAIR, NEON, NEON_HAIR, SKIN, STREET, WORK } from './people';
 
 type Rand = () => number;
 const pick = <T,>(r: Rand, a: T[]): T => a[Math.floor(r() * a.length)];
@@ -20,11 +21,60 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 const debugList: { name: string; get: () => { x: number; z: number; yaw: number; state: string; leg: number } }[] = [];
 if (DEBUG) (globalThis as unknown as { __walkers: typeof debugList }).__walkers = debugList;
 
+// The body arrives as one mesh per material (skin, shirt and so on). Merged into a single mesh
+// with a per-vertex part number, each person is one draw call, coloured from a small palette.
+const PARTS = ['skin', 'shirt', 'trousers', 'boots', 'hair', 'eyes'] as const;
+type Part = (typeof PARTS)[number];
+const ROUGH: Record<Part, number> = { skin: 0.72, shirt: 0.85, trousers: 0.88, boots: 0.55, hair: 0.9, eyes: 0.2 };
+let base: THREE.MeshStandardMaterial | null = null;
+
+function mergeBody(scene: THREE.Group) {
+  const parts: THREE.SkinnedMesh[] = [];
+  scene.traverse((n) => { if ((n as THREE.SkinnedMesh).isSkinnedMesh) parts.push(n as THREE.SkinnedMesh); });
+  const geos = parts.map((m) => {
+    const g = m.geometry.clone();
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'skinIndex', 'skinWeight'].includes(k)) g.deleteAttribute(k);
+    const i = Math.max(0, PARTS.indexOf((m.material as THREE.Material).name as Part));
+    g.setAttribute('part', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(i), 1));
+    return g;
+  });
+  const first = parts[0];
+  const body = new THREE.SkinnedMesh(mergeGeometries(geos, false)!, new THREE.MeshStandardMaterial());
+  body.name = 'body';
+  body.bind(first.skeleton, first.bindMatrix);
+  first.parent!.add(body);
+  for (const m of parts) m.removeFromParent();
+  base = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0 });
+}
+
+/** One material per person, sharing one compiled shader: the colour and roughness come from a
+ *  palette indexed by the vertex's part number. */
+function personMaterial(colours: Record<Part, number>) {
+  const m = base!.clone();
+  const palette = { value: PARTS.map((p) => new THREE.Color(colours[p])) };
+  const rough = { value: PARTS.map((p) => ROUGH[p]) };
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.palette = palette;
+    sh.uniforms.pRough = rough;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float part;\nvarying float vPart;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPart = part;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 palette[6];\nuniform float pRough[6];\nvarying float vPart;')
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'int pi = int(vPart + 0.5);\nvec4 diffuseColor = vec4( palette[pi], opacity );')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = pRough[pi];');
+  };
+  m.customProgramCacheKey = () => 'person-palette';
+  return m;
+}
+
 /** Load the body once at start-up. If it fails, interiors keep the old people. */
 export async function loadPeople() {
   try {
     file = await new GLTFLoader().loadAsync(personGlb);
+    mergeBody(file.scene);
   } catch (e) {
+    file = null;
     console.warn('The skinned person did not load; keeping the simple people.', e);
   }
 }
@@ -40,6 +90,7 @@ const LANE = 0.9, STOP_P = 0.4, TURN_PACE = 0.65;
 
 export interface Walker {
   group: THREE.Group;
+  body: THREE.SkinnedMesh;
   update(dt: number): void;
 }
 
@@ -52,6 +103,8 @@ export interface WalkerOpts {
   /** Which side the return lane is on: 1 or -1 (towards the walker's left or right). */
   lane?: 1 | -1;
   plain?: boolean;
+  /** Clothes for the neon districts: dark streetwear, now and then a bright shirt or dyed hair. */
+  street?: boolean;
 }
 
 export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: WalkerOpts = {}): Walker | null {
@@ -61,24 +114,22 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   group.add(root);
 
   // Clothes and colouring for this person.
-  const colours: Record<string, number> = {
-    skin: pick(r, SKIN), hair: pick(r, HAIR), shirt: pick(r, o.plain ? CIVIL : WORK),
-    trousers: pick(r, [0x23262c, 0x2f3540, 0x3b3530, 0x4a4f58, 0x1d2a38]), boots: pick(r, [0x0f0e0e, 0x2a1d14, 0x3a3a3a]),
+  const neonHair = o.street && r() < 0.12;
+  const colours: Record<Part, number> = {
+    skin: pick(r, SKIN),
+    // Dyed, not lit: neon shades a little darker, so they read as hair rather than a lamp.
+    hair: neonHair ? new THREE.Color(pick(r, NEON_HAIR)).multiplyScalar(0.7).getHex() : pick(r, HAIR),
+    // A bright dyed shirt, not a lit sign: neon shades at about 40% so bloom leaves them alone.
+    shirt: o.plain ? pick(r, CIVIL) : o.street ? (r() < 0.15 ? new THREE.Color(pick(r, NEON)).multiplyScalar(0.4).getHex() : pick(r, STREET)) : pick(r, WORK),
+    trousers: pick(r, [0x23262c, 0x2f3540, 0x3b3530, 0x4a4f58, 0x1d2a38]),
+    boots: pick(r, [0x0f0e0e, 0x2a1d14, 0x3a3a3a]),
+    eyes: 0x060608,
   };
-  const made = new Map<string, THREE.MeshStandardMaterial>();
-  root.traverse((n) => {
-    const m = n as THREE.SkinnedMesh;
-    if (!m.isMesh) return;
-    const src = m.material as THREE.MeshStandardMaterial;
-    let mat = made.get(src.name);
-    if (!mat) {
-      mat = src.clone();
-      if (colours[src.name] !== undefined) mat.color.setHex(colours[src.name]);
-      made.set(src.name, mat);
-    }
-    m.material = mat;
-    m.castShadow = true;
-  });
+  let body!: THREE.SkinnedMesh;
+  root.traverse((n) => { if ((n as THREE.SkinnedMesh).isSkinnedMesh) body = n as THREE.SkinnedMesh; });
+  body.material = personMaterial(colours);
+  body.castShadow = true;
+  body.receiveShadow = true;
 
   // Belters: tall and slight. Everyone else a little variety in height and build.
   const h = (o.belter ? 1.13 : 1) * (0.93 + r() * 0.13);
@@ -101,7 +152,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   idle.time = r() * idle.getClip().duration;
 
   const beat = o.beat ?? 0;
-  if (beat <= 0) return { group, update: (dt) => mixer.update(dt) };
+  if (beat <= 0) return { group, body, update: (dt) => mixer.update(dt) };
 
   // Pace a loop of two lanes: walk to the far end, U-turn in a small arc onto the next lane,
   // walk back, U-turn again. Now and then stop at the end, stand a while, then step off into the turn.
@@ -171,5 +222,5 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   if (DEBUG) debugList.push({ name: `w${debugList.length}`, get: () => ({ x: group.position.x, z: group.position.z, yaw: group.rotation.y, state, leg }) });
   // Start some already walking.
   if (r() < 0.6) go();
-  return { group, update };
+  return { group, body, update };
 }
