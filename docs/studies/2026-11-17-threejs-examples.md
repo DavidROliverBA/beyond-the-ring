@@ -92,4 +92,4 @@ For us:
 4. UltraHDR environments per place.
 5. ~~Camera look pass~~ done 2026-11-17 (`src/look.ts`): quarter-resolution god rays and lens ghosts from the bloom's bright image, dirt and a turning starburst, per-place grade, vignette, grain; about 1 ms a frame.
 6. Ship viewer with physical glass and TAA.
-7. Spike: Takram atmosphere for Earth at true scale.
+7. ~~Spike: Takram atmosphere for Earth at true scale.~~ Done differently 2026-11-17: our own per-pixel single-scattering shader on the existing shell (O'Neil, GPU Gems 2 ch. 16), in planet units so true scale is no problem, ~1 ms a frame. Takram's library was skipped: it needs the pmndrs postprocessing pipeline and metre-scale ECEF coordinates.

@@ -142,30 +142,69 @@ async function waterRoughness(url: string): Promise<THREE.Texture> {
 
 // ----------------------------------------------------------------- shaders
 
+// Air seen from space: single scattering, marched per pixel (after O'Neil, GPU Gems 2 ch. 16).
+// Worked in the planet's own units (radius 1) with the camera passed in relative to the planet, so
+// true-scale distances don't eat the float precision. Short wavelengths scatter most (a blue limb);
+// light crossing a lot of air loses its blue (red at the terminator); air in shadow scatters nothing.
+const ATMO_TOP = 1.015;
 const ATMO_V = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>
-varying vec3 vN; varying vec3 vV; varying vec3 vW;
+varying vec3 vP;
 void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vN = normalize(normalMatrix * normal);
-  vV = normalize(-mv.xyz);
-  vW = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * mv;
+  vP = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   #include <logdepthbuf_vertex>
 }`;
 const ATMO_F = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform vec3 color; uniform vec3 sunDir; uniform float strength;
-varying vec3 vN; varying vec3 vV; varying vec3 vW;
+uniform vec3 beta;      // scattering per planet radius, per colour
+uniform vec3 sunDir; uniform vec3 cam; uniform float R; uniform float strength;
+varying vec3 vP;
+const float TOP = ${ATMO_TOP};
+const float H = (TOP - 1.0) / 6.0;       // scale height: the air thins by e every sixth of the shell
+const float MIE = 0.12;                   // haze, a little, scattered mostly forwards
+vec2 hit(vec3 o, vec3 d, float r) {       // entry and exit distances along a ray through a sphere
+  float b = dot(o, d), c = dot(o, o) - r * r, h = b * b - c;
+  if (h < 0.0) return vec2(1e9, -1e9);
+  h = sqrt(h);
+  return vec2(-b - h, -b + h);
+}
+float depthTo(vec3 p, vec3 d) {           // air between a point and the top, towards the sun
+  vec2 t = hit(p, d, TOP);
+  float l = t.y / 4.0, od = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec3 q = p + d * (l * (float(i) + 0.5));
+    od += exp(-(length(q) - 1.0) / H);
+  }
+  return od * l;
+}
 void main() {
   #include <logdepthbuf_fragment>
-  // Brightest at the planet's limb, thinning to nothing at the top of the air.
-  float ndv = abs(dot(normalize(vN), normalize(vV)));
-  float rim = pow(1.0 - ndv, 2.6) * smoothstep(0.0, 0.17, ndv) * 1.5;
-  float lit = clamp(dot(normalize(vW), sunDir) * 1.3 + 0.45, 0.06, 1.0);
-  gl_FragColor = vec4(color, rim * strength * lit);
+  vec3 o = cam / R, d = normalize(vP / R - o);
+  vec2 ta = hit(o, d, TOP), tp = hit(o, d, 1.0);
+  float t0 = max(ta.x, 0.0), t1 = ta.y;
+  if (tp.x > 0.0) t1 = min(t1, tp.x);     // stop at the ground
+  if (t1 <= t0) discard;
+  const int N = 14;
+  float ds = (t1 - t0) / float(N), odView = 0.0;
+  vec3 sumR = vec3(0.0); float sumM = 0.0;
+  for (int i = 0; i < N; i++) {
+    vec3 p = o + d * (t0 + ds * (float(i) + 0.5));
+    float dens = exp(-(length(p) - 1.0) / H) * ds;
+    odView += dens;
+    if (hit(p, sunDir, 1.0).x > 0.0) continue;   // in the planet's shadow
+    float odSun = depthTo(p, sunDir);
+    vec3 att = exp(-(beta + MIE * 0.02) * (odView + odSun));
+    sumR += att * dens;
+    sumM += att.g * dens;
+  }
+  float mu = dot(d, sunDir);
+  float phaseR = 0.0597 * (1.0 + mu * mu);
+  float g = 0.76, phaseM = 0.119 * (1.0 - g * g) * (1.0 + mu * mu) / ((2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
+  vec3 col = (sumR * beta * phaseR + sumM * MIE * 0.02 * phaseM) * 6.8 * strength;   // twice the sunlight: single scattering alone undersells the bright limb
+  gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;
 
@@ -492,10 +531,21 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
 
   if (b.atmo) {
     const sunDir = pos.lengthSq() > 0 ? pos.clone().negate().normalize() : new V3(0, 1, 0);
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(R * 1.015, 96, 48), new THREE.ShaderMaterial({
-      uniforms: { color: { value: new THREE.Color(b.atmo) }, sunDir: { value: sunDir }, strength: { value: b.atmoK ?? 1 } },
-      vertexShader: ATMO_V, fragmentShader: ATMO_F, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
+    // Scattering strength per colour from the planet's air tint: Earth's blue gives roughly the real
+    // Rayleigh ratios (red scatters least), a dusty tint gives Mars its butterscotch.
+    const tint = new THREE.Color(b.atmo);
+    const beta = new V3(tint.r, tint.g, tint.b).multiplyScalar(220 / Math.max(tint.r, tint.g, tint.b));
+    const uniforms = { beta: { value: beta }, sunDir: { value: sunDir }, cam: { value: new V3() }, R: { value: R }, strength: { value: b.atmoK ?? 1 } };
+    const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: ATMO_V, fragmentShader: ATMO_F, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(R * ATMO_TOP, 96, 48), mat);
+    // Each frame: where the camera is relative to this planet, and whether we're inside the air.
+    const wp = new V3();
+    shell.onBeforeRender = (_r, _s, cam) => {
+      shell.getWorldPosition(wp);
+      uniforms.cam.value.copy(cam.position).sub(wp);
+      const side = uniforms.cam.value.length() < R * ATMO_TOP ? THREE.BackSide : THREE.FrontSide;
+      if (mat.side !== side) { mat.side = side; mat.needsUpdate = true; }
+    };
     holder.add(shell);
   }
   if (b.rings) {
