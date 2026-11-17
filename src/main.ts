@@ -861,7 +861,7 @@ const camQ = new THREE.Quaternion();
 // On foot inside a station.
 let walk: Interior | null = null;
 let nearPoint: Point | null = null;
-const walker = { x: 0, z: 0, yaw: 0, pitch: 0, bob: 0 };
+const walker = { x: 0, z: 0, yaw: 0, pitch: 0, bob: 0, vx: 0, vz: 0 };
 let lodBusy = false;
 
 const loadingEl = $('loading');
@@ -1083,7 +1083,7 @@ function buildNav() {
       const el = document.createElement('button');
       el.className = 'nav-item';
       el.textContent = pl.name;
-      el.addEventListener('click', () => Object.assign(walker, { x: pl.x, z: pl.z, yaw: pl.yaw, pitch: 0 }));
+      el.addEventListener('click', () => Object.assign(walker, { x: pl.x, z: pl.z, yaw: pl.yaw, pitch: 0, vx: 0, vz: 0 }));
       list.append(el);
     }
     $('nav-any').style.display = 'none';
@@ -1277,10 +1277,10 @@ async function dock(th: Thing) {
     const it = await buildInterior(th.dock!);
     it.scene.environment = envMap;
     it.scene.environmentIntensity = 0.3;
-    Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0 });
+    Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0, vx: 0, vz: 0 });
     await warm(it.scene, walkCam);
     walk = it;
-    Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0 });
+    Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0, vx: 0, vz: 0 });
     document.body.classList.add('walking');
     buildNav();
     $('loc-name').textContent = it.name;
@@ -1315,16 +1315,33 @@ function walkStep(dt: number) {
   if (keys.has('ArrowDown')) walker.pitch = Math.max(-1.45, walker.pitch - 1.2 * dt);
   const f = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   const r = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  // Feet take a moment to get going and to stop: ease the velocity towards what the keys ask for.
+  const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  let tx = 0, tz = 0;
   if ((f || r) && !busy) {
-    const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
-    const v = (run ? (it.curveR ? 18 : 10) : 4.2) * dt / Math.hypot(f, r);
+    const v = (run ? (it.curveR ? 18 : 10) : 4.2) / Math.hypot(f, r);
     const sin = Math.sin(walker.yaw), cos = Math.cos(walker.yaw);
-    const dx = (-sin * f + cos * r) * v, dz = (-cos * f - sin * r) * v;
-    if (it.free(walker.x + dx, walker.z)) walker.x += dx;
-    if (it.free(walker.x, walker.z + dz)) walker.z += dz;
-    walker.bob += dt * (run ? 13 : 8);
+    tx = (-sin * f + cos * r) * v;
+    tz = (-cos * f - sin * r) * v;
   }
-  const eye = 1.7 + Math.sin(walker.bob) * 0.03;
+  const ease = 1 - Math.exp(-dt * (tx || tz ? 9 : 12));
+  walker.vx += (tx - walker.vx) * ease;
+  walker.vz += (tz - walker.vz) * ease;
+  const speed = Math.hypot(walker.vx, walker.vz);
+  if (speed < 0.02) walker.vx = walker.vz = 0;
+  // Move in short hops so a fast run can't jump through a thin wall, sliding along whatever blocks one axis.
+  const hops = Math.max(1, Math.ceil((speed * dt) / 0.2));
+  for (let i = 0; i < hops; i++) {
+    const dx = (walker.vx * dt) / hops, dz = (walker.vz * dt) / hops;
+    if (it.free(walker.x + dx, walker.z)) walker.x += dx; else walker.vx *= 0.5;
+    if (it.free(walker.x, walker.z + dz)) walker.z += dz; else walker.vz *= 0.5;
+  }
+  // People are solid too: step round them rather than through.
+  const [px, pz] = it.clearOfPeople(walker.x, walker.z, 0.3);
+  if (it.free(px, pz)) { walker.x = px; walker.z = pz; }
+  // The head bobs with each stride, more when running, not at all when standing.
+  walker.bob += dt * speed * (run ? 1.3 : 1.9);
+  const eye = 1.7 + Math.sin(walker.bob) * 0.03 * Math.min(1, speed / 4);
   const q = walkCam.quaternion.setFromAxisAngle(_a.set(0, 1, 0), walker.yaw).multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), walker.pitch));
   if (it.curveR) {
     const R = it.curveR, th = walker.x / R;
@@ -1528,6 +1545,8 @@ let clock = 0;
 // With ?debug in the address, keep the last few thousand frame times for tests (hitch hunting).
 const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
+// (walker is declared further down; expose it lazily for tests)
+if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null }) });
 
 function frame(now: number) {
   requestAnimationFrame(frame);
