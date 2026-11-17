@@ -12,6 +12,7 @@ import {
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
 import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
+import { canBounce } from './probes';
 import { loadPeople } from './skinned';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
@@ -38,6 +39,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000003);
 const camera = new THREE.PerspectiveCamera(60, 1, 1e-9, 4e6 * LOGK);
 const walkCam = new THREE.PerspectiveCamera(72, 1, 0.08, 12000 * LOGK);
+/** How far a light probe sees (scaled like every far plane), and how long (ms) docking may
+ *  spend filling probes in the dark before the rest is left to the frames that follow. */
+const PROBE_FAR = 400 * LOGK, BAKE_DARK = 1500;
 
 // Everything is drawn into a float buffer first, so lamps, drives and city lights
 // can be brighter than white and bleed a little, the way they do on film.
@@ -1274,12 +1278,22 @@ async function dock(th: Thing) {
   ship.throttle = ship.speed = 0;
   await fade(async () => {
     loadingEl.textContent = 'Docking…';
-    const it = await buildInterior(th.dock!);
+    const it = await buildInterior(th.dock!, canBounce(renderer) && !new URLSearchParams(location.search).has('nobounce'));
     it.scene.environment = envMap;
     it.scene.environmentIntensity = 0.3;
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0 });
+    // The probe textures must exist before the shaders are compiled, or every shader is
+    // compiled twice. Then fill in the room you arrive in while the screen is still dark;
+    // the other rooms follow a few probes a frame (see frame()).
+    it.bounce?.prime(renderer);
     await warm(it.scene, walkCam);
+    if (it.bounce && !it.bounce.done) {
+      const here = new V3(it.spawn.x, 1.7, it.spawn.z), t0 = performance.now();
+      while (!it.bounce.step(renderer, 24, here, PROBE_FAR) && performance.now() - t0 < BAKE_DARK) await pause();
+      renderer.getContext().finish();
+    }
     walk = it;
+    walkSince = clock;
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0 });
     document.body.classList.add('walking');
     buildNav();
@@ -1527,7 +1541,9 @@ let clock = 0;
 
 // With ?debug in the address, keep the last few thousand frame times for tests (hitch hunting).
 const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
-if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
+if (FRAMES) Object.assign(globalThis, { __frames: FRAMES, __bounce: () => walk?.bounce && { count: walk.bounce.count, left: walk.bounce.left, ...walk.bounce.stats, draws: renderer.info.render.calls, tris: renderer.info.render.triangles }, __walk: () => walk, __cam: walkCam, __draw: () => { if (walk) draw(walk.scene, walkCam); }, __V3: V3, __renderer: renderer, __bounceStop: () => { if (walk?.bounce) walk.bounce.done = true; } });
+
+let walkSince = 0, bakeSkip = 0;
 
 function frame(now: number) {
   requestAnimationFrame(frame);
@@ -1537,6 +1553,9 @@ function frame(now: number) {
   clock += dt;
   if (!space) return;
   if (walk) {
+    // Light probes still to fill in: a little each frame, nearest room first. Not in the first
+    // second or so on foot, and only every fourth frame when frames are already slow.
+    if (walk.bounce && !walk.bounce.done && clock - walkSince > 1.7 && (dt < 0.024 || ++bakeSkip % 4 === 0)) walk.bounce.step(renderer, 3, walkCam.position, PROBE_FAR);
     walkStep(dt);
     updateHud(dt);
     draw(walk.scene, walkCam);

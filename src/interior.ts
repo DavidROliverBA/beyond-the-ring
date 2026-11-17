@@ -9,6 +9,7 @@ import { PHOTOS } from './photos';
 import { buildPerson } from './people';
 import { buildWalker, peopleReady, type Walker } from './skinned';
 import { buildConcourse, terraceFront } from './concourse';
+import { Bounce, type ProbeBox } from './probes';
 
 /** How much each station's spin gravity turns a walk into the Belter lope (0 walk, 1 full lope). */
 const LOPE: Record<string, number> = { ceres: 0.6, tycho: 0.5, medina: 0.5, ganymede: 0.8 };
@@ -28,6 +29,8 @@ export interface Interior {
   free(x: number, z: number): boolean;
   roomAt(x: number, z: number): string;
   tick(t: number, dt: number, cam: THREE.Vector3): void;
+  /** Bounce light, where the browser can do it (see probes.ts). */
+  bounce?: Bounce;
 }
 
 // --------------------------------------------------------------- surfaces
@@ -248,10 +251,14 @@ type Side = 'n' | 's' | 'e' | 'w';
 interface Rect { x0: number; z0: number; x1: number; z1: number }
 interface Opening { side: Side; a: number; b: number; y0: number; y1: number; glass: boolean; label?: string }
 interface RoomOpts { floor: Surf; wall: Surf; ceil?: Surf; tint?: number; floorTint?: number; open?: boolean; glow?: number; /** Daylit and quiet: the neon pass leaves it alone. */ calm?: boolean }
-interface Room extends Rect { name: string; h: number; o: RoomOpts; openings: Opening[] }
+interface Room extends Rect { name: string; h: number; o: RoomOpts; openings: Opening[]; /** Changes to the room's box of light probes. */ probe?: Partial<ProbeBox> }
 interface PutOpts { y?: number; yaw?: number; solid?: boolean }
 
 const M = 0.35;
+/** Whether interiors built from now on get bounce light. Set by buildInterior. */
+let BOUNCE = false;
+/** With bounce light the flat fill light can drop to this much of itself: the probes do its job. */
+const FILL = 0.45;
 
 class Kit {
   scene = new THREE.Scene();
@@ -275,6 +282,11 @@ class Kit {
   /** Called every frame with where you are and the light that follows you. */
   onCam: ((cam: THREE.Vector3, key: THREE.DirectionalLight) => void)[] = [];
   /** Skinned people, animated more often the nearer they are to you (see tick). */
+  /** Probe boxes beyond the one each room gets. */
+  volumes: ProbeBox[] = [];
+  /** Things the light probes should not see: people (they move) and the painted-on shade. */
+  unlit: THREE.Object3D[] = [];
+  bounce = BOUNCE;
   folk: { w: Walker; acc: number; i: number; stand?: { shadow: THREE.Group; rect: Rect } }[] = [];
   private mats = new Map<string, THREE.MeshStandardMaterial>();
   r = rng(1);
@@ -372,6 +384,7 @@ class Kit {
       s.translateZ(0.012);
       s.renderOrder = 1;
       this.scene.add(s);
+      this.unlit.push(s);
     };
     if (y0 < 0.01) strip(false);
     if (y1 > room.h - 0.01 && !room.o.open) strip(true);
@@ -385,6 +398,7 @@ class Kit {
     g.add(m);
     m.position.y = 0.02;
     m.renderOrder = 1;
+    this.unlit.push(g);
     return this.place(g, x, 0, z, yaw);
   }
 
@@ -534,6 +548,7 @@ class Kit {
     // Walkers pace a short beat along the way they face, so long as the whole beat is open floor.
     const beat = walk && !this.curveR && [-1, -0.5, 0, 0.5, 1].every((s) => this.free(x + fx * A * s, z + fz * A * s));
     this.place(g, x, 0, z, yaw);
+    this.unlit.push(g);
     if (!beat) this.contact(x, z, 1.0, 1.0, 0, 0.5);
     if (!beat) {
       this.block(x, z, 0.3, 0.3);
@@ -562,6 +577,7 @@ class Kit {
     const g = LOPE[this.id] ?? 0.4;
     const w = buildWalker(this.r, x, z, yaw, { belter, lope: lope ?? (belter ? g : g * 0.5), beat: side ? beat : 0, lane: side, plain: this.plainPeople, street: !this.plainPeople });
     if (!w) return;
+    this.unlit.push(w.group);
     let stand: { shadow: THREE.Group; rect: Rect } | undefined;
     if (side) this.scene.add(w.group);
     else {
@@ -641,8 +657,13 @@ class Kit {
       const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, area = w * d;
       const col = PAL[ri % PAL.length], col2 = PAL[(ri + 2) % PAL.length];
       if (h < 3.3 || room.o.calm) return;
-      const L = new THREE.PointLight(col, 60 + Math.min(area, 400) * 0.25, Math.max(w, d) * 0.8 + 8, 1.5);
-      this.place(L, cx, Math.min(h - 0.6, 3.6), cz);
+      // With bounce light to fill the room, the lamp can be dimmer and (where there is headroom)
+      // higher, which stops it burning out the heads of tall people standing near it.
+      // Under a low ceiling it cannot go higher, so it is dimmed further.
+      const soft = this.bounce, ly = Math.min(h - 0.6, soft ? 4.4 : 3.6);
+      const dim = soft ? 0.3 + 0.25 * Math.min(1, Math.max(0, (ly - 3) / 1.4)) : 1;
+      const L = new THREE.PointLight(col, (60 + Math.min(area, 400) * 0.25) * dim, Math.max(w, d) * 0.8 + 8, 1.5);
+      this.place(L, cx, ly, cz);
       // Nobody stands right under it: a tall Belter's head would be a hand's breadth from the bulb.
       for (const f of this.folk) {
         const p = f.w.group.position, dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
@@ -873,9 +894,38 @@ class Kit {
     key.shadow.normalBias = 0.05;
     this.scene.add(key, key.target);
     const up = new THREE.Vector3();
+    /** Set the lights as they are for someone standing at `cam`. */
+    const aim = (cam: THREE.Vector3) => {
+      for (const f of this.onCam) f(cam, key);
+      if (this.curveR) {
+        // In the drum the light comes from the axis, straight overhead wherever you stand.
+        up.set(-cam.x, -cam.y, 0).normalize();
+        key.target.position.copy(cam).addScaledVector(up, -1.7);
+        key.position.copy(key.target.position).addScaledVector(up, 110);
+      } else {
+        key.target.position.set(cam.x, 0, cam.z);
+        key.position.copy(key.target.position).addScaledVector(this.keyFrom, 110);
+      }
+    };
+    let bounce: Bounce | undefined;
+    if (this.bounce && this.rooms.length + this.volumes.length) {
+      // One box of probes per room, about 2 m apart in small rooms and wider in the big ones.
+      // A room's probes are all inside its own walls, which is what stops light leaking through.
+      const boxes = [...this.volumes];
+      for (const r of this.rooms) {
+        const w = r.x1 - r.x0, d = r.z1 - r.z0, step = Math.min(5, Math.max(2, Math.sqrt((w * d) / 100)));
+        boxes.push({
+          x0: r.x0, x1: r.x1, y0: 0, y1: r.h, z0: r.z0, z1: r.z1,
+          nx: Math.max(2, Math.round(w / step)), ny: Math.min(3, Math.max(2, Math.round(r.h / 2.5))), nz: Math.max(2, Math.round(d / step)), ...r.probe,
+        });
+      }
+      this.scene.traverse((o) => { if (o instanceof THREE.HemisphereLight) o.intensity *= FILL; });
+      if (this.stars) this.unlit.push(this.stars);
+      bounce = new Bounce(this.scene, boxes, aim, this.unlit);
+    }
     let frame = 0;
     return {
-      id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR,
+      id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR, bounce,
       free: (x, z) => this.free(x, z),
       roomAt: (x, z) => this.roomAt(x, z),
       tick: (t, dt, cam) => {
@@ -890,17 +940,8 @@ class Kit {
           if ((frame + f.i) % every === 0) { f.w.update(f.acc); f.acc = 0; }
         }
         for (const a of this.anims) a(t, dt);
-        for (const f of this.onCam) f(cam, key);
         this.stars?.position.copy(cam);
-        if (this.curveR) {
-          // In the drum the light comes from the axis, straight overhead wherever you stand.
-          up.set(-cam.x, -cam.y, 0).normalize();
-          key.target.position.copy(cam).addScaledVector(up, -1.7);
-          key.position.copy(key.target.position).addScaledVector(up, 110);
-        } else {
-          key.target.position.set(cam.x, 0, cam.z);
-          key.position.copy(key.target.position).addScaledVector(this.keyFrom, 110);
-        }
+        aim(cam);
       },
     };
   }
@@ -1067,6 +1108,8 @@ function ceres(): Interior {
   const CW = 8, CZ0 = 130, CZ1 = 310, CH = 3.6;
   const con = k.room('The Concourse', -CW, CZ0, CW, CZ1, CH, { floor: 'grime', wall: 'white', open: true, calm: true, floorTint: 0xb9bdc1 }, Math.PI);
   k.places[k.places.length - 1].z = CZ0 + 9;
+  // The street's probes take in the terraces up both walls as well, so they are lit the same way.
+  con.probe = { x0: -26, x1: 26, y1: 26, nx: 8, ny: 4, nz: 24 };
   k.door(hydro, con, 0, 3.4);
   k.window(dock, 'n', -14, 14, 2, 10);
   k.finish();
@@ -1370,6 +1413,9 @@ function medina(): Interior {
     { name: 'Far side of the drum', x: C / 2, z: -200, yaw: Math.PI },
     { name: 'Stern end', x: -40, z: 440, yaw: 0 },
   );
+  // The whole drum in one coarse box of probes. The light in here changes slowly, and what a
+  // probe sees in every direction is lit farmland, which is exactly the drum's fill light.
+  k.volumes.push({ x0: -R, x1: R, y0: -R, y1: R, z0: -L / 2, z1: L / 2, nx: 10, ny: 10, nz: 16 });
   return k.done({ name: 'Bow lift', x: 0, z: -438, yaw: Math.PI });
 }
 
@@ -1478,15 +1524,19 @@ async function ganymede(): Promise<Interior> {
     'Ganymede is the only moon with a magnetic field of its own, which shelters the surface from the worst of Jupiter\'s radiation. That makes it the safest place beyond Mars to carry a child, and Belter families cross the system to do it.');
   k.placard(-4, -34, Math.PI / 2, 'A sixth of a sixth',
     'Gravity here is about a seventh of Earth\'s. Crops grow tall and thin, water arcs lazily out of the irrigation heads, and a dropped tool takes a full second and a half to reach the soil.');
+  // One low box of probes for the whole dome: sunlight coming back up off the soil and crops.
+  k.volumes.push({ x0: -R, x1: R, y0: 0, y1: 15, z0: -R, z1: R, nx: 16, ny: 3, nz: 16 });
   k.places.push({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 }, { name: 'Centre of the dome', x: 0, z: -4, yaw: 0 }, { name: 'Far edge', x: 0, z: -54, yaw: 0 });
   return k.done({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 });
 }
 
 const cache = new Map<string, Interior>();
 
-export async function buildInterior(id: string): Promise<Interior> {
+/** Build (once) the inside of a station. `bounce` adds light probes, if the browser can do them. */
+export async function buildInterior(id: string, bounce = false): Promise<Interior> {
   let it = cache.get(id);
   if (!it) {
+    BOUNCE = bounce;
     it = id === 'tycho' ? tycho() : id === 'ceres' ? ceres() : id === 'medina' ? medina() : await ganymede();
     cache.set(id, it);
   }
