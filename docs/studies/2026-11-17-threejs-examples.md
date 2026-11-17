@@ -86,8 +86,8 @@ For us:
 
 ## Suggested order, merged with the earlier studies
 
-1. Skinned people (in progress on branch `skinned-people`).
-2. `compileAsync` when docking and at start-up. Small, removes hitches.
+1. ~~Skinned people~~ done 2026-11-17, in every interior.
+2. ~~`compileAsync` when docking and at start-up~~ done 2026-11-17 (`warm()` in `src/main.ts`): the 175 ms freeze on first turning round in Ceres is gone; the work now happens behind the docking fade.
 3. Light probe grid in interiors, starting with the Concourse.
 4. UltraHDR environments per place.
 5. Camera look pass (god rays, lens ghosts, grade) from the Above the Clouds study.

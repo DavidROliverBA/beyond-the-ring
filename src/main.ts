@@ -56,6 +56,25 @@ function draw(s: THREE.Scene, c: THREE.Camera) {
   composer.render();
 }
 
+/** Get a scene ready to show without hitches: upload every texture and compile every shader now,
+ *  while the screen is still dark, instead of on the first frame each thing comes into view.
+ *  Shaders are compiled for the off-screen buffer the scene is really drawn into (it skips tone
+ *  mapping, which happens in the last pass), or they would not be the ones used. */
+async function warm(s: THREE.Scene, c: THREE.Camera) {
+  const seen = new Set<THREE.Texture>();
+  s.traverse((o) => {
+    const mats = (o as THREE.Mesh).material;
+    if (!mats) return;
+    for (const m of Array.isArray(mats) ? mats : [mats]) {
+      for (const v of Object.values(m)) if (v instanceof THREE.Texture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); }
+    }
+  });
+  renderer.setRenderTarget(composer.renderTarget1);
+  const done = renderer.compileAsync(s, c);
+  renderer.setRenderTarget(null);
+  await done;
+}
+
 // A dim studio stands in for all the light bouncing around, so metal has something to reflect.
 const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environment = envMap;
@@ -957,6 +976,7 @@ async function transit(g: Thing) {
   loadingEl.textContent = '';
   const next = await getSpace(g.to.space);
   enter(next);
+  await warm(scene, camera);
   const dest = next.things.find((t) => t.id === g.to!.gate)!;
   ship.pos.copy(dest.pos).addScaledVector(dest.normal!, dest.radius * 2.5);
   ship.prev.copy(ship.pos);
@@ -1257,6 +1277,8 @@ async function dock(th: Thing) {
     const it = await buildInterior(th.dock!);
     it.scene.environment = envMap;
     it.scene.environmentIntensity = 0.3;
+    Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0 });
+    await warm(it.scene, walkCam);
     walk = it;
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0 });
     document.body.classList.add('walking');
@@ -1503,8 +1525,13 @@ const _off = new V3(), _lookQ = new THREE.Quaternion();
 let last = performance.now();
 let clock = 0;
 
+// With ?debug in the address, keep the last few thousand frame times for tests (hitch hunting).
+const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
+if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
+
 function frame(now: number) {
   requestAnimationFrame(frame);
+  if (FRAMES && last) { FRAMES.push(now - last); if (FRAMES.length > 5000) FRAMES.shift(); }
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   clock += dt;
@@ -1570,6 +1597,8 @@ async function boot() {
   const s = await getSpace(id);
   enter(s);
   placeAt(s.things.find((t) => t.id === (id === 'sol' ? 'earth' : id === 'slow' ? 'station' : 'ring'))!);
+  loadingEl.textContent = 'Warming up…';
+  await warm(scene, camera);
   loadingEl.textContent = '';
   busy = false;
   $('launch').removeAttribute('disabled');
