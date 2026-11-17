@@ -15,6 +15,7 @@ import { buildInterior, type Interior, type Point } from './interior';
 import { loadPeople } from './skinned';
 import { createLook } from './look';
 import { addLightning } from './lightning';
+import { createTour } from './tour';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
 type V3 = THREE.Vector3;
@@ -980,6 +981,7 @@ function banner(title: string, text: string) {
 
 async function transit(g: Thing) {
   if (busy || !g.to) return;
+  stopTour();
   busy = true;
   auto = null;
   const flash = $('flash');
@@ -1032,6 +1034,34 @@ addEventListener('wheel', (e) => {
 
 const STEER = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'KeyX', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
+// Tour mode: the camera films the system shot by shot. Behind the start screen it just plays;
+// in flight T starts and stops it, and any other key hands control back where you left off.
+const tour = createTour(
+  (t, caption) => { if (started) banner(t.name, caption); },
+  (on) => $('flash').classList.toggle('on', on),
+);
+let tourSave: { pos: V3; q: THREE.Quaternion } | null = null;
+function startTour() {
+  if (busy || walk || tour.active) return;
+  tourSave = { pos: ship.pos.clone(), q: ship.q.clone() };
+  auto = null;
+  ship.speed = ship.throttle = 0;
+  tour.start(space.id, space.things, space.things.find((t) => t.kind === 'star')?.pos ?? null);
+}
+function stopTour() {
+  if (!tour.active && !tourSave) return;
+  tour.stop();
+  $('banner').classList.remove('show');
+  if (tourSave) {
+    ship.pos.copy(tourSave.pos);
+    ship.prev.copy(tourSave.pos);
+    ship.q.copy(tourSave.q);
+    camQ.copy(tourSave.q);
+    tourSave = null;
+  }
+  shipModel.visible = chase;
+}
+
 // Photo mode: time stands still, the HUD goes, the mouse still looks around.
 let photo = false, saveShot = false;
 function setPhoto(on: boolean) {
@@ -1058,6 +1088,8 @@ addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
   if (e.metaKey || e.ctrlKey) return;
   if (started && !busy && e.code === 'KeyP') { setPhoto(!photo); return; }
+  // Any key but T (and the panels) ends a tour and only does that, so the ship doesn't lurch off.
+  if (started && tour.active && !['KeyT', 'Tab', 'KeyN', 'KeyH'].includes(e.code)) { stopTour(); return; }
   if (photo) {
     if (e.code === 'BracketRight') renderer.toneMappingExposure = Math.min(4, renderer.toneMappingExposure * 1.15);
     else if (e.code === 'BracketLeft') renderer.toneMappingExposure = Math.max(0.25, renderer.toneMappingExposure / 1.15);
@@ -1077,6 +1109,7 @@ addEventListener('keydown', (e) => {
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
     return;
   }
+  if (e.code === 'KeyT') { if (tour.active) stopTour(); else startTour(); return; }
   if (STEER.includes(e.code)) auto = null;
   switch (e.code) {
     case 'Tab':
@@ -1616,7 +1649,7 @@ function frame(now: number) {
     lookPitch = clamp(lookPitch - mdy * 0.003, -1.4, 1.4);
     mdx = mdy = 0;
   }
-  if (!busy && started) step(dt);
+  if (!busy && started && !tour.active) step(dt);
   lodTick();
 
   shipModel.position.copy(ship.pos);
@@ -1635,6 +1668,12 @@ function frame(now: number) {
   camera.position.copy(ship.pos).add(_off.applyQuaternion(_lookQ));
   camera.quaternion.copy(_lookQ);
   camera.updateMatrixWorld();
+  if (tour.active && tour.update(dt, camera, !started)) {
+    // The tour drives the camera; the ship rides along unseen, so maps sharpen where we're looking.
+    shipModel.visible = false;
+    ship.pos.copy(camera.position);
+    ship.prev.copy(camera.position);
+  }
   sky.position.copy(camera.position);
 
   const p = dustGeo.getAttribute('position') as THREE.BufferAttribute;
@@ -1678,10 +1717,13 @@ async function boot() {
   loadingEl.textContent = '';
   busy = false;
   $('launch').removeAttribute('disabled');
+  // Behind the start screen, show the system off.
+  startTour();
   $('launch').textContent = 'Launch';
 }
 
 $('launch').addEventListener('click', () => {
+  stopTour();
   started = true;
   document.body.classList.add('started');
   banner(space.id === 'slow' ? space.name : `${space.name} system`, space.blurb);
