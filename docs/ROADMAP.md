@@ -81,7 +81,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Backlog (not scheduled)
 
-- **Bug found 2026-11-17: Earth's night side renders almost as bright as the day side**, with day colours, although the city lights correctly appear only there. Turning the Sun's light and the ambient light to zero in the page doesn't darken it, and neither the atmosphere shell nor the camera look is the cause. Investigate with the space-lighting work (Phase A step 2): check the surface shader output and the cloud deck.
+- ~~Bug: Earth's night side rendered nearly as bright as day.~~ *Fixed 2026-11-17:* the studio environment meant for ship reflections was lighting every planet, because a material's `envMapIntensity` doesn't scale `scene.environment`. Planets, clouds and rocks now carry their own black environment.
 - **Sound.** Parked at the owner's request. When revisited: synthesised or CC0 audio only, Web Audio positional sound with a convolver reverb per room, footsteps per material, ventilation and crowd murmur layers.
 - Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).
 - Hand-flying and hand-walking test pass by a person, not only headless Playwright.

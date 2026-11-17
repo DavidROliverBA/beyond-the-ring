@@ -87,6 +87,9 @@ async function warm(s: THREE.Scene, c: THREE.Camera) {
 const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environment = envMap;
 scene.environmentIntensity = 0.3;
+// Planets, moons and rocks must not pick up that studio: it lit night sides like day. A material's
+// envMapIntensity doesn't scale scene.environment, so they get their own black environment instead.
+const NO_ENV = new THREE.PMREMGenerator(renderer).fromScene(new THREE.Scene(), 0).texture;
 
 function resize() {
   composer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -460,6 +463,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   } else {
     const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, bumpScale: photo?.bumpScale ?? 3 });
     if (photo?.normal) mat.normalScale.set(1.6, 1.6);
+    mat.envMap = NO_ENV;
     mat.envMapIntensity = 0;
     if (kinds.lights) {
       mat.emissive = new THREE.Color(0xffffff);
@@ -472,7 +476,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   tilt.add(mesh);
   ctx.spin.push({ o: mesh, r: b.spin ?? 0.02 });
   if (kinds.clouds) {
-    lod.clouds = new THREE.MeshStandardMaterial({ transparent: true, roughness: 1, depthWrite: false, envMapIntensity: 0 });
+    lod.clouds = new THREE.MeshStandardMaterial({ transparent: true, roughness: 1, depthWrite: false, envMap: NO_ENV, envMapIntensity: 0 });
     const deck = new THREE.Mesh(new THREE.SphereGeometry(R * 1.012, 96, 48), lod.clouds);
     tilt.add(deck);
     ctx.spin.push({ o: deck, r: (b.spin ?? 0.02) * 1.4 });
@@ -558,7 +562,7 @@ function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>) {
 
   const knots = (b.clusters ?? []).map((id) => posOf.get(id)).filter((p): p is V3 => !!p);
   const perKnot = 90;
-  const rockMat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 1, flatShading: true, envMapIntensity: 0 });
+  const rockMat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 1, flatShading: true, envMap: NO_ENV, envMapIntensity: 0 });
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new V3(), e = new THREE.Euler();
   const put = (rocks: THREE.InstancedMesh, i: number, at: V3, size: number) => {
     e.set(r() * TAU, r() * TAU, r() * TAU);
