@@ -1618,6 +1618,9 @@ function updateHud(dt: number) {
   hudClock = 0;
   if (walk) {
     $('loc-near').textContent = walk.roomAt(walker.x, walker.z);
+    // Station time runs on your own clock, so a late-night visit finds the place on its night shift.
+    const now = new Date();
+    $('loc-sub').textContent = `On foot · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time`;
     const pt = nearPoint as Point | null;
     $('card').style.display = pt ? 'block' : 'none';
     if (pt) {
