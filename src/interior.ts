@@ -896,11 +896,21 @@ class Kit {
     key.shadow.normalBias = 0.05;
     this.scene.add(key, key.target);
     const up = new THREE.Vector3();
+    // Lamps on the drum's axis (see aim).
+    const axial: THREE.PointLight[] = [];
+    if (this.curveR) this.scene.traverse((o) => {
+      if (o instanceof THREE.PointLight && o.position.x === 0 && o.position.y === 0) { o.userData.base = o.intensity; axial.push(o); }
+    });
     /** Set the lights as they are for someone standing at `cam`. */
     const aim = (cam: THREE.Vector3) => {
       for (const f of this.onCam) f(cam, key);
       if (this.curveR) {
         // In the drum the light comes from the axis, straight overhead wherever you stand.
+        // The light probes are aimed from the axis itself, where no one direction is overhead:
+        // for them the lamps along the axis shine with the key's strength instead.
+        const axis = cam.x * cam.x + cam.y * cam.y < 1;
+        key.intensity = axis ? 0 : this.keyPower;
+        for (const l of axial) l.intensity = l.userData.base + (axis ? this.keyPower : 0);
         up.set(-cam.x, -cam.y, 0).normalize();
         key.target.position.copy(cam).addScaledVector(up, -1.7);
         key.position.copy(key.target.position).addScaledVector(up, 110);
@@ -1304,9 +1314,11 @@ function ceres(): Interior {
       const u = Math.min(1, Math.max(0, (cam.z - (CZ0 - 3)) / 8)), b = u * u * (3 - 2 * u);
       fog.color.lerpColors(base.fog, dayFog, b);
       fog.density = base.dens + (0.0068 - base.dens) * b;
-      hemi.intensity = base.hemi + (1.1 - base.hemi) * b;
+      // With bounce light the sky panels and white walls light the street themselves, so the
+      // flat fill and the key both come down or the terraces wash out.
+      hemi.intensity = base.hemi + ((k.bounce ? 0.5 : 1.1) - base.hemi) * b;
       hemi.color.lerpColors(base.sky, daySky, b);
-      key.intensity = base.key + (2.1 - base.key) * b;
+      key.intensity = base.key + ((k.bounce ? 1.9 : 2.1) - base.key) * b;
       key.color.lerpColors(base.keyC, dayKey, b);
     });
   }
