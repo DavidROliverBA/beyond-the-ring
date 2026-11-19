@@ -15,6 +15,7 @@ Note what felt wrong and where. "Fine" is a useful answer too.
 - [ ] Fly towards the Sun: soft rays and a faint lens halo, not a washed-out screen.
 - [ ] Look at Earth's night side: dark, city lights, now and then a lightning flash in the clouds. Day side: a light blue haze, thin blue limb.
 - [ ] T plays the tour from where you are; any key hands control back where you were.
+- [ ] Near Tycho, aim at a ship or the station and press I: the camera glides in; move the mouse to circle it, wheel to zoom; I again to fly on. Do the new hull textures, grime and lit windows look right up close?
 - [ ] P (photo mode): HUD gone, time frozen, mouse looks, [ ] exposure, Enter saves a PNG, P again to fly on.
 - [ ] Fly through the Ring into the ring space, then out through a gate.
 

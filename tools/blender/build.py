@@ -1,9 +1,9 @@
-import bpy, sys, os, math
+import bpy, sys, os, math, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import importlib, kit
 importlib.reload(kit)
 import bmesh
-from kit import Ship, reset, bake_ao, export, preview, section_at
+from kit import Ship, reset, bake_ao, weather, export, preview, section_at
 from mathutils import Matrix, Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,7 +42,7 @@ def corvette():
         if c.y > 0.33 and abs(c.x) < 0.045:
             f.material_index = kit.NAMES.index('mred')
     band(sides, 'trim', -0.18, -0.15, lambda c: c.z > 0.0)
-    s.plate(sides, accents=[('hull2', 0.18)], merge=0.55)
+    hp = s.plate(sides, accents=[('hull2', 0.18)], merge=0.55)
     s.paint(caps, 'dark')
 
     # Raised crew block: angled front with the cockpit glazing, light panelled roof, red edge stripes.
@@ -55,7 +55,12 @@ def corvette():
             f.material_index = kit.NAMES.index('mred')
     s.plate(cb, inset=0.002, depth=0.001, merge=0.4)
     s.paint(cbc, 'dark')
-    s.windows((-0.03, 0.158, 0.088), (0.03, 0.158, 0.088), 4, (0, 0.6, 0.8), s=0.0035, skip=0)
+    # Flight deck glazing across the sloped front, a row of cabin ports down each side.
+    slope = Vector((0, 0.746, 0.666))
+    for i in range(5):
+        s.pane(Vector(((i - 2) * 0.019, 0.148, 0.1086)) + slope * 0.0012, slope, 0.015, 0.011, along=(1, 0, 0))
+    for sx in (1, -1):
+        s.windows((sx * 0.0912, 0.105, 0.1), (sx * 0.0983, -0.055, 0.1), 8, (sx, 0, 0), s=0.0032)
 
     # Engineering section: boxy, pale with red and white stripes, wider than the hull behind the crew block.
     en, enc = s.loft([(-0.14, 0.13, 0.070, 0.040, 0.035, 0.012), (-0.18, 0.152, 0.092, 0.050, 0.045, 0.006),
@@ -66,12 +71,15 @@ def corvette():
             f.material_index = kit.NAMES.index('mred')
         elif abs(c.x) > 0.14 and c.z > -0.02 and -0.35 < c.y < -0.2:
             f.material_index = kit.NAMES.index('hull2')
-    s.plate(en, inset=0.002, depth=0.0012, merge=0.4)
+    ep = s.plate(en, inset=0.002, depth=0.0012, merge=0.4)
     s.paint(enc, 'dark')
-    # Machinery door on each flank, a grille above the aft hull.
+    # Machinery door on each flank, coolant lines above and below it, a grille forward of it.
     for sx in (1, -1):
         s.box(0.004, 0.09, 0.05, (sx * 0.1535, -0.27, 0.0), 'dark')
         s.box(0.005, 0.06, 0.03, (sx * 0.1535, -0.27, 0.0), 'trim')
+        s.pipe([(sx * 0.1542, -0.19, -0.03), (sx * 0.1542, -0.225, -0.03), (sx * 0.1542, -0.235, -0.037), (sx * 0.1542, -0.37, -0.037)], r=0.0018)
+        s.pipe([(sx * 0.1542, -0.195, 0.038), (sx * 0.1542, -0.365, 0.038)], r=0.0024, m='steel')
+        s.vent((sx * 0.1525, -0.2, 0.004), (sx, 0, 0), 0.04, 0.02, n=4, m='hull2')
 
     # Dorsal gun tower behind the crew block.
     t, tc = s.loft([(-0.13, 0.04, 0.020, 0.010, 0.006, 0.108), (-0.15, 0.052, 0.034, 0.014, 0.006, 0.118), (-0.23, 0.052, 0.034, 0.014, 0.006, 0.118), (-0.25, 0.04, 0.020, 0.010, 0.006, 0.108)], 'hull', cell=0.03, smooth=False)
@@ -114,7 +122,27 @@ def corvette():
         a = k / 8 * math.tau + 0.2
         s.box(0.018, 0.012, 0.03, (math.cos(a) * 0.118, -0.55, math.sin(a) * 0.118), 'hull2', rot=(0, -a, 0))
     s.cyl(0.05, 0.05, 0.0005, (0, -0.485, 0), 'glow', segs=20)
+    # Inside the drum: the injector on its six struts.
+    s.cyl(0.02, 0.009, 0.03, (0, -0.5, 0), 'dark', segs=12)
+    for k in range(6):
+        a = k / 6 * math.tau
+        s.strut((math.cos(a) * 0.016, -0.5, math.sin(a) * 0.016), (math.cos(a) * 0.085, -0.52, math.sin(a) * 0.085), 0.003, 'hull2')
     s.empty('drive_main', (0, -0.555, 0), 0.09)
+
+    # The things a crew uses: an airlock on each flank with its hazard border and a ladder of rungs,
+    # cabin ports low on the hull, a cargo door in the belly.
+    for sx in (1, -1):
+        s.box(0.002, 0.04, 0.046, (sx * 0.1474, -0.02, -0.004), 'yellow')
+        s.hatch((sx * 0.1482, -0.02, -0.004), (sx, 0, 0), 0.036, 0.03, m='lgrey', lit=True)
+        s.rungs((sx * 0.1488, -0.052, -0.03), (sx * 0.1488, -0.052, 0.022), (sx, 0, 0), n=6, w=0.008)
+        s.windows((sx * 0.1456, 0.09, 0.008), (sx * 0.147, 0.02, 0.008), 4, (sx, 0, 0), s=0.003, skip=0)
+    s.hatch((0, -0.02, -0.0735), (0, 0, -1), 0.08, 0.07, m='hull2')
+    s.lamp((0, -0.39, 0.1), 'window', 0.003)
+    s.scorches.append((Vector((0, 0.46, 0.06)), 0.07, 0.6))  # the railgun's muzzle
+    # Lockers, grilles, tanks and pipework scattered over the plating, kept clear of the doors and ports.
+    clear = lambda c, n: not (abs(n.x) > 0.7 and -0.07 < c.y < 0.11 and c.z > -0.035)
+    s.greeble(hp, 0.16, keep=lambda c, n: n.z < 0.5 and c.y < 0.44 and clear(c, n))
+    s.greeble(ep, 0.16, m=('hull2', 'lgrey', 'dark'), keep=lambda c, n: n.z < 0.5 and not (abs(n.x) > 0.7 and abs(c.z) < 0.045))
     return s
 
 
@@ -137,13 +165,15 @@ def battleship():
     band(sides, 'trim', -0.37, -0.35)
     band(sides, 'hull2', 0.45, 0.5)
     s.paint(caps, 'dark')
-    s.plate(sides, accents=[('hull2', 0.22)])
+    hp = s.plate(sides, accents=[('hull2', 0.22)])
+    s.uv_scale = 0.04
+    tops = []
 
     # Decks stacked on the back, ending in the bridge.
     for (y0, y1, w, h, z, m) in [(0.10, -0.34, 0.062, 0.016, 0.100, 'hull'), (-0.02, -0.30, 0.044, 0.012, 0.127, 'hull2'), (-0.10, -0.24, 0.026, 0.012, 0.150, 'hull')]:
         L = y0 - y1
         tier, _ = s.loft([(y0, w * 0.6, h * 0.4, h * 0.3, 0, z - h * 0.6), (y0 - L * 0.12, w, h, h * 0.5, 0, z), (y1 + L * 0.1, w, h, h * 0.5, 0, z), (y1, w * 0.7, h * 0.5, h * 0.3, 0, z - h * 0.5)], m, cell=0.018)
-        s.plate(tier, merge=0.5, inset=0.0022, depth=0.001)
+        tops += s.plate(tier, merge=0.5, inset=0.0022, depth=0.001)
         for sx in (1, -1):
             s.windows((sx * (w + 0.0005), y0 - L * 0.16, z + h * 0.2), (sx * (w + 0.0005), y1 + L * 0.14, z + h * 0.2), int(L / 0.011), (sx, 0, 0), s=0.0026)
     s.windows((-0.016, -0.1, 0.155), (0.016, -0.1, 0.155), 6, (0, 1, 0.2), s=0.0026, skip=0)
@@ -154,18 +184,20 @@ def battleship():
 
     # Hangar deck below: the corvettes ride here.
     hg, _ = s.loft([(0.12, 0.04, 0.008, 0.005, 0.005, -0.092), (0.06, 0.066, 0.02, 0.006, 0.01, -0.104), (-0.30, 0.074, 0.022, 0.006, 0.01, -0.112), (-0.36, 0.05, 0.01, 0.005, 0.005, -0.1)], 'hull2', cell=0.02)
-    s.plate(hg, merge=0.5)
+    gp = s.plate(hg, merge=0.5)
     for sx in (1, -1):
         for i in range(4):
+            # Each bay mouth stands open, lit blue inside, with a row of marker lights over it.
             y = 0.0 - i * 0.085
             s.box(0.003, 0.05, 0.022, (sx * 0.0745, y, -0.11), 'dark')
-            s.windows((sx * 0.076, y + 0.02, -0.095), (sx * 0.076, y - 0.02, -0.095), 5, (sx, 0, 0), s=0.0022, m='blue', skip=0)
+            s.pane((sx * 0.0763, y, -0.112), (sx, 0, 0), 0.04, 0.013, m='blue', along=(0, 1, 0), frame=None)
+            s.windows((sx * 0.0762, y + 0.02, -0.0975), (sx * 0.0762, y - 0.02, -0.0975), 5, (sx, 0, 0), s=0.0018, m='blue', skip=0)
 
     for sx in (1, -1):
         # Armour skirts along the flanks.
         sk, _ = s.loft([(0.02, 0.006, 0.03, 0.003, 0.003), (-0.08, 0.012, 0.058, 0.006, 0.006), (-0.40, 0.014, 0.064, 0.006, 0.006), (-0.44, 0.008, 0.04, 0.004, 0.004)], 'hull', cell=0.02, matrix=T((sx * 0.122, 0, 0)))
         band(sk, 'trim', -0.2, -0.18)
-        s.plate(sk, merge=0.5, accents=[('hull2', 0.3)])
+        s.greeble(s.plate(sk, merge=0.5, accents=[('hull2', 0.3)]), 0.1, keep=lambda c, n: abs(n.x) > 0.5)
         # Rows of point defence, top and bottom, and windows along the waist.
         for i in range(8):
             y = 0.36 - i * 0.1
@@ -199,12 +231,25 @@ def battleship():
 
     # Engineering and five drives.
     en, _ = s.loft([(-0.44, 0.102, 0.086, 0.03, 0.03), (-0.462, 0.108, 0.09, 0.03, 0.03), (-0.478, 0.09, 0.076, 0.026, 0.026)], 'hull2', cell=0.02)
-    s.plate(en, merge=0.3)
+    s.greeble(s.plate(en, merge=0.3), 0.25)
     s.bell(0.036, (0, -0.476, 0), name='drive_0', length=0.042)
     for sx in (1, -1):
         for sz in (1, -1):
             s.bell(0.03, (sx * 0.062, -0.476, sz * 0.046), name=f'drive_{sx}_{sz}', length=0.036)
     s.mast((0, 0.5, 0), 0.05, axis=(0, 1, 0))
+
+    # A warship this size is a town: fittings all over the hull (clear of the window rows and the gun
+    # turrets), plant on the deck roofs, a radiator bank and sensor towers aft of the bridge.
+    s.greeble(hp, 0.12, keep=lambda c, n: not (abs(n.x) > 0.7 and abs(c.z) < 0.03) and not (abs(n.z) > 0.7 and abs(c.x) < 0.035 and c.y > 0.0))
+    s.greeble(tops, 0.2, keep=lambda c, n: n.z > 0.7)
+    s.greeble(gp, 0.12, keep=lambda c, n: n.z < -0.5)
+    for k in range(7):
+        s.box(0.0014, 0.06, 0.018, ((k - 3) * 0.011, -0.395, 0.106), 'dark')
+    s.box(0.08, 0.004, 0.004, (0, -0.395, 0.1), 'hull2')
+    for (x, y, h) in ((0.018, -0.16, 0.03), (-0.016, -0.215, 0.022)):
+        s.box(0.008, 0.012, h, (x, y, 0.162 + h / 2), 'hull2')
+        s.box(0.014, 0.005, 0.006, (x, y, 0.162 + h), 'dark')
+        s.lamp((x, y, 0.166 + h), 'red', 0.0022)
     return s
 
 
@@ -215,7 +260,8 @@ def hauler():
     bow, caps = s.loft([(0.500, 0.026, 0.026, 0.01, 0.01), (0.470, 0.05, 0.044, 0.016, 0.016), (0.405, 0.06, 0.05, 0.018, 0.018), (0.372, 0.044, 0.038, 0.014, 0.014)], 'hull', cell=0.018)
     band(bow, 'yellow', 0.43, 0.445)
     s.paint(caps, 'dark')
-    s.plate(bow, accents=[('rust', 0.12), ('hull2', 0.2)])
+    s.uv_scale, s.age = 0.04, 1.3
+    s.greeble(s.plate(bow, accents=[('rust', 0.12), ('hull2', 0.2)]), 0.12, m=('hull2', 'rust', 'dark'), keep=lambda c, n: abs(n.x) < 0.7 or abs(c.z - 0.012) > 0.012)
     for sx in (1, -1):
         s.windows((sx * 0.0605, 0.46, 0.012), (sx * 0.0605, 0.4, 0.012), 9, (sx, 0, 0), s=0.003)
         s.lamp((sx * 0.062, 0.42, -0.02), 'green' if sx > 0 else 'red', 0.004)
@@ -252,7 +298,7 @@ def hauler():
     # Engineering: reactor housing, tanks, radiators.
     en, _ = s.loft([(-0.285, 0.05, 0.05, 0.02, 0.02), (-0.31, 0.078, 0.078, 0.028, 0.028), (-0.40, 0.084, 0.084, 0.03, 0.03), (-0.435, 0.06, 0.06, 0.022, 0.022)], 'hull', cell=0.02)
     band(en, 'yellow', -0.345, -0.332)
-    s.plate(en, accents=[('rust', 0.15), ('hull2', 0.25)])
+    s.greeble(s.plate(en, accents=[('rust', 0.15), ('hull2', 0.25)]), 0.16, m=('hull2', 'rust', 'dark'), keep=lambda c, n: abs(n.x) < 0.7 or abs(c.z - 0.01) > 0.012)
     for sx in (1, -1):
         s.box(0.19, 0.1, 0.003, (sx * 0.18, -0.36, 0), 'dark')
         for k in range(6):
@@ -279,13 +325,18 @@ def tycho():
         c = f.calc_center_median()
         if abs(c.z) < 0.02 or 0.2 < c.z < 0.215 or -0.215 < c.z < -0.2:
             f.material_index = kit.NAMES.index('hull2')
-    s.plate(sph, merge=0.5, inset=0.0026, depth=0.002, accents=[('hull', 0.22), ('hull2', 0.06)])
+    s.uv_scale = 0.035
+    sp = s.plate(sph, merge=0.5, inset=0.0026, depth=0.002, accents=[('hull', 0.22), ('hull2', 0.06)])
+    # Plant on the skin: tanks, grilles and housings, thinning out towards the poles.
+    s.greeble(sp, 0.09, m=('hull2', 'hull', 'dark'), keep=lambda c, n: 0.03 < abs(c.z) < 0.3 and abs(abs(c.z) - 0.07) > 0.02)
     s.hoop(R + 0.004, 0.008, 0.02, 0, 'hull2', segs=56, axis='Z')
-    # Docking bays let into the equator, and the lights of a working station.
+    # Docking bays let into the equator, each mouth lit from inside, and the lights of a working station.
     for i in range(10):
         a = i / 10 * math.tau
-        s.box(0.012, 0.05, 0.022, (math.cos(a) * (R + 0.009), math.sin(a) * (R + 0.009), 0), 'dark', rot=(0, 0, a))
-        s.box(0.004, 0.04, 0.003, (math.cos(a) * (R + 0.014), math.sin(a) * (R + 0.014), 0.014), 'window', rot=(0, 0, a))
+        out = Vector((math.cos(a), math.sin(a), 0))
+        s.box(0.012, 0.05, 0.022, out * (R + 0.009), 'dark', rot=(0, 0, a))
+        s.pane(out * (R + 0.0152), out, 0.04, 0.014, along=(-out.y, out.x, 0), frame=None)
+        s.box(0.004, 0.04, 0.003, out * (R + 0.014) + Vector((0, 0, 0.014)), 'window', rot=(0, 0, a))
     for i in range(150):
         lat, lon = math.asin(r.uniform(-0.93, 0.93)), r.random() * math.tau
         n = Vector((math.cos(lat) * math.cos(lon), math.cos(lat) * math.sin(lon), math.sin(lat)))
@@ -303,7 +354,8 @@ def tycho():
             c = f.calc_center_median()
             if abs(c.z - z) < 0.001 and c.xy.length > rad:
                 f.material_index = kit.NAMES.index('hull2')
-        s.plate(ring, merge=0.45, inset=0.003, depth=0.0018, accents=[('hull', 0.2)])
+        rp = s.plate(ring, merge=0.45, inset=0.003, depth=0.0018, accents=[('hull', 0.2)])
+        s.greeble(rp, 0.07, m=('hull2', 'hull'), keep=lambda c, n: abs(n.z) > 0.7 or c.xy.length < rad)
         for i in range(84):
             a = (i + 0.5) / 84 * math.tau
             c, sn = math.cos(a), math.sin(a)
@@ -322,7 +374,8 @@ def tycho():
 
     # Drives: Tycho can move itself.
     sk = s.lathe([(0.2, -0.3), (0.27, -0.33), (0.26, -0.44), (0.2, -0.46), (0.1, -0.46), (0.1, -0.3)], (0, 0, 0), 'hull2', segs=40, axis='Z')
-    s.plate(sk, merge=0.4)
+    s.greeble(s.plate(sk, merge=0.4), 0.2)
+    s.scorches.clear()  # (the bells below are cold: Tycho has not moved in years)
     s.bell(0.07, (0, 0, -0.455), glow='dark', length=0.1, axis='Z')
     for i in range(6):
         a = i / 6 * math.tau
@@ -353,6 +406,7 @@ def tycho():
     for sgn in (1, -1):
         s.strut((sgn * g, 0, 0.57), (sgn * 0.07, 0, 0.6), 0.004, 'trim')
         s.strut((0, sgn * g, 0.72), (0, sgn * 0.06, 0.7), 0.004, 'trim')
+    s.scorches.clear()
     return s
 
 
@@ -364,6 +418,7 @@ def tube_sections(pts, k=0.4, squash=1.0):
 def dreadnought():
     """UN Navy battleship: slab-sided and blocky. Earth builds for armour, not grace."""
     s = Ship('dreadnought', 21)
+    s.uv_scale = 0.04
     hull = [(0.500, 0.046, 0.036, 0.008, 0.008), (0.440, 0.066, 0.05, 0.01, 0.01), (0.350, 0.08, 0.06, 0.011, 0.011), (-0.380, 0.086, 0.063, 0.011, 0.011), (-0.435, 0.074, 0.054, 0.01, 0.01)]
     at = lambda y: section_at(hull, y)
     sides, caps = s.loft(hull, 'navy', cell=0.021)
@@ -414,6 +469,7 @@ def dreadnought():
 def racer():
     """The Razorback: a racing pinnace, almost nothing but a drive and a seat."""
     s = Ship('racer', 3)
+    s.uv_scale, s.age = 0.12, 0.6
     body = [(0.5, 0.004, 0.004, 0.0015, 0.0015), (0.34, 0.018, 0.016, 0.007, 0.006), (0.1, 0.038, 0.032, 0.015, 0.013), (-0.12, 0.052, 0.043, 0.02, 0.017), (-0.28, 0.062, 0.05, 0.024, 0.02), (-0.345, 0.054, 0.046, 0.022, 0.019)]
     sides, caps = s.loft(body, 'pale', cell=0.02)
     band(sides, 'orange', 0.0, 0.03)
@@ -438,6 +494,7 @@ def racer():
 def freighter():
     """A Belter cargo hauler: bridge block forward, a cage of mismatched containers, drives aft."""
     s = Ship('freighter', 77)
+    s.age = 1.3
     r = s.rng
     br, caps = s.loft([(0.5, 0.05, 0.036, 0.012, 0.012), (0.47, 0.07, 0.05, 0.014, 0.014), (0.38, 0.072, 0.052, 0.014, 0.014), (0.355, 0.05, 0.036, 0.012, 0.012)], 'belt', cell=0.018)
     band(br, 'yellow', 0.4, 0.41)
@@ -478,6 +535,7 @@ def freighter():
 def stealth():
     """Amun-Ra-class stealth frigate: faceted, black, nothing proud of the hull, no lights."""
     s = Ship('stealth', 13)
+    s.age = 0.4
     body = [(0.5, 0.005, 0.004, 0.003, 0.003), (0.18, 0.09, 0.034, 0.03, 0.03), (-0.18, 0.168, 0.046, 0.04, 0.04), (-0.38, 0.132, 0.04, 0.034, 0.034), (-0.46, 0.06, 0.024, 0.02, 0.02)]
     sides, caps = s.loft(body, 'black', cell=0.06, smooth=False)
     s.plate(sides + caps, merge=0.0, inset=0.0018, depth=0.0, flat=1.0)
@@ -492,6 +550,7 @@ def stealth():
 def survey():
     """A corporate survey and colony ship: long white hull, spin section, dishes, shuttle bay."""
     s = Ship('survey', 41)
+    s.uv_scale, s.age = 0.05, 0.7
     body = tube_sections([(0.5, 0.018), (0.44, 0.04), (0.3, 0.05), (-0.1, 0.064), (-0.34, 0.068), (-0.37, 0.05)])
     sides, caps = s.loft(body, 'pale', cell=0.019)
     band(sides, 'rce', 0.2, 0.245)
@@ -531,6 +590,7 @@ def survey():
 def medina():
     """Medina Station, once the Nauvoo: a spinning drum between a command bow and the drive."""
     s = Ship('medina', 9)
+    s.uv_scale = 0.035
     r = s.rng
     R = 0.125
     s.part('drum')
@@ -584,7 +644,8 @@ def player():
     band(sides, 'hull2', -0.08, -0.03)
     band(sides, 'orange', -0.44, -0.4, lambda c: c.z > 0)
     s.paint(caps, 'dark')
-    s.plate(sides, inset=0.004, depth=0.0024, accents=[('hull2', 0.18)])
+    s.uv_scale = 0.14
+    hp = s.plate(sides, inset=0.004, depth=0.0024, accents=[('hull2', 0.18)])
     # Cockpit.
     cp, _ = s.loft([(0.58, 0.02, 0.006, 0.004, 0, 0.05), (0.5, 0.044, 0.022, 0.014, 0, 0.076), (0.36, 0.05, 0.024, 0.014, 0, 0.094), (0.3, 0.03, 0.008, 0.004, 0, 0.096)], 'dark', cell=0.03)
     s.box(0.07, 0.11, 0.004, (0, 0.445, 0.102), 'glow', rot=(-0.16, 0, 0))
@@ -599,7 +660,7 @@ def player():
         # Engine nacelles and swept wings.
         nc, _ = s.loft([(0.2, 0.012, 0.012, 0.005, 0.005), (0.1, 0.04, 0.04, 0.016, 0.016), (-0.44, 0.046, 0.046, 0.018, 0.018), (-0.47, 0.036, 0.036, 0.014, 0.014)], 'steel', cell=0.036, matrix=T((sx * 0.23, 0, -0.01)))
         band(nc, 'orange', -0.1, -0.06)
-        s.plate(nc, merge=0.5, inset=0.004, depth=0.002, accents=[('hull2', 0.2)])
+        s.greeble(s.plate(nc, merge=0.5, inset=0.004, depth=0.002, accents=[('hull2', 0.2)]), 0.14, keep=lambda c, n: c.y < 0.05)
         s.box(0.09, 0.22, 0.03, (sx * 0.15, -0.2, -0.005), 'hull2')
         s.bell(0.042, (sx * 0.23, -0.47, -0.01), name=f'drive_small_{sx}', length=0.05)
         wing = s.box(0.36, 0.26, 0.014, (sx * 0.41, -0.3, -0.012), 'orange', rot=(0, 0, sx * -0.35))
@@ -612,6 +673,14 @@ def player():
     s.mast((0, 0.79, 0), 0.26, r=0.005, axis=(0, 1, 0))
     s.cyl(0.14, 0.12, 0.05, (0, -0.5, 0), 'dark', segs=24)
     s.bell(0.2, (0, -0.47, 0), name='drive_main', length=0.19)
+    # You walk right up to this one in the docking bays: an airlock with its ladder on the port side,
+    # a service hatch to starboard, and fittings on the hull clear of the cockpit and the cabin ports.
+    q = at(-0.2)
+    s.box(0.004, 0.11, 0.12, (-q[1] + 0.001, -0.2, -0.005), 'yellow')
+    s.hatch((-q[1] - 0.0015, -0.2, -0.005), (-1, 0, 0), 0.1, 0.085, m='steel', lit=True)
+    s.rungs((-q[1] - 0.002, -0.275, -0.07), (-q[1] - 0.002, -0.275, 0.06), (-1, 0, 0), n=7, w=0.03, r=0.002)
+    s.hatch((q[1] + 0.0015, -0.2, 0.0), (1, 0, 0), 0.08, 0.12, m='hull2')
+    s.greeble(hp, 0.09, m=('hull2', 'dark', 'steel'), keep=lambda c, n: c.y < 0.3 and not (abs(n.x) > 0.7 and (c.y > -0.05 and abs(c.z - 0.03) < 0.03 or -0.3 < c.y < -0.1)) and not (n.z > 0.5 and c.y > -0.4))
     return s
 
 
@@ -620,6 +689,26 @@ BUILD = {'corvette': corvette, 'battleship': battleship, 'hauler': hauler, 'tych
 
 
 
+def pack(path):
+    """Squeeze the exported file to about a third: whole-number coordinates and meshopt compression
+    (glTF-Transform, fetched by bunx). The game's loader unpacks it; nothing visible changes."""
+    before = os.path.getsize(path)
+    try:
+        subprocess.run(['bunx', '@gltf-transform/cli@4.5.1', 'meshopt', path, path, '--level', 'medium'], check=True, capture_output=True, timeout=300)
+        print(f'packed {os.path.basename(path)}: {before // 1024} KB -> {os.path.getsize(path) // 1024} KB')
+    except Exception as e:
+        print('not packed (the file still loads, it is just larger):', e)
+
+
+# Where to stand for a third, close-up still of each ship.
+CLOSE = {
+    'corvette': ((0.42, 0.34, 0.2), (0.1, 0.05, 0.04)),
+    'battleship': ((0.3, -0.05, 0.22), (0.05, -0.15, 0.08)),
+    'player': ((0.55, 0.75, 0.3), (0.05, 0.25, 0.05)),
+    'tycho': ((0.75, -0.6, 0.3), (0.3, 0.0, 0.05)),
+    'hauler': ((0.3, 0.75, 0.16), (0.0, 0.42, 0.0)),
+}
+
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else ['all']
 which = list(BUILD) if argv[0] == 'all' else argv[0].split(',')
 prev = argv[argv.index('--preview') + 1] if '--preview' in argv else None
@@ -627,9 +716,13 @@ for name in which:
     reset()
     ship = BUILD[name]()
     objs = ship.finish()
-    print(name, 'tris ~', sum(len(o.data.polygons) for o in objs))
+    print(name, 'tris ~', sum(len(p.vertices) - 2 for o in objs for p in o.data.polygons))
     if '--noao' not in argv:
         bake_ao(objs)
+        weather(objs, ship)
     export(os.path.join(ROOT, 'assets', 'models', name + '.glb'))
+    if '--nopack' not in argv:
+        pack(os.path.join(ROOT, 'assets', 'models', name + '.glb'))
     if prev:
-        preview(os.path.join(prev, name), views=((1.6, -1.5, 0.9), (-1.5, 1.7, -0.6)) if name in ('tycho', 'player') else ((1.25, -1.15, 0.7), (-1.1, 1.3, -0.45)))
+        far = ((1.6, -1.5, 0.9), (-1.5, 1.7, -0.6)) if name in ('tycho', 'player') else ((1.25, -1.15, 0.7), (-1.1, 1.3, -0.45))
+        preview(os.path.join(prev, name), views=far + ((CLOSE[name],) if name in CLOSE else ()))
