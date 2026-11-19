@@ -22,7 +22,8 @@ for (const [id, nav, hash] of STATIONS) {
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   page.on('pageerror', (e: Error) => console.log('page error: ' + e.message));
   page.on('console', (m: { type(): string; text(): string }) => { if (m.type() === 'error') console.log('page: ' + m.text()); });
-  await page.goto(`http://localhost:${port}/?debug&bake${hash}`);
+  // (Saving a file makes the dev server rebuild, so the next page can be slow to arrive.)
+  await page.goto(`http://localhost:${port}/?debug&bake${hash}`, { timeout: 180000 });
   await page.waitForSelector('#launch:not([disabled])', { timeout: 180000 });
   await page.click('#launch');
   await page.click(`#nav-list .nav-item:has-text("${nav}") >> text=/dock/`);

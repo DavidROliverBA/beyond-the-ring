@@ -9,7 +9,7 @@ import { PHOTOS } from './photos';
 import { buildPerson } from './people';
 import { buildWalker, peopleReady, type Walker } from './skinned';
 import { buildConcourse, terraceFront } from './concourse';
-import { Bounce, type ProbeBox } from './probes';
+import { BAKING, Bounce, fits, type ProbeBox } from './probes';
 
 /** How much each station's spin gravity turns a walk into the Belter lope (0 walk, 1 full lope). */
 const LOPE: Record<string, number> = { ceres: 0.6, tycho: 0.5, medina: 0.5, ganymede: 0.8 };
@@ -186,8 +186,10 @@ function surf(kind: Surf): THREE.Texture {
   return t;
 }
 
+/** A flat panel, cut into squares about 3 m across: bounce light is worked out at the corners
+ *  (see probes.ts), so a wall needs more corners than its own four to show any. */
 function plane(w: number, h: number, mat: THREE.Material, tile: number): THREE.Mesh {
-  const g = new THREE.PlaneGeometry(w, h);
+  const g = new THREE.PlaneGeometry(w, h, Math.min(64, Math.ceil(w / 3)), Math.min(64, Math.ceil(h / 3)));
   const uv = g.getAttribute('uv');
   for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * w) / tile, (uv.getY(i) * h) / tile);
   return new THREE.Mesh(g, mat);
@@ -257,8 +259,9 @@ interface Room extends Rect { name: string; h: number; o: RoomOpts; openings: Op
 interface PutOpts { y?: number; yaw?: number; solid?: boolean }
 
 const M = 0.35;
-/** Whether interiors built from now on get bounce light. Set by buildInterior. */
-let BOUNCE = false;
+/** Whether interiors built from now on get bounce light, and the probes saved for the next
+ *  one. Set by buildInterior. */
+let BOUNCE = false, SAVED: ArrayBuffer | null = null;
 /** With bounce light the flat fill light can drop to this much of itself: the probes do its job. */
 const FILL = 0.45;
 
@@ -858,6 +861,24 @@ class Kit {
   }
 
   done(spawn: Place): Interior {
+    // One box of light probes per room, 4 to 6 m apart, in one layer under a low ceiling and
+    // two under a high one. A room's probes are all inside its own walls, which is what stops
+    // light leaking through. The probes themselves were saved ahead of time; if the saved
+    // file was made for other boxes the rooms have changed, and stale light would be wrong
+    // light, so the place is lit the old way instead.
+    const boxes = [...this.volumes];
+    for (const r of this.rooms) {
+      const w = r.x1 - r.x0, d = r.z1 - r.z0, step = Math.min(6, Math.max(4, Math.sqrt((w * d) / 40)));
+      boxes.push({
+        x0: r.x0, x1: r.x1, y0: 0, y1: r.h, z0: r.z0, z1: r.z1,
+        nx: Math.max(1, Math.round(w / step)), ny: r.h < 4 ? 1 : 2, nz: Math.max(1, Math.round(d / step)), ...r.probe,
+      });
+    }
+    if (this.bounce && !BAKING && !fits(SAVED, boxes)) {
+      console.warn(`The saved light probes do not fit ${this.name}; going without. Run: bun tools/bake-probes.ts`);
+      this.bounce = false;
+    }
+    if (!boxes.length) this.bounce = false;
     this.neon();
     // A place in the middle of a room may be under a parked ship or a table: nudge it to open floor.
     // It also wants elbow room, so you do not arrive nose to nose with someone.
@@ -907,10 +928,11 @@ class Kit {
       if (this.curveR) {
         // In the drum the light comes from the axis, straight overhead wherever you stand.
         // The light probes are aimed from the axis itself, where no one direction is overhead:
-        // for them the lamps along the axis shine with the key's strength instead.
+        // for them the lamps along the axis shine with some of the key's strength instead
+        // (all of it washes the drum out: the ground is all round you and all of it bounces).
         const axis = cam.x * cam.x + cam.y * cam.y < 1;
         key.intensity = axis ? 0 : this.keyPower;
-        for (const l of axial) l.intensity = l.userData.base + (axis ? this.keyPower : 0);
+        for (const l of axial) l.intensity = l.userData.base + (axis ? this.keyPower * 0.4 : 0);
         up.set(-cam.x, -cam.y, 0).normalize();
         key.target.position.copy(cam).addScaledVector(up, -1.7);
         key.position.copy(key.target.position).addScaledVector(up, 110);
@@ -920,22 +942,11 @@ class Kit {
       }
     };
     let bounce: Bounce | undefined;
-    if (this.bounce && this.rooms.length + this.volumes.length) {
-      // One box of probes per room, 4 to 6 m apart, in one layer under a low ceiling and two
-      // under a high one. Few probes on purpose: each costs six drawings of the room, and
-      // bounce light changes slowly across a room anyway.
-      // A room's probes are all inside its own walls, which is what stops light leaking through.
-      const boxes = [...this.volumes];
-      for (const r of this.rooms) {
-        const w = r.x1 - r.x0, d = r.z1 - r.z0, step = Math.min(6, Math.max(4, Math.sqrt((w * d) / 40)));
-        boxes.push({
-          x0: r.x0, x1: r.x1, y0: 0, y1: r.h, z0: r.z0, z1: r.z1,
-          nx: Math.max(1, Math.round(w / step)), ny: r.h < 4 ? 1 : 2, nz: Math.max(1, Math.round(d / step)), ...r.probe,
-        });
-      }
+    if (this.bounce) {
       this.scene.traverse((o) => { if (o instanceof THREE.HemisphereLight) o.intensity *= FILL; });
       if (this.stars) this.unlit.push(this.stars);
       bounce = new Bounce(this.scene, boxes, aim, this.unlit);
+      if (!BAKING) bounce.load(SAVED!);
     }
     let frame = 0;
     return {
@@ -1348,7 +1359,7 @@ function medina(): Interior {
   const tex = surf('fields').clone();
   tex.repeat.set(6, 4);
   tex.needsUpdate = true;
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 128, 1, true).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 0.95 }));
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 128, 16, true).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 0.95 }));
   k.scene.add(drum);
   const sunTube = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, L * 0.94, 12).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }));
   k.scene.add(sunTube);
@@ -1556,11 +1567,13 @@ async function ganymede(): Promise<Interior> {
 
 const cache = new Map<string, Interior>();
 
-/** Build (once) the inside of a station. `bounce` adds light probes, if the browser can do them. */
-export async function buildInterior(id: string, bounce = false): Promise<Interior> {
+/** Build (once) the inside of a station. `saved` is its file of light probes, if bounce light
+ *  is wanted and the browser can do it. */
+export async function buildInterior(id: string, bounce = false, saved: ArrayBuffer | null = null): Promise<Interior> {
   let it = cache.get(id);
   if (!it) {
     BOUNCE = bounce;
+    SAVED = saved;
     it = id === 'tycho' ? tycho() : id === 'ceres' ? ceres() : id === 'medina' ? medina() : await ganymede();
     cache.set(id, it);
   }

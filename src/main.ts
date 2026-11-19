@@ -42,9 +42,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000003);
 const camera = new THREE.PerspectiveCamera(60, 1, 1e-9, 4e6 * LOGK);
 const walkCam = new THREE.PerspectiveCamera(72, 1, 0.08, 12000 * LOGK);
-/** How far a light probe sees (scaled like every far plane), and how long (ms) docking may
- *  spend filling probes in the dark before the rest is left to the frames that follow. */
-const PROBE_FAR = 400 * LOGK, BAKE_DARK = 800;
+/** How far a light probe sees when the bake tool takes them (scaled like every far plane). */
+const PROBE_FAR = 400 * LOGK;
 
 // Everything is drawn into a float buffer first, so lamps, drives and city lights
 // can be brighter than white and bleed a little, the way they do on film.
@@ -1408,27 +1407,21 @@ async function dock(th: Thing) {
   ship.throttle = ship.speed = 0;
   await fade(async () => {
     loadingEl.textContent = 'Docking…';
-    const it = await buildInterior(th.dock!, canBounce(renderer) && !new URLSearchParams(location.search).has('nobounce'));
+    // Bounce light comes from probes saved ahead of time (see probes.ts): fetch this place's.
+    const bounce = canBounce(renderer) && !new URLSearchParams(location.search).has('nobounce');
+    const it = await buildInterior(th.dock!, bounce, bounce && !BAKING ? await savedProbes(th.dock!) : null);
     it.scene.environment = envMap;
     it.scene.environmentIntensity = 0.3;
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0, vx: 0, vz: 0 });
-    // Bounce light: load the probes saved for this place. Failing that, take them now: the
-    // probe textures must exist before the shaders are compiled (or every shader is compiled
-    // twice), then the room you arrive in is filled while the screen is still dark, and the
-    // other rooms follow a slice a frame (see frame()).
-    if (it.bounce && !it.bounce.done) {
-      const saved = await savedProbes(it.id);
-      if (!saved || !it.bounce.load(saved)) console.warn(`No saved light probes fit ${it.name}; taking them now. Run: bun tools/bake-probes.ts`);
-    }
-    it.bounce?.prime(renderer);
+    // (For the bake tool the probe textures are made empty here, before the shaders are
+    // compiled so they are not compiled twice, and filled once the shaders are ready.)
+    if (BAKING) it.bounce?.prime(renderer);
     await warm(it.scene, walkCam);
-    if (it.bounce && !it.bounce.done) {
-      const here = new V3(it.spawn.x, 1.7, it.spawn.z), t0 = performance.now();
-      while (!it.bounce.step(renderer, 24, here, PROBE_FAR) && (BAKING || performance.now() - t0 < BAKE_DARK)) await pause();
-      renderer.getContext().finish();
+    if (BAKING && it.bounce) {
+      const here = new V3(it.spawn.x, 1.7, it.spawn.z);
+      while (!it.bounce.step(renderer, 24, here, PROBE_FAR)) await pause();
     }
     walk = it;
-    walkSince = clock;
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0, vx: 0, vz: 0 });
     document.body.classList.add('walking');
     buildNav();
@@ -1706,7 +1699,6 @@ if (FRAMES) Object.defineProperty(globalThis, '__bounce', { get: () => walk?.bou
 // For tools/bake-probes.ts: the finished probes of the place you are in, as a file.
 if (FRAMES) Object.assign(globalThis, { __saveProbes: () => walk?.bounce?.done ? Array.from(walk.bounce.save(renderer)) : null });
 
-let walkSince = 0, bakeLast = 0;
 
 function frame(now: number) {
   requestAnimationFrame(frame);
@@ -1718,13 +1710,6 @@ function frame(now: number) {
   clock += dt;
   if (!space) return;
   if (walk) {
-    // Light probes still to fill in: a couple of milliseconds' worth a frame, nearest room
-    // first. Not in the first second or so on foot, and not while frames are slow, when it
-    // would only make them slower: then it is one small slice a second, so it still finishes.
-    if (walk.bounce && !walk.bounce.done && clock - walkSince > 1.7 && (dt < 0.02 || now - bakeLast > 1000)) {
-      walk.bounce.step(renderer, 2, walkCam.position, PROBE_FAR);
-      bakeLast = now;
-    }
     walkStep(dt);
     updateHud(dt);
     look.update(dt, walk.id, walkCam, null, walkCam.aspect);
