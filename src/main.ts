@@ -1082,6 +1082,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('wheel', (e) => {
   if ((e.target as HTMLElement).closest('#nav')) return;
   if (walk) return;
+  if (inspect.on) { inspect.dist = clamp(inspect.dist * (e.deltaY > 0 ? 1.12 : 1 / 1.12), 1.25, 12); return; }
   auto = null;
   ship.throttle = clamp(ship.throttle - Math.sign(e.deltaY) * 0.04, -0.3, 1);
 }, { passive: true });
@@ -1114,6 +1115,51 @@ function stopTour() {
     tourSave = null;
   }
   shipModel.visible = chase;
+}
+
+// Inspect (I): orbit whatever you're aiming at, or the nearest ship or station. The camera eases in,
+// the mouse turns it round the subject, the wheel moves closer or further. I or any flight key ends it.
+const inspect = { on: false, th: null as Thing | null, yaw: 0, pitch: 0.25, dist: 3, ease: 0, from: new V3() };
+function startInspect() {
+  if (busy || walk || tour.active) return;
+  let th = aimed;
+  if (!th) {
+    let bd = Infinity;
+    for (const t of space.things) {
+      if (t.kind !== 'ship' && t.kind !== 'station') continue;
+      const d = t.pos.distanceTo(ship.pos) / Math.max(t.radius, 1e-12);
+      if (d < bd) { bd = d; th = t; }
+    }
+  }
+  if (!th) return;
+  auto = null;
+  ship.speed = ship.throttle = 0;
+  // Start the orbit from where the camera already is, so the move in is one smooth glide.
+  const off = camera.position.clone().sub(th.pos);
+  Object.assign(inspect, { on: true, th, ease: 0, dist: th.kind === 'ship' ? 2.4 : 3, yaw: Math.atan2(off.x, off.z), pitch: clamp(Math.asin(off.y / off.length()), -1.2, 1.2) });
+  inspect.from.copy(camera.position);
+  banner(th.name, th.desc ?? th.sub ?? '');
+}
+function stopInspect() {
+  if (!inspect.on) return;
+  inspect.on = false;
+  $('banner').classList.remove('show');
+}
+const _ip = new V3();
+function inspectCamera(dt: number) {
+  const th = inspect.th!;
+  inspect.yaw -= mdx * 0.004;
+  inspect.pitch = clamp(inspect.pitch + mdy * 0.004, -1.35, 1.35);
+  mdx = mdy = 0;
+  inspect.ease = Math.min(1, inspect.ease + dt / 1.4);
+  const k = inspect.ease * inspect.ease * (3 - 2 * inspect.ease);
+  const r = th.radius * inspect.dist;
+  _ip.set(Math.sin(inspect.yaw) * Math.cos(inspect.pitch), Math.sin(inspect.pitch), Math.cos(inspect.yaw) * Math.cos(inspect.pitch)).multiplyScalar(r).add(th.pos);
+  camera.position.lerpVectors(inspect.from, _ip, k);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(th.pos);
+  camera.updateMatrixWorld();
+  shipModel.visible = false;
 }
 
 // Photo mode: time stands still, the HUD goes, the mouse still looks around.
@@ -1164,6 +1210,8 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyT') { if (tour.active) stopTour(); else startTour(); return; }
+  if (e.code === 'KeyI') { if (inspect.on) stopInspect(); else startInspect(); return; }
+  if (inspect.on && (STEER.includes(e.code) || e.code === 'Escape')) stopInspect();
   if (STEER.includes(e.code)) auto = null;
   switch (e.code) {
     case 'Tab':
@@ -1706,7 +1754,7 @@ function frame(now: number) {
     lookPitch = clamp(lookPitch - mdy * 0.003, -1.4, 1.4);
     mdx = mdy = 0;
   }
-  if (!busy && started && !tour.active) step(dt);
+  if (!busy && started && !tour.active && !inspect.on) step(dt);
   lodTick();
 
   shipModel.position.copy(ship.pos);
@@ -1725,6 +1773,7 @@ function frame(now: number) {
   camera.position.copy(ship.pos).add(_off.applyQuaternion(_lookQ));
   camera.quaternion.copy(_lookQ);
   camera.updateMatrixWorld();
+  if (inspect.on && inspect.th) inspectCamera(realDt);
   if (tour.active && tour.update(dt, camera, !started)) {
     // The tour drives the camera; the ship rides along unseen, so maps sharpen where we're looking.
     shipModel.visible = false;
