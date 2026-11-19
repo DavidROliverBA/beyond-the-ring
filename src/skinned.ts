@@ -32,7 +32,7 @@ const ROUGH: Record<Part, number> = { skin: 0.72, shirt: 0.85, trousers: 0.88, b
 let base: THREE.MeshStandardMaterial | null = null;
 const pieces: { geo: THREE.BufferGeometry; tag: string }[] = [];
 const wardrobe = new Map<string, THREE.BufferGeometry>();
-/** Which morph target is which build (the file names them). */
+/** Which of the file's two shapes is which build (the file names them). */
 const build = { heavy: 0, curvy: 1 };
 
 function mergeBody(scene: THREE.Group) {
@@ -54,7 +54,7 @@ function mergeBody(scene: THREE.Group) {
   const first = parts[0];
   build.heavy = first.morphTargetDictionary?.heavy ?? 0;
   build.curvy = first.morphTargetDictionary?.curvy ?? 1;
-  const body = new THREE.SkinnedMesh(bodyFor([]), new THREE.MeshStandardMaterial());
+  const body = new THREE.SkinnedMesh(bodyFor(['crop', 'sleeve']), new THREE.MeshStandardMaterial());
   body.name = 'body';
   body.bind(first.skeleton, first.bindMatrix);
   first.parent!.add(body);
@@ -62,12 +62,26 @@ function mergeBody(scene: THREE.Group) {
   base = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0 });
 }
 
-/** The body wearing the chosen optional pieces, built the first time someone asks for that set. */
-function bodyFor(tags: string[]) {
-  const key = [...tags].sort().join(' ');
+/** Builds on offer: how much of the `heavy` and `curvy` shapes (below zero is a slighter frame). */
+const HEAVY = [-0.4, 0, 0.45, 1], CURVY = [0, 0.75];
+
+/** The body wearing the chosen optional pieces in one of the builds, made the first time someone
+ *  asks for that combination. The build is worked into the vertex positions here, once, rather
+ *  than blended by the graphics card on every frame for every person: in a crowd of 130 the
+ *  blending cost about a millisecond a frame (measured 2026-11-19). */
+function bodyFor(tags: string[], heavy = 1, curvy = 0) {
+  const key = `${[...tags].sort().join(' ')}|${heavy}|${curvy}`;
   let g = wardrobe.get(key);
   if (!g) {
     g = mergeGeometries(pieces.filter((p) => !p.tag || tags.includes(p.tag)).map((p) => p.geo), false)!;
+    const shapes = g.morphAttributes.position;
+    if (shapes && shapes.length > 1) {
+      const pos = g.attributes.position.array as Float32Array;
+      const a = shapes[build.heavy].array, b = shapes[build.curvy].array;
+      const h = HEAVY[heavy], c = CURVY[curvy];
+      for (let i = 0; i < pos.length; i++) pos[i] += a[i] * h + b[i] * c;
+    }
+    g.morphAttributes = {};
     wardrobe.set(key, g);
   }
   return g;
@@ -216,8 +230,11 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   else tags.push(q() < 0.36 ? 'bare' : 'sleeve');
   let body!: THREE.SkinnedMesh;
   root.traverse((n) => { if ((n as THREE.SkinnedMesh).isSkinnedMesh) body = n as THREE.SkinnedMesh; });
-  body.geometry = bodyFor(tags);
-  body.updateMorphTargets();
+  // Build: one of a few body shapes; Belters keep to the slighter ones. Height and width (below)
+  // vary continuously on top.
+  const heavy = o.belter ? (q() < 0.7 ? 0 : 1) : Math.min(HEAVY.length - 1, Math.floor(q() ** 1.5 * HEAVY.length));
+  const curvy = q() < 0.42 ? 1 : 0;
+  body.geometry = bodyFor(tags, heavy, curvy);
   body.material = personMaterial(colours);
   body.castShadow = true;
   body.receiveShadow = true;
@@ -226,12 +243,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   const h = (o.belter ? 1.13 : 1) * (0.93 + r() * 0.13);
   const w = (o.belter ? 0.86 : 0.95 + r() * 0.12) * h;
   group.scale.set(w, h, w);
-  // Build: two shapes blended in by different amounts. `heavy` below zero is a slighter frame,
-  // which is where Belters sit. Heads keep their own width whatever the body's, and vary a little.
-  const heavy = o.belter ? -0.5 + q() * 0.6 : -0.4 + 1.5 * q() ** 2.2;
-  const curvy = q() < 0.45 ? 0.35 + q() * 0.65 : q() * 0.2;
-  const inf = body.morphTargetInfluences;
-  if (inf && inf.length > 1) { inf[build.heavy] = heavy; inf[build.curvy] = curvy; }
+  // Heads keep their own width whatever the body's, and vary a little.
   const head = root.getObjectByName('head');
   if (head) {
     const k = 0.96 + q() * 0.09, across = (k * h) / w;
