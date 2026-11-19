@@ -60,7 +60,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 3. **Ambient occlusion and contact shadows.** Runtime AO first (cheap trial of N8AO or realism-effects). Bake corner AO for the static parts of interiors.
 4. **Baked interior lighting.** Move interior layouts into Blender (kit exists), bake lighting with Cycles into lightmaps, export GLB. Keep runtime lights only for neon and signs. This is a rebuild of the interiors from generated code to authored assets, so do one room as a trial (a Tycho corridor) before committing the rest.
 5. **Hero ships and stations.** Hull panels, normal and roughness maps, weathering, windows with emissive interiors. Start with the Rocinante, Donnager and docked ships. Update the in-code fallback `corvette()` in `src/ships.ts` (still the old shape).
-6. **Photo mode (optional).** Stills refined with `three-gpu-pathtracer` (WebGL 2, progressive). Untested at true scale; treat as an experiment.
+6. **Photo mode.** *Done 2026-11-17:* P freezes time and hides the HUD, the mouse still looks around, [ and ] set exposure, Enter saves a PNG; works in flight and on foot. Path-traced stills (`three-gpu-pathtracer`) not attempted: untested at true scale and the log-depth patch is WebGL-shader specific.
 
 **Step 5 status 2026-11-17 (branch `hero-ships`):** first pass done for every Blender-built ship, with extra work on the Rocinante, the Donnager, your own ship (the one parked in the docking bays), the Canterbury-type hauler and Tycho. All ships now share a hull texture set painted by `tools/blender/hulltex.py` (seams, hatches, vents and fasteners in relief; sheen; dirt and chipped paint) in place of the scanned plates, and carry weathering in their vertex colours (`weather()` in `tools/blender/kit.py`): dirt in recesses, soot round drives and thrusters, bright scuffed edges on raised plates, stains and streaks. Windows are framed panes showing small lit rooms from a shared sheet. The hero ships gained airlocks with ladders, cabin ports, pipe runs, grilles, lit hangar and docking-bay mouths and scattered fittings. Models are packed with meshopt, so the folder shrank from 18 MB to about 8 MB despite the added detail. The fallback `corvette()` now matches the Blender Rocinante's layout. Not done: per-ship painted markings or names, landing gear, a detail pass on the dreadnought, survey ship, freighter, racer and Medina beyond the shared textures and weathering, and the rooms behind windows are flat pictures (no parallax).
 
@@ -83,9 +83,10 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Backlog (not scheduled)
 
+- ~~Bug: Earth's night side rendered nearly as bright as day.~~ *Fixed 2026-11-17:* the studio environment meant for ship reflections was lighting every planet, because a material's `envMapIntensity` doesn't scale `scene.environment`. Planets, clouds and rocks now carry their own black environment.
 - **Sound.** Parked at the owner's request. When revisited: synthesised or CC0 audio only, Web Audio positional sound with a convolver reverb per room, footsteps per material, ventilation and crowd murmur layers.
 - Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).
-- Hand-flying and hand-walking test pass by a person, not only headless Playwright.
+- Hand-flying and hand-walking test pass by a person, not only headless Playwright. *Checklist ready: `docs/HAND-TEST.md` (2026-11-17); needs David.*
 
 ## 3. Hosting options
 
@@ -107,7 +108,9 @@ A static site: `bun run build` makes a `dist/` of 73 files and about 97 MB. The 
 
 ### Decision
 
-**Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
+**Live since 2026-11-17 on here.now** (David's personal account): https://silken-marvel-d95y.here.now/. Cloudflare Pages was dropped because the only Cloudflare login available was tied to a work email. Republish after changes: `bun run build && ~/.claude/skills/here-now/scripts/publish.sh dist --slug silken-marvel-d95y --client claude-code`. Tested before going live in Chromium, WebKit and Firefox (headless).
+
+Earlier plan, kept for reference: **Cloudflare Pages** (chosen 2026-11-15), deployed from the public GitHub repo, with the build run in CI (`bun install && bun run build`, output `dist`). GitHub Pages is the fallback.
 
 ### Things to settle before going public
 

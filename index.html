@@ -77,6 +77,10 @@
   #keys b { color: var(--cyan); font-weight: 400; display: inline-block; min-width: 92px; }
   #keys-tip { position: absolute; right: 16px; bottom: 18px; font-size: 11px; color: var(--dim); }
   body.help-open #keys-tip { display: none; }
+  /* Photo mode: everything but the picture goes, bar a quiet strip of keys. */
+  body.photo #hud, body.photo #labels { display: none; }
+  #photo-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 11px; color: rgba(220, 235, 245, 0.55); letter-spacing: 0.08em; display: none; pointer-events: none; text-shadow: 0 0 6px #000; }
+  body.photo #photo-bar { display: block; }
 
   #banner { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); text-align: center; max-width: 560px; opacity: 0; transition: opacity 1.2s; }
   #banner.show { opacity: 1; }
@@ -88,7 +92,7 @@
   #loading { position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%); color: #0a2a4a; font-size: 12px; letter-spacing: 0.1em; pointer-events: none; }
   body:not(.started) #loading { color: var(--dim); bottom: 14%; }
 
-  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 2, 8, 0.55); }
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse 48% 60% at 50% 45%, rgba(0, 2, 8, 0.72), rgba(0, 2, 8, 0.12) 100%); }
   body.started #start { display: none; }
   #start-box { width: min(560px, 90vw); padding: 28px 32px; text-align: center; }
   #start h1 { margin: 0; font-size: 30px; font-weight: 400; letter-spacing: 0.34em; color: #fff; text-transform: uppercase; }
@@ -133,6 +137,7 @@
 
   <div id="keys-tip">H — keys</div>
   <div id="keys" class="panel">
+    <div><b>P</b>photo mode: freeze, hide the HUD, Enter saves</div>
     <div class="walk-only"><b>Mouse</b>look around</div>
     <div class="walk-only"><b>W A S D</b>walk</div>
     <div class="walk-only"><b>Shift</b>run</div>
@@ -155,6 +160,7 @@
   </div>
 </div>
 
+<div id="photo-bar">PHOTO · mouse to look · [ ] exposure · Enter save · P back</div>
 <div id="flash"></div>
 <div id="loading"></div>
 
