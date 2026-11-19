@@ -75,6 +75,8 @@ Each step is a shippable change. Steps may be split into smaller commits.
 - `?nobounce` in the address turns it off, for comparing.
 - Not done: per-interior HDR environments (step 2), real ambient occlusion (step 3), Blender lightmaps (step 4, probably no longer needed).
 
+**Tried and shelved 2026-11-19: reflections captured per room.** A cube capture from each room's centre at docking (PMREM, swapped by room) in place of the studio RoomEnvironment. The market and docks looked about the same, the daylit Concourse came out darker with a purple cast in its gutter, and docking took ~0.3 s longer. Kept the studio. Worth another look once reflections can come from the baked probe data or from per-room UltraHDR maps made offline.
+
 ### Phase B: walking inside stations
 
 **Status 2026-11-17 (branch `skinned-people`):** every person in every interior is now one shared skinned body (`tools/blender/person.py`) with idle, walk and lope clips, coloured per person in one draw call. Walkers pace two-lane loops with walking U-turns and occasional stops; the lope blend follows each station's gravity; animation runs less often with distance and only people within 25 m cast shadows. Frame rate is the same or slightly better than the old block people. Still to do from step 8: avoidance, queueing, conversations, glancing at the player, doors, impostors. Known: heads blow out directly under the strong neon room lights (a lighting issue, same on the old people).
