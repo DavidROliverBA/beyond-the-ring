@@ -62,7 +62,18 @@ Each step is a shippable change. Steps may be split into smaller commits.
 5. **Hero ships and stations.** Hull panels, normal and roughness maps, weathering, windows with emissive interiors. Start with the Rocinante, Donnager and docked ships. Update the in-code fallback `corvette()` in `src/ships.ts` (still the old shape).
 6. **Photo mode.** *Done 2026-11-17:* P freezes time and hides the HUD, the mouse still looks around, [ and ] set exposure, Enter saves a PNG; works in flight and on foot. Path-traced stills (`three-gpu-pathtracer`) not attempted: untested at true scale and the log-depth patch is WebGL-shader specific.
 
+**Step 5 status 2026-11-17 (branch `hero-ships`):** first pass done for every Blender-built ship, with extra work on the Rocinante, the Donnager, your own ship (the one parked in the docking bays), the Canterbury-type hauler and Tycho. All ships now share a hull texture set painted by `tools/blender/hulltex.py` (seams, hatches, vents and fasteners in relief; sheen; dirt and chipped paint) in place of the scanned plates, and carry weathering in their vertex colours (`weather()` in `tools/blender/kit.py`): dirt in recesses, soot round drives and thrusters, bright scuffed edges on raised plates, stains and streaks. Windows are framed panes showing small lit rooms from a shared sheet. The hero ships gained airlocks with ladders, cabin ports, pipe runs, grilles, lit hangar and docking-bay mouths and scattered fittings. Models are packed with meshopt, so the folder shrank from 18 MB to about 8 MB despite the added detail. The fallback `corvette()` now matches the Blender Rocinante's layout. Not done: per-ship painted markings or names, landing gear, a detail pass on the dreadnought, survey ship, freighter, racer and Medina beyond the shared textures and weathering, and the rooms behind windows are flat pictures (no parallax).
+
 **Ceres concourse (2026-11-15):** new walkable street on Ceres (`src/concourse.ts`), reached through Hydroponics: vaulted sky-panel ceiling with ribs, seven terraces of housing each side, shopfronts, planters, bikes, public screens, a plain-clothes crowd, and daylight that blends in as you walk through the door. First pass; next would be more relief on the housing, softer shadows and denser street life.
+
+**Bounce light in the interiors (2026-11-19):** all four interiors now get indirect light from light probe grids (three.js `LightProbeGridWebGL`, see `src/probes.ts`). This covers the interior half of step 2 and the lighting part of step 4 without rebuilding the interiors in Blender, and is a partial answer to step 3 (corners are darker because the flat fill light is cut to 45% where probes are on; the painted wall-base shade is still there).
+- One box of probes per room (4 to 6 m apart, one layer under 4 m ceilings, two above), so light does not leak through the thin walls. Ceres has 585 probes, Tycho 414, Medina 288, Ganymede 100.
+- The probes are taken ahead of time, not in the game: `bun tools/bake-probes.ts` (needs the dev server and Playwright) writes `assets/probes/<interior>.bin`, about 100 kB for all four. Docking loads the file; nothing is baked at run time. Taking them in the browser was tried first and cost minutes of poor frame rate.
+- **Rebake whenever an interior's rooms, lights or large props change.** Each file carries a fingerprint of the probe boxes; if it does not match, that interior goes without bounce light (and says so in the console) rather than show stale light. Moved props or changed lamps are not detected, so rebake after those too.
+- In the game the probe light is worked out at the corners of each triangle, not for every pixel, from one shared texture per interior (our own shader, patched into three.js's in `src/probes.ts`). three.js's stock per-pixel lookup nearly halved the frame rate in the Concourse and the Ceres market; this way costs about 1 ms a frame. Walls and floors are cut into 3 m panels so they have corners to light. The patch is tied to three.js r187's shader text and warns in the console if an upgrade breaks it.
+- With bounce light on, the neon room lamps are dimmer and higher, which stops most of the burnt-out heads under them, and the Concourse's fill and key are lower.
+- `?nobounce` in the address turns it off, for comparing.
+- Not done: per-interior HDR environments (step 2), real ambient occlusion (step 3), Blender lightmaps (step 4, probably no longer needed).
 
 ### Phase B: walking inside stations
 
@@ -81,10 +92,10 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Backlog (not scheduled)
 
-- **Bug found 2026-11-17: Earth's night side renders almost as bright as the day side**, with day colours, although the city lights correctly appear only there. Turning the Sun's light and the ambient light to zero in the page doesn't darken it, and neither the atmosphere shell nor the camera look is the cause. Investigate with the space-lighting work (Phase A step 2): check the surface shader output and the cloud deck.
+- ~~Bug: Earth's night side rendered nearly as bright as day.~~ *Fixed 2026-11-17:* the studio environment meant for ship reflections was lighting every planet, because a material's `envMapIntensity` doesn't scale `scene.environment`. Planets, clouds and rocks now carry their own black environment.
 - **Sound.** Parked at the owner's request. When revisited: synthesised or CC0 audio only, Web Audio positional sound with a convolver reverb per room, footsteps per material, ventilation and crowd murmur layers.
 - Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).
-- Hand-flying and hand-walking test pass by a person, not only headless Playwright.
+- Hand-flying and hand-walking test pass by a person, not only headless Playwright. *Checklist ready: `docs/HAND-TEST.md` (2026-11-17); needs David.*
 
 ## 3. Hosting options
 

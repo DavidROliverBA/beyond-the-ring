@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { paintGlow, rng } from './textures';
 import { scan } from './materials';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import corvetteGlb from '../assets/models/corvette.glb';
 import battleshipGlb from '../assets/models/battleship.glb';
 import haulerGlb from '../assets/models/hauler.glb';
@@ -16,6 +17,10 @@ import stealthGlb from '../assets/models/stealth.glb';
 import surveyGlb from '../assets/models/survey.glb';
 import medinaGlb from '../assets/models/medina.glb';
 import playerGlb from '../assets/models/player.glb';
+import hullColor from '../assets/pbr/hull_color.jpg';
+import hullNormal from '../assets/pbr/hull_normal.jpg';
+import hullRough from '../assets/pbr/hull_rough.jpg';
+import windowRooms from '../assets/pbr/windows.jpg';
 
 export const glowTex = new THREE.CanvasTexture(paintGlow());
 glowTex.colorSpace = THREE.SRGBColorSpace;
@@ -110,34 +115,60 @@ const MCRN = () => [metal(0x62675f), metal(0xa8452c, { roughness: 0.6 }), metal(
 const UNN = () => [metal(0x7c8998), metal(0xd7dde2, { roughness: 0.6 }), metal(0x2d3540)] as const;
 const BELT = () => [metal(0x8a8377, { roughness: 0.75 }), metal(0xc49a2e, { roughness: 0.7 }), metal(0x35322e)] as const;
 
+/** A square-ended block along Z that narrows to `k` of its size at the front (−Z). */
+function taper(g: G, m: Mat, w: number, h: number, len: number, k: number, x = 0, y = 0, z = 0): THREE.Mesh {
+  const r = Math.SQRT1_2;
+  const o = new THREE.Mesh(new THREE.CylinderGeometry(r * k, r, len, 4, 1).rotateY(Math.PI / 4).rotateX(-Math.PI / 2), m);
+  o.scale.set(w, h, 1);
+  o.position.set(x, y, z);
+  g.add(o);
+  return o;
+}
+
 function corvette(): G {
-  // Stocky wedge, one big drive, PDCs at the shoulders and a keel railgun.
+  // Stand-in for the Blender Rocinante (tools/blender/build.py), same layout in plain blocks: a dark flat hull
+  // with a low wedge prow over the spiked rail frame, a raised pale crew block, a wider striped engineering
+  // section, the gun tower behind the crew block, the railgun on the roof and one wide drum drive.
   const g = new THREE.Group();
-  const [hull, trim, dark] = MCRN();
-  const body = tube(g, hull, 0.085, 0.14, 0.62, 0, 6);
-  body.scale.set(1.25, 0.8, 1);
-  const nose = tube(g, hull, 0.03, 0.085, 0.2, -0.41, 6);
-  nose.scale.set(1.25, 0.8, 1);
-  bx(g, trim, 0.2, 0.012, 0.1, 0, 0.072, -0.12);
-  bx(g, dark, 0.11, 0.035, 0.24, 0, 0.1, 0.1);
-  bx(g, hull, 0.06, 0.03, 0.08, 0, 0.125, 0.16);
+  const gun = metal(0x5c6066), pale = metal(0xb8bcc0, { roughness: 0.6 }), red = metal(0xbb4540, { roughness: 0.6 });
+  const dark = metal(0x2b2e30), drum = metal(0x8794a3), steel = metal(0xbcc3ca);
+  bx(g, gun, 0.29, 0.15, 0.7, 0, 0, 0.05);
+  taper(g, gun, 0.25, 0.1, 0.22, 0.4, 0, -0.02, -0.41);
+  bx(g, pale, 0.2, 0.006, 0.4, 0, 0.076, -0.08);
+  bx(g, red, 0.08, 0.006, 0.1, 0, 0.05, -0.39).rotation.x = 0.2;
+  // Crew block, its sloped front glazed.
+  bx(g, pale, 0.19, 0.08, 0.2, 0, 0.105, 0.01);
+  taper(g, pale, 0.18, 0.075, 0.06, 0.5, 0, 0.1, -0.12);
+  bx(g, lit(0xffe2a8), 0.09, 0.008, 0.004, 0, 0.112, -0.148).rotation.x = -0.8;
+  for (const s of [1, -1]) bx(g, red, 0.014, 0.004, 0.2, s * 0.078, 0.147, 0.01);
+  // Engineering: wider than the hull, pale with red stripes, a machinery door on each flank.
+  bx(g, pale, 0.304, 0.184, 0.22, 0, 0.006, 0.29);
+  for (const x of [-0.082, -0.032, 0.032, 0.082]) bx(g, red, 0.016, 0.004, 0.22, x, 0.099, 0.29);
+  // Gun tower, railgun and the rail frame under the prow.
+  bx(g, gun, 0.1, 0.06, 0.1, 0, 0.12, 0.19);
+  pdc(g, dark, 0, 0.158, 0.19, 0.015);
+  tube(g, steel, 0.011, 0.011, 0.3, -0.3, 10, 0, 0.06);
+  tube(g, dark, 0.015, 0.015, 0.03, -0.46, 10, 0, 0.06);
+  bx(g, dark, 0.16, 0.008, 0.3, 0, -0.052, -0.4);
+  for (const x of [-0.055, 0, 0.055]) tube(g, dark, 0.0035, 0.0045, 0.2, -0.58, 6, x, -0.05);
   for (const s of [1, -1]) {
-    bx(g, hull, 0.05, 0.09, 0.34, s * 0.17, 0, 0.12);
-    bx(g, trim, 0.052, 0.02, 0.1, s * 0.17, 0.035, 0.0);
-    bx(g, dark, 0.012, 0.11, 0.2, s * 0.2, 0, 0.16);
-    pdc(g, dark, s * 0.13, 0.085, -0.2);
-    pdc(g, dark, s * 0.17, 0.05, 0.26);
-    pdc(g, dark, s * 0.13, -0.085, 0.0);
-    tube(g, dark, 0.012, 0.012, 0.05, -0.49, 8, s * 0.045, 0.02);
-    lamp(g, s > 0 ? 0x4fff7a : 0xff4f4f, s * 0.2, 0, -0.04);
+    bx(g, gun, 0.05, 0.07, 0.18, s * 0.14, -0.012, -0.2);
+    bx(g, dark, 0.004, 0.05, 0.09, s * 0.153, 0, 0.27);
+    bx(g, red, 0.005, 0.03, 0.06, s * 0.153, 0, 0.27);
+    pdc(g, dark, s * 0.17, 0.085, -0.26, 0.013);
+    pdc(g, dark, s * 0.175, -0.11, 0.08, 0.013);
+    lamp(g, s > 0 ? 0x4fff7a : 0xff4f4f, s * 0.172, 0, -0.06, 0.004);
+    windows(g, s * 0.096, 0.1, -0.1, 0.05, 6, 0xffe2a8, 0.0035);
   }
-  tube(g, dark, 0.012, 0.012, 0.5, -0.12, 8, 0, -0.1);
-  bx(g, dark, 0.03, 0.03, 0.12, 0, -0.1, 0.1);
-  tube(g, dark, 0.004, 0.004, 0.16, -0.52, 5, 0, 0.03);
-  bx(g, hull, 0.24, 0.2, 0.1, 0, 0, 0.36);
-  drive(g, dark, 0.1, 0.46);
-  windows(g, 0.108, 0.02, -0.25, 0.05, 6);
-  windows(g, -0.108, 0.02, -0.25, 0.05, 6);
+  pdc(g, dark, 0, -0.125, 0.2, 0.013);
+  // Drum drive: a ribbed barrel on a short collar, lit inside.
+  tube(g, dark, 0.108, 0.108, 0.02, 0.41, 8);
+  tube(g, drum, 0.112, 0.112, 0.135, 0.4875, 24);
+  for (const z of [0.445, 0.475, 0.505, 0.535]) tube(g, dark, 0.115, 0.115, 0.008, z, 24);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), lit(0x9fd8ff));
+  disc.position.z = 0.556;
+  g.add(disc);
+  plumeAt(g, 0.09, 0, 0, 0.556, 0x9fd8ff, 1);
   return g;
 }
 
@@ -555,10 +586,33 @@ const BURN: Partial<Record<ShipModel, [color: number, burn: number]>> = {
   freighter: [0xffd9a8, 0.4], stealth: [0x6f8fb0, 0.12], survey: [0xcfe6ff, 0.5],
 };
 const LAMPS = new Set(['window', 'glow', 'red', 'green', 'blue']);
+/** Lamps that are windows: their panes show small lit rooms from the window sheet. */
+const PANES = new Set(['window', 'blue']);
+/** The level clean paint is stored at in the models' vertex colours (CLEAN in tools/blender/kit.py). */
+const CLEAN = 0.72;
 const loaded = new Map<ShipModel, G>();
 
+/** The textures every Blender-built ship shares, painted by tools/blender/hulltex.py: hull wear,
+ *  relief and sheen (tiling), and the sheet of lit rooms behind the windows. */
+let shared: { color: THREE.Texture; normal: THREE.Texture; rough: THREE.Texture; rooms: THREE.Texture } | undefined;
+function hullMaps() {
+  if (!shared) {
+    const loader = new THREE.TextureLoader();
+    const load = (url: string, srgb: boolean, tile = true) => {
+      const t = loader.load(url);
+      t.flipY = false; // the way model files count texture rows
+      if (tile) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 8;
+      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      return t;
+    };
+    shared = { color: load(hullColor, true), normal: load(hullNormal, false), rough: load(hullRough, false), rooms: load(windowRooms, true, false) };
+  }
+  return shared;
+}
+
 function prepare(root: G): G {
-  const plates = scan('plates', 1);
+  const hull = hullMaps();
   const mats = new Map<string, Mat>();
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -567,15 +621,18 @@ function prepare(root: G): G {
     let m = mats.get(src.name);
     if (!m) {
       if (LAMPS.has(src.name)) {
-        const b = new THREE.MeshBasicMaterial({ color: src.color });
+        const b = new THREE.MeshBasicMaterial({ color: src.color, map: PANES.has(src.name) ? hull.rooms : null });
         b.color.multiplyScalar(1.6);
         m = b;
       } else {
+        // The vertex colours hold the weathering (shadowed dirt, soot, scuffed edges) as a multiplier on the paint.
+        src.color.multiplyScalar(1 / CLEAN);
         if (src.name !== 'ice') {
-          src.normalMap = plates.normalMap;
-          src.normalScale.set(0.5, 0.5);
-          src.roughnessMap = plates.roughnessMap;
-          src.roughness = 1.7;
+          src.map = hull.color;
+          src.normalMap = hull.normal;
+          src.normalScale.set(0.8, 0.8);
+          src.roughnessMap = hull.rough;
+          src.roughness = 1;
         }
         m = src;
       }
@@ -587,7 +644,8 @@ function prepare(root: G): G {
 }
 
 export async function loadModels() {
-  const loader = new GLTFLoader();
+  // The files are packed with meshopt (tools/blender/build.py), which the loader unpacks as it reads.
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   await Promise.all((Object.entries(GLB) as [ShipModel, string][]).map(async ([name, url]) => {
     try {
       loaded.set(name, prepare((await loader.loadAsync(url)).scene));

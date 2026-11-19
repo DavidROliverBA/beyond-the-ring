@@ -79,8 +79,11 @@ To jump, fly through the middle of a ring.
 - The ship and station models are built by script in [Blender](https://www.blender.org). To rebuild them:
 
   ```sh
-  blender -b -P tools/blender/build.py -- all
+  blender -b -P tools/blender/hulltex.py          # the hull and window textures all ships share
+  blender -b -P tools/blender/build.py -- all     # the models (add --preview <folder> for stills)
   ```
+
+  The build weathers each model (dirt, soot, scuffed plate edges, held in vertex colours) and packs it with meshopt through `bunx`, so it needs a network connection the first time.
 
 Everything is its true size: a ship is tens or hundreds of metres long in a system billions of kilometres across. Ships from different points in the story are all on show at once.
 
