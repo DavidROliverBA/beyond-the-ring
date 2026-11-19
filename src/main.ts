@@ -12,7 +12,7 @@ import {
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
 import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
-import { canBounce } from './probes';
+import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
 import { createLook } from './look';
 import { addLightning } from './lightning';
@@ -43,7 +43,7 @@ const camera = new THREE.PerspectiveCamera(60, 1, 1e-9, 4e6 * LOGK);
 const walkCam = new THREE.PerspectiveCamera(72, 1, 0.08, 12000 * LOGK);
 /** How far a light probe sees (scaled like every far plane), and how long (ms) docking may
  *  spend filling probes in the dark before the rest is left to the frames that follow. */
-const PROBE_FAR = 400 * LOGK, BAKE_DARK = 1500;
+const PROBE_FAR = 400 * LOGK, BAKE_DARK = 800;
 
 // Everything is drawn into a float buffer first, so lamps, drives and city lights
 // can be brighter than white and bleed a little, the way they do on film.
@@ -1294,14 +1294,19 @@ async function dock(th: Thing) {
     it.scene.environment = envMap;
     it.scene.environmentIntensity = 0.3;
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0, vx: 0, vz: 0 });
-    // The probe textures must exist before the shaders are compiled, or every shader is
-    // compiled twice. Then fill in the room you arrive in while the screen is still dark;
-    // the other rooms follow a few probes a frame (see frame()).
+    // Bounce light: load the probes saved for this place. Failing that, take them now: the
+    // probe textures must exist before the shaders are compiled (or every shader is compiled
+    // twice), then the room you arrive in is filled while the screen is still dark, and the
+    // other rooms follow a slice a frame (see frame()).
+    if (it.bounce && !it.bounce.done) {
+      const saved = await savedProbes(it.id);
+      if (!saved || !it.bounce.load(saved)) console.warn(`No saved light probes fit ${it.name}; taking them now. Run: bun tools/bake-probes.ts`);
+    }
     it.bounce?.prime(renderer);
     await warm(it.scene, walkCam);
     if (it.bounce && !it.bounce.done) {
       const here = new V3(it.spawn.x, 1.7, it.spawn.z), t0 = performance.now();
-      while (!it.bounce.step(renderer, 24, here, PROBE_FAR) && performance.now() - t0 < BAKE_DARK) await pause();
+      while (!it.bounce.step(renderer, 24, here, PROBE_FAR) && (BAKING || performance.now() - t0 < BAKE_DARK)) await pause();
       renderer.getContext().finish();
     }
     walk = it;
@@ -1577,8 +1582,10 @@ if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, spa
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null }) });
 // The light probes too: how many are left to fill, and a switch for before-and-after tests.
 if (FRAMES) Object.defineProperty(globalThis, '__bounce', { get: () => walk?.bounce });
+// For tools/bake-probes.ts: the finished probes of the place you are in, as a file.
+if (FRAMES) Object.assign(globalThis, { __saveProbes: () => walk?.bounce?.done ? Array.from(walk.bounce.save(renderer)) : null });
 
-let walkSince = 0, bakeSkip = 0;
+let walkSince = 0, bakeLast = 0;
 
 function frame(now: number) {
   requestAnimationFrame(frame);
@@ -1588,9 +1595,13 @@ function frame(now: number) {
   clock += dt;
   if (!space) return;
   if (walk) {
-    // Light probes still to fill in: a little each frame, nearest room first. Not in the first
-    // second or so on foot, and only every fourth frame when frames are already slow.
-    if (walk.bounce && !walk.bounce.done && clock - walkSince > 1.7 && (dt < 0.024 || ++bakeSkip % 4 === 0)) walk.bounce.step(renderer, 3, walkCam.position, PROBE_FAR);
+    // Light probes still to fill in: a couple of milliseconds' worth a frame, nearest room
+    // first. Not in the first second or so on foot, and not while frames are slow, when it
+    // would only make them slower: then it is one small slice a second, so it still finishes.
+    if (walk.bounce && !walk.bounce.done && clock - walkSince > 1.7 && (dt < 0.02 || now - bakeLast > 1000)) {
+      walk.bounce.step(renderer, 2, walkCam.position, PROBE_FAR);
+      bakeLast = now;
+    }
     walkStep(dt);
     updateHud(dt);
     look.update(dt, walk.id, walkCam, null, walkCam.aspect);

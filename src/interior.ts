@@ -921,14 +921,16 @@ class Kit {
     };
     let bounce: Bounce | undefined;
     if (this.bounce && this.rooms.length + this.volumes.length) {
-      // One box of probes per room, about 2 m apart in small rooms and wider in the big ones.
+      // One box of probes per room, 4 to 6 m apart, in one layer under a low ceiling and two
+      // under a high one. Few probes on purpose: each costs six drawings of the room, and
+      // bounce light changes slowly across a room anyway.
       // A room's probes are all inside its own walls, which is what stops light leaking through.
       const boxes = [...this.volumes];
       for (const r of this.rooms) {
-        const w = r.x1 - r.x0, d = r.z1 - r.z0, step = Math.min(5, Math.max(2, Math.sqrt((w * d) / 100)));
+        const w = r.x1 - r.x0, d = r.z1 - r.z0, step = Math.min(6, Math.max(4, Math.sqrt((w * d) / 40)));
         boxes.push({
           x0: r.x0, x1: r.x1, y0: 0, y1: r.h, z0: r.z0, z1: r.z1,
-          nx: Math.max(2, Math.round(w / step)), ny: Math.min(3, Math.max(2, Math.round(r.h / 2.5))), nz: Math.max(2, Math.round(d / step)), ...r.probe,
+          nx: Math.max(1, Math.round(w / step)), ny: r.h < 4 ? 1 : 2, nz: Math.max(1, Math.round(d / step)), ...r.probe,
         });
       }
       this.scene.traverse((o) => { if (o instanceof THREE.HemisphereLight) o.intensity *= FILL; });
@@ -1129,7 +1131,7 @@ function ceres(): Interior {
   const con = k.room('The Concourse', -CW, CZ0, CW, CZ1, CH, { floor: 'grime', wall: 'white', open: true, calm: true, floorTint: 0xb9bdc1 }, Math.PI);
   k.places[k.places.length - 1].z = CZ0 + 9;
   // The street's probes take in the terraces up both walls as well, so they are lit the same way.
-  con.probe = { x0: -26, x1: 26, y1: 26, nx: 8, ny: 4, nz: 24 };
+  con.probe = { x0: -26, x1: 26, y1: 26, nx: 6, ny: 3, nz: 12 };
   k.door(hydro, con, 0, 3.4);
   k.window(dock, 'n', -14, 14, 2, 10);
   k.finish();
@@ -1437,7 +1439,7 @@ function medina(): Interior {
   );
   // The whole drum in one coarse box of probes. The light in here changes slowly, and what a
   // probe sees in every direction is lit farmland, which is exactly the drum's fill light.
-  k.volumes.push({ x0: -R, x1: R, y0: -R, y1: R, z0: -L / 2, z1: L / 2, nx: 10, ny: 10, nz: 16 });
+  k.volumes.push({ x0: -R, x1: R, y0: -R, y1: R, z0: -L / 2, z1: L / 2, nx: 6, ny: 6, nz: 8 });
   return k.done({ name: 'Bow lift', x: 0, z: -438, yaw: Math.PI });
 }
 
@@ -1547,7 +1549,7 @@ async function ganymede(): Promise<Interior> {
   k.placard(-4, -34, Math.PI / 2, 'A sixth of a sixth',
     'Gravity here is about a seventh of Earth\'s. Crops grow tall and thin, water arcs lazily out of the irrigation heads, and a dropped tool takes a full second and a half to reach the soil.');
   // One low box of probes for the whole dome: sunlight coming back up off the soil and crops.
-  k.volumes.push({ x0: -R, x1: R, y0: 0, y1: 15, z0: -R, z1: R, nx: 16, ny: 3, nz: 16 });
+  k.volumes.push({ x0: -R, x1: R, y0: 0, y1: 10, z0: -R, z1: R, nx: 10, ny: 1, nz: 10 });
   k.places.push({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 }, { name: 'Centre of the dome', x: 0, z: -4, yaw: 0 }, { name: 'Far edge', x: 0, z: -54, yaw: 0 });
   return k.done({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 });
 }

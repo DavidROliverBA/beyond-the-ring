@@ -3,10 +3,36 @@
 // from each side. Surfaces and people then pick up the light of the probes nearest them, so
 // daylight comes back off white walls, neon tints the floor near it, and corners stay dark.
 //
-// The pictures are taken once per interior, a few per frame, nearest room first.
+// Taking the pictures is slow (each is the room drawn six times), so it is done ahead of time:
+// `bun tools/bake-probes.ts` fills every interior's probes in a headless browser and saves them
+// in assets/probes/, a few kilobytes each, and docking just loads the file. If a file is missing
+// or no longer fits the rooms (the layout changed), the pictures are taken on the spot instead:
+// the room you arrive in while the screen is dark, the rest a slice a frame, nearest room first.
 
 import * as THREE from 'three';
 import { LightProbeGridWebGL } from 'three/addons/lighting/LightProbeGridWebGL.js';
+import ceresProbes from '../assets/probes/ceres.bin';
+import tychoProbes from '../assets/probes/tycho.bin';
+import ganymedeProbes from '../assets/probes/ganymede.bin';
+import medinaProbes from '../assets/probes/medina.bin';
+
+/** The saved probes of each interior. */
+const SAVED: Record<string, string> = { ceres: ceresProbes, tycho: tychoProbes, ganymede: ganymedeProbes, medina: medinaProbes };
+/** With ?bake in the address the saved probes are ignored and taken afresh, with more care
+ *  (finer pictures and a second bounce), for tools/bake-probes.ts to save. */
+export const BAKING = new URLSearchParams(location.search).has('bake');
+/** First four bytes of a probe file, then: how many grids, each grid's three probe counts,
+ *  then each grid's texture as half floats. All 16-bit numbers. */
+const MAGIC = [0x5442, 0x5052]; // "BTRP"
+
+/** Fetch an interior's saved probes, or null if there are none to be had. */
+export async function savedProbes(id: string): Promise<ArrayBuffer | null> {
+  if (BAKING || !SAVED[id]) return null;
+  try {
+    const r = await fetch(SAVED[id]);
+    return r.ok ? await r.arrayBuffer() : null;
+  } catch { return null; }
+}
 
 {
   // three.js picks the grid that lights a surface by stepping half a probe spacing out along the
@@ -42,15 +68,16 @@ export class Bounce {
   private now: Job | null = null;
   private hide: THREE.Object3D[] = [];
   private shadows: THREE.LightShadow[] = [];
-  private per = 2;
+  /** What a probe has been costing lately (ms), so a slice can be sized to the time allowed. */
+  private each = 2;
   private primed = false;
   /** True once every probe has been filled in. */
   done = false;
 
   /** `aim` sets the lights as they are when you stand at a spot (they follow you about), and
    *  `skip` lists what should not be in the probes' pictures: people, who move, and fake shade.
-   *  `bounces` is how many extra times light is followed off a surface. */
-  constructor(private scene: THREE.Scene, boxes: ProbeBox[], private aim: (at: THREE.Vector3) => void, skip: THREE.Object3D[], private bounces = 1) {
+   *  `bounces` is how many extra times light is followed off a surface (each doubles the work). */
+  constructor(private scene: THREE.Scene, boxes: ProbeBox[], private aim: (at: THREE.Vector3) => void, skip: THREE.Object3D[], private bounces = BAKING ? 1 : 0) {
     for (const b of boxes) {
       const grid = new LightProbeGridWebGL(b.x1 - b.x0, b.y1 - b.y0, b.z1 - b.z0, b.nx, b.ny, b.nz);
       grid.position.set((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2);
@@ -67,7 +94,7 @@ export class Bounce {
     scene.traverse((o) => {
       if (!o.visible || under.has(o)) return;
       // Stars and wire frames are drawn a pixel wide however far off they are. In a picture
-      // sixteen pixels across that makes them enormous lamps, so they stay out too.
+      // eight pixels across that makes them enormous lamps, so they stay out too.
       if ((o as THREE.Points).isPoints || (o as THREE.Line).isLine) this.hide.push(o);
       const l = o as THREE.DirectionalLight;
       if (l.isLight && l.castShadow) this.shadows.push(l.shadow);
@@ -84,6 +111,59 @@ export class Bounce {
   /** How many probes there are, and how many pictures are still to take (for tests). */
   get count(): number { return this.jobs.reduce((s, j) => s + j.n, 0); }
   get left(): number { return this.jobs.reduce((s, j) => s + Math.max(0, this.bounces + 1 - j.pass) * j.n - j.next, 0); }
+
+  /** Use probes saved earlier by `save`. False (and nothing changed) if they are not for
+   *  these grids, which means the rooms have changed since and the file needs baking again. */
+  load(file: ArrayBuffer): boolean {
+    if (this.primed || file.byteLength < 6 || file.byteLength % 2) return false;
+    const d = new Uint16Array(file);
+    if (d[0] !== MAGIC[0] || d[1] !== MAGIC[1] || d[2] !== this.jobs.length) return false;
+    let at = 3 + this.jobs.length * 3;
+    const sizes = this.jobs.map((j, i) => {
+      const r = j.grid.resolution, ok = d[3 + i * 3] === r.x && d[4 + i * 3] === r.y && d[5 + i * 3] === r.z;
+      return ok ? r.x * r.y * 7 * (r.z + 2) * 4 : -1;
+    });
+    if (sizes.includes(-1) || at + sizes.reduce((a, b) => a + b, 0) !== d.length) return false;
+    this.jobs.forEach((j, i) => {
+      const r = j.grid.resolution, t = new THREE.Data3DTexture(d.slice(at, at + sizes[i]), r.x, r.y, 7 * (r.z + 2));
+      t.format = THREE.RGBAFormat; t.type = THREE.HalfFloatType;
+      t.minFilter = t.magFilter = THREE.LinearFilter;
+      t.needsUpdate = true;
+      j.grid.texture = t;
+      j.pass = this.bounces + 1;
+      at += sizes[i];
+    });
+    this.primed = this.done = true;
+    return true;
+  }
+
+  /** The filled probes as a file for `load` (used by the bake tool; reads back from the graphics card). */
+  save(renderer: THREE.WebGLRenderer): Uint16Array {
+    const gl = renderer.getContext() as WebGL2RenderingContext, parts: Uint16Array[] = [];
+    const head = [...MAGIC, this.jobs.length];
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    for (const j of this.jobs) {
+      const r = j.grid.resolution, depth = 7 * (r.z + 2), layer = new Float32Array(r.x * r.y * 4), out = new Uint16Array(layer.length * depth);
+      const rt = (j.grid as unknown as { _renderTarget: THREE.WebGL3DRenderTarget })._renderTarget;
+      const tex = (renderer.properties.get(rt.texture) as { __webglTexture: WebGLTexture }).__webglTexture;
+      for (let z = 0; z < depth; z++) {
+        gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, tex, 0, z);
+        gl.readPixels(0, 0, r.x, r.y, gl.RGBA, gl.FLOAT, layer);
+        for (let i = 0; i < layer.length; i++) out[z * layer.length + i] = THREE.DataUtils.toHalfFloat(layer[i]);
+      }
+      head.push(r.x, r.y, r.z);
+      parts.push(out);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    renderer.resetState();
+    const file = new Uint16Array(head.length + parts.reduce((a, p) => a + p.length, 0));
+    file.set(head);
+    let at = head.length;
+    for (const p of parts) { file.set(p, at); at += p.length; }
+    return file;
+  }
 
   /** Switch the bounce light off and on (for before-and-after tests). */
   show(on: boolean) { for (const j of this.jobs) j.grid.visible = on; }
@@ -121,8 +201,8 @@ export class Bounce {
     try {
       for (;;) {
         if (!this.now) {
-          // Every room gets its first pass before any gets its second, so the second sees
-          // the neighbours' light through the doors.
+          // Nearest room first. (With extra bounces, every room gets its first pass before
+          // any gets its second, so the second sees the neighbours' light through the doors.)
           let best: Job | null = null, bd = Infinity;
           for (const j of this.jobs) {
             const d = j.pass * 1e9 + j.mid.distanceToSquared(cam);
@@ -134,19 +214,19 @@ export class Bounce {
         const j = this.now;
         this.aim(j.mid);
         show(j.hide, false);
-        const count = Math.min(this.per, j.n - j.next), t1 = performance.now();
+        // As many probes as should fit in the time left, going by what they have been costing.
+        const room = ms - (performance.now() - t0);
+        const count = Math.min(Math.max(1, Math.floor(room / this.each)), 32, j.n - j.next), t1 = performance.now();
         try {
-          j.grid.bake(renderer, scene, { cubemapSize: 16, near: 0.05, far, start: j.next, count, pass: j.pass });
+          j.grid.bake(renderer, scene, { cubemapSize: BAKING ? 16 : 8, near: 0.05, far, start: j.next, count, pass: j.pass });
         } finally {
           show(j.hide, true);
         }
         j.next += count;
         if (j.next >= j.n) { j.next = 0; j.pass++; this.now = null; }
-        // Settle on as many probes per go as fit the time allowed (each go has a fixed cost
-        // too, so never fewer than two).
-        const t2 = performance.now(), each = (t2 - t1) / count;
-        this.per = Math.max(2, Math.min(64, Math.floor((ms * 0.8) / Math.max(each, 0.05))));
-        if (t2 - t0 + each * 2 > ms) return false;
+        const t2 = performance.now();
+        this.each = this.each * 0.7 + ((t2 - t1) / count) * 0.3;
+        if (t2 - t0 + this.each > ms) return false;
       }
     } finally {
       show(this.hide, true);
