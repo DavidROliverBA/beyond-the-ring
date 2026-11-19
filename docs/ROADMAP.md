@@ -60,7 +60,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 3. **Ambient occlusion and contact shadows.** Runtime AO first (cheap trial of N8AO or realism-effects). Bake corner AO for the static parts of interiors.
 4. **Baked interior lighting.** Move interior layouts into Blender (kit exists), bake lighting with Cycles into lightmaps, export GLB. Keep runtime lights only for neon and signs. This is a rebuild of the interiors from generated code to authored assets, so do one room as a trial (a Tycho corridor) before committing the rest.
 5. **Hero ships and stations.** Hull panels, normal and roughness maps, weathering, windows with emissive interiors. Start with the Rocinante, Donnager and docked ships. Update the in-code fallback `corvette()` in `src/ships.ts` (still the old shape).
-6. **Photo mode (optional).** Stills refined with `three-gpu-pathtracer` (WebGL 2, progressive). Untested at true scale; treat as an experiment.
+6. **Photo mode.** *Done 2026-11-17:* P freezes time and hides the HUD, the mouse still looks around, [ and ] set exposure, Enter saves a PNG; works in flight and on foot. Path-traced stills (`three-gpu-pathtracer`) not attempted: untested at true scale and the log-depth patch is WebGL-shader specific.
 
 **Ceres concourse (2026-11-15):** new walkable street on Ceres (`src/concourse.ts`), reached through Hydroponics: vaulted sky-panel ceiling with ribs, seven terraces of housing each side, shopfronts, planters, bikes, public screens, a plain-clothes crowd, and daylight that blends in as you walk through the door. First pass; next would be more relief on the housing, softer shadows and denser street life.
 
@@ -81,10 +81,10 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 ### Backlog (not scheduled)
 
-- **Bug found 2026-11-17: Earth's night side renders almost as bright as the day side**, with day colours, although the city lights correctly appear only there. Turning the Sun's light and the ambient light to zero in the page doesn't darken it, and neither the atmosphere shell nor the camera look is the cause. Investigate with the space-lighting work (Phase A step 2): check the surface shader output and the cloud deck.
+- ~~Bug: Earth's night side rendered nearly as bright as day.~~ *Fixed 2026-11-17:* the studio environment meant for ship reflections was lighting every planet, because a material's `envMapIntensity` doesn't scale `scene.environment`. Planets, clouds and rocks now carry their own black environment.
 - **Sound.** Parked at the owner's request. When revisited: synthesised or CC0 audio only, Web Audio positional sound with a convolver reverb per room, footsteps per material, ventilation and crowd murmur layers.
 - Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).
-- Hand-flying and hand-walking test pass by a person, not only headless Playwright.
+- Hand-flying and hand-walking test pass by a person, not only headless Playwright. *Checklist ready: `docs/HAND-TEST.md` (2026-11-17); needs David.*
 
 ## 3. Hosting options
 

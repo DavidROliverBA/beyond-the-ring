@@ -16,6 +16,7 @@ import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
 import { createLook } from './look';
 import { addLightning } from './lightning';
+import { createTour } from './tour';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
 type V3 = THREE.Vector3;
@@ -90,6 +91,9 @@ async function warm(s: THREE.Scene, c: THREE.Camera) {
 const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environment = envMap;
 scene.environmentIntensity = 0.3;
+// Planets, moons and rocks must not pick up that studio: it lit night sides like day. A material's
+// envMapIntensity doesn't scale scene.environment, so they get their own black environment instead.
+const NO_ENV = new THREE.PMREMGenerator(renderer).fromScene(new THREE.Scene(), 0).texture;
 
 function resize() {
   composer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -142,30 +146,69 @@ async function waterRoughness(url: string): Promise<THREE.Texture> {
 
 // ----------------------------------------------------------------- shaders
 
+// Air seen from space: single scattering, marched per pixel (after O'Neil, GPU Gems 2 ch. 16).
+// Worked in the planet's own units (radius 1) with the camera passed in relative to the planet, so
+// true-scale distances don't eat the float precision. Short wavelengths scatter most (a blue limb);
+// light crossing a lot of air loses its blue (red at the terminator); air in shadow scatters nothing.
+const ATMO_TOP = 1.015;
 const ATMO_V = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>
-varying vec3 vN; varying vec3 vV; varying vec3 vW;
+varying vec3 vP;
 void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vN = normalize(normalMatrix * normal);
-  vV = normalize(-mv.xyz);
-  vW = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * mv;
+  vP = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   #include <logdepthbuf_vertex>
 }`;
 const ATMO_F = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform vec3 color; uniform vec3 sunDir; uniform float strength;
-varying vec3 vN; varying vec3 vV; varying vec3 vW;
+uniform vec3 beta;      // scattering per planet radius, per colour
+uniform vec3 sunDir; uniform vec3 cam; uniform float R; uniform float strength;
+varying vec3 vP;
+const float TOP = ${ATMO_TOP};
+const float H = (TOP - 1.0) / 6.0;       // scale height: the air thins by e every sixth of the shell
+const float MIE = 0.12;                   // haze, a little, scattered mostly forwards
+vec2 hit(vec3 o, vec3 d, float r) {       // entry and exit distances along a ray through a sphere
+  float b = dot(o, d), c = dot(o, o) - r * r, h = b * b - c;
+  if (h < 0.0) return vec2(1e9, -1e9);
+  h = sqrt(h);
+  return vec2(-b - h, -b + h);
+}
+float depthTo(vec3 p, vec3 d) {           // air between a point and the top, towards the sun
+  vec2 t = hit(p, d, TOP);
+  float l = t.y / 4.0, od = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec3 q = p + d * (l * (float(i) + 0.5));
+    od += exp(-(length(q) - 1.0) / H);
+  }
+  return od * l;
+}
 void main() {
   #include <logdepthbuf_fragment>
-  // Brightest at the planet's limb, thinning to nothing at the top of the air.
-  float ndv = abs(dot(normalize(vN), normalize(vV)));
-  float rim = pow(1.0 - ndv, 2.6) * smoothstep(0.0, 0.17, ndv) * 1.5;
-  float lit = clamp(dot(normalize(vW), sunDir) * 1.3 + 0.45, 0.06, 1.0);
-  gl_FragColor = vec4(color, rim * strength * lit);
+  vec3 o = cam / R, d = normalize(vP / R - o);
+  vec2 ta = hit(o, d, TOP), tp = hit(o, d, 1.0);
+  float t0 = max(ta.x, 0.0), t1 = ta.y;
+  if (tp.x > 0.0) t1 = min(t1, tp.x);     // stop at the ground
+  if (t1 <= t0) discard;
+  const int N = 14;
+  float ds = (t1 - t0) / float(N), odView = 0.0;
+  vec3 sumR = vec3(0.0); float sumM = 0.0;
+  for (int i = 0; i < N; i++) {
+    vec3 p = o + d * (t0 + ds * (float(i) + 0.5));
+    float dens = exp(-(length(p) - 1.0) / H) * ds;
+    odView += dens;
+    if (hit(p, sunDir, 1.0).x > 0.0) continue;   // in the planet's shadow
+    float odSun = depthTo(p, sunDir);
+    vec3 att = exp(-(beta + MIE * 0.02) * (odView + odSun));
+    sumR += att * dens;
+    sumM += att.g * dens;
+  }
+  float mu = dot(d, sunDir);
+  float phaseR = 0.0597 * (1.0 + mu * mu);
+  float g = 0.76, phaseM = 0.119 * (1.0 - g * g) * (1.0 + mu * mu) / ((2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
+  vec3 col = (sumR * beta * phaseR + sumM * MIE * 0.02 * phaseM) * 6.8 * strength;   // twice the sunlight: single scattering alone undersells the bright limb
+  gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;
 
@@ -463,6 +506,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   } else {
     const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, bumpScale: photo?.bumpScale ?? 3 });
     if (photo?.normal) mat.normalScale.set(1.6, 1.6);
+    mat.envMap = NO_ENV;
     mat.envMapIntensity = 0;
     if (kinds.lights) {
       mat.emissive = new THREE.Color(0xffffff);
@@ -475,7 +519,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   tilt.add(mesh);
   ctx.spin.push({ o: mesh, r: b.spin ?? 0.02 });
   if (kinds.clouds) {
-    lod.clouds = new THREE.MeshStandardMaterial({ transparent: true, roughness: 1, depthWrite: false, envMapIntensity: 0 });
+    lod.clouds = new THREE.MeshStandardMaterial({ transparent: true, roughness: 1, depthWrite: false, envMap: NO_ENV, envMapIntensity: 0 });
     const deck = new THREE.Mesh(new THREE.SphereGeometry(R * 1.012, 96, 48), lod.clouds);
     tilt.add(deck);
     ctx.spin.push({ o: deck, r: (b.spin ?? 0.02) * 1.4 });
@@ -491,10 +535,21 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
 
   if (b.atmo) {
     const sunDir = pos.lengthSq() > 0 ? pos.clone().negate().normalize() : new V3(0, 1, 0);
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(R * 1.015, 96, 48), new THREE.ShaderMaterial({
-      uniforms: { color: { value: new THREE.Color(b.atmo) }, sunDir: { value: sunDir }, strength: { value: b.atmoK ?? 1 } },
-      vertexShader: ATMO_V, fragmentShader: ATMO_F, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
+    // Scattering strength per colour from the planet's air tint: Earth's blue gives roughly the real
+    // Rayleigh ratios (red scatters least), a dusty tint gives Mars its butterscotch.
+    const tint = new THREE.Color(b.atmo);
+    const beta = new V3(tint.r, tint.g, tint.b).multiplyScalar(220 / Math.max(tint.r, tint.g, tint.b));
+    const uniforms = { beta: { value: beta }, sunDir: { value: sunDir }, cam: { value: new V3() }, R: { value: R }, strength: { value: b.atmoK ?? 1 } };
+    const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: ATMO_V, fragmentShader: ATMO_F, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(R * ATMO_TOP, 96, 48), mat);
+    // Each frame: where the camera is relative to this planet, and whether we're inside the air.
+    const wp = new V3();
+    shell.onBeforeRender = (_r, _s, cam) => {
+      shell.getWorldPosition(wp);
+      uniforms.cam.value.copy(cam.position).sub(wp);
+      const side = uniforms.cam.value.length() < R * ATMO_TOP ? THREE.BackSide : THREE.FrontSide;
+      if (mat.side !== side) { mat.side = side; mat.needsUpdate = true; }
+    };
     holder.add(shell);
   }
   if (b.rings) {
@@ -561,7 +616,7 @@ function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>) {
 
   const knots = (b.clusters ?? []).map((id) => posOf.get(id)).filter((p): p is V3 => !!p);
   const perKnot = 90;
-  const rockMat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 1, flatShading: true, envMapIntensity: 0 });
+  const rockMat = new THREE.MeshStandardMaterial({ color: b.color, roughness: 1, flatShading: true, envMap: NO_ENV, envMapIntensity: 0 });
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new V3(), e = new THREE.Euler();
   const put = (rocks: THREE.InstancedMesh, i: number, at: V3, size: number) => {
     e.set(r() * TAU, r() * TAU, r() * TAU);
@@ -984,6 +1039,7 @@ function banner(title: string, text: string) {
 
 async function transit(g: Thing) {
   if (busy || !g.to) return;
+  stopTour();
   busy = true;
   auto = null;
   const flash = $('flash');
@@ -1036,9 +1092,70 @@ addEventListener('wheel', (e) => {
 
 const STEER = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'KeyX', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
+// Tour mode: the camera films the system shot by shot. Behind the start screen it just plays;
+// in flight T starts and stops it, and any other key hands control back where you left off.
+const tour = createTour(
+  (t, caption) => { if (started) banner(t.name, caption); },
+  (on) => $('flash').classList.toggle('on', on),
+);
+let tourSave: { pos: V3; q: THREE.Quaternion } | null = null;
+function startTour() {
+  if (busy || walk || tour.active) return;
+  tourSave = { pos: ship.pos.clone(), q: ship.q.clone() };
+  auto = null;
+  ship.speed = ship.throttle = 0;
+  tour.start(space.id, space.things, space.things.find((t) => t.kind === 'star')?.pos ?? null);
+}
+function stopTour() {
+  if (!tour.active && !tourSave) return;
+  tour.stop();
+  $('banner').classList.remove('show');
+  if (tourSave) {
+    ship.pos.copy(tourSave.pos);
+    ship.prev.copy(tourSave.pos);
+    ship.q.copy(tourSave.q);
+    camQ.copy(tourSave.q);
+    tourSave = null;
+  }
+  shipModel.visible = chase;
+}
+
+// Photo mode: time stands still, the HUD goes, the mouse still looks around.
+let photo = false, saveShot = false;
+function setPhoto(on: boolean) {
+  photo = on;
+  document.body.classList.toggle('photo', on);
+  if (!on) renderer.toneMappingExposure = 1;
+  keys.clear();
+}
+function savePicture() {
+  const d = new Date(), p2 = (n: number) => String(n).padStart(2, '0');
+  const name = `beyond-the-ring-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.png`;
+  // Called straight after a draw, before the browser clears the canvas.
+  canvas.toBlob((b) => {
+    if (!b) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, 'image/png');
+}
+
 addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
   if (e.metaKey || e.ctrlKey) return;
+  if (started && !busy && e.code === 'KeyP') { setPhoto(!photo); return; }
+  // Any key but T (and the panels) ends a tour and only does that, so the ship doesn't lurch off.
+  if (started && tour.active && !['KeyT', 'Tab', 'KeyN', 'KeyH'].includes(e.code)) { stopTour(); return; }
+  if (photo) {
+    if (e.code === 'BracketRight') renderer.toneMappingExposure = Math.min(4, renderer.toneMappingExposure * 1.15);
+    else if (e.code === 'BracketLeft') renderer.toneMappingExposure = Math.max(0.25, renderer.toneMappingExposure / 1.15);
+    else if (e.code === 'Enter') saveShot = true;
+    else if (e.code === 'Escape') return;
+    e.preventDefault();
+    return;
+  }
   keys.add(e.code);
   if (walk) {
     if (e.code === 'Tab' || e.code === 'KeyN') {
@@ -1050,6 +1167,7 @@ addEventListener('keydown', (e) => {
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
     return;
   }
+  if (e.code === 'KeyT') { if (tour.active) stopTour(); else startTour(); return; }
   if (STEER.includes(e.code)) auto = null;
   switch (e.code) {
     case 'Tab':
@@ -1519,6 +1637,9 @@ function updateHud(dt: number) {
   hudClock = 0;
   if (walk) {
     $('loc-near').textContent = walk.roomAt(walker.x, walker.z);
+    // Station time runs on your own clock, so a late-night visit finds the place on its night shift.
+    const now = new Date();
+    $('loc-sub').textContent = `On foot · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time`;
     const pt = nearPoint as Point | null;
     $('card').style.display = pt ? 'block' : 'none';
     if (pt) {
@@ -1590,7 +1711,9 @@ let walkSince = 0, bakeLast = 0;
 function frame(now: number) {
   requestAnimationFrame(frame);
   if (FRAMES && last) { FRAMES.push(now - last); if (FRAMES.length > 5000) FRAMES.shift(); }
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const realDt = Math.min(0.05, (now - last) / 1000);
+  // In photo mode the world stops; only the camera moves.
+  const dt = photo ? 0 : realDt;
   last = now;
   clock += dt;
   if (!space) return;
@@ -1606,9 +1729,16 @@ function frame(now: number) {
     updateHud(dt);
     look.update(dt, walk.id, walkCam, null, walkCam.aspect);
     draw(walk.scene, walkCam);
+    if (saveShot) { saveShot = false; savePicture(); }
     return;
   }
-  if (!busy && started) step(dt);
+  if (photo) {
+    // Look around freely without steering the ship.
+    lookYaw -= mdx * 0.003;
+    lookPitch = clamp(lookPitch - mdy * 0.003, -1.4, 1.4);
+    mdx = mdy = 0;
+  }
+  if (!busy && started && !tour.active) step(dt);
   lodTick();
 
   shipModel.position.copy(ship.pos);
@@ -1627,6 +1757,12 @@ function frame(now: number) {
   camera.position.copy(ship.pos).add(_off.applyQuaternion(_lookQ));
   camera.quaternion.copy(_lookQ);
   camera.updateMatrixWorld();
+  if (tour.active && tour.update(dt, camera, !started)) {
+    // The tour drives the camera; the ship rides along unseen, so maps sharpen where we're looking.
+    shipModel.visible = false;
+    ship.pos.copy(camera.position);
+    ship.prev.copy(camera.position);
+  }
   sky.position.copy(camera.position);
 
   const p = dustGeo.getAttribute('position') as THREE.BufferAttribute;
@@ -1647,6 +1783,7 @@ function frame(now: number) {
   updateHud(dt);
   look.update(dt, 'space', camera, space.things.find((t) => t.kind === 'star')?.pos ?? null, camera.aspect);
   draw(scene, camera);
+  if (saveShot) { saveShot = false; savePicture(); }
 }
 
 // ------------------------------------------------------------------- boot
@@ -1669,10 +1806,13 @@ async function boot() {
   loadingEl.textContent = '';
   busy = false;
   $('launch').removeAttribute('disabled');
+  // Behind the start screen, show the system off.
+  startTour();
   $('launch').textContent = 'Launch';
 }
 
 $('launch').addEventListener('click', () => {
+  stopTour();
   started = true;
   document.body.classList.add('started');
   banner(space.id === 'slow' ? space.name : `${space.name} system`, space.blurb);
