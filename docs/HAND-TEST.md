@@ -19,6 +19,18 @@ Note what felt wrong and where. "Fine" is a useful answer too.
 - [ ] P (photo mode): HUD gone, time frozen, mouse looks, [ ] exposure, Enter saves a PNG, P again to fly on.
 - [ ] Fly through the Ring into the ring space, then out through a gate.
 
+### The ring space, now at true scale
+Start there directly with `#slow` on the address, or arrive through the Ring.
+- [ ] At the Ring Station (5 km across): look round. The gates should be a sphere of small lights all about you, the charted ones amber with names, Sol's white.
+- [ ] Tab, "Medina Station": a few seconds' hop (45 km). Ships round it should be the right size beside your own and move at a believable pace, not as a blur. Press I to circle Medina, then L to dock, and E at the lift to come back out.
+- [ ] Tab, any charted gate (or type a number, or Random). The trip should take about half a minute: a quick run up to the speed limit (0.10 c on the dial, with the "Speed limit" hint), dust streaking then gone, then a long ease down as the gate grows from a dot to a hoop that fills the view. Does the wait feel right, too long, too short?
+- [ ] Parked in front of a gate: it should look huge (1,000 km across; your ship is a speck). The film moves, and the glow in the middle is the colour of the star on the far side. Does the change from far dot to full hoop happen without a visible jump?
+- [ ] Hold W and fly through the middle: you arrive in that system. Turn round, come back through its gate, and you should be back in front of the same gate in the ring space.
+- [ ] From one gate, pick another on the far side of the list: the autopilot should cross in under a minute and steer round the Ring Station if it is in the way.
+- [ ] Fly by hand near the wall: G takes you to the nearest gate; F to whatever is under the crosshair. Try to fly out between the gates: you should be held just outside the wall.
+- [ ] Look back from a gate: the station and Medina's traffic should be a small knot of lights in the middle of the dark.
+- [ ] T for the tour here: station, Medina, the Sol gate, the Adro gate.
+
 ## 3. Docking and walking (10 minutes)
 - [ ] Dock at Ceres (L when close). No freeze when the screen comes back, nor when you first turn round.
 - [ ] Walk (W A S D, Shift to run). Starting and stopping should feel eased, not instant. You slide along walls and step round people.

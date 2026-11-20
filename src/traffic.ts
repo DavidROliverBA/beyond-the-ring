@@ -37,6 +37,10 @@ export interface Fleet {
   n: number;
   /** Only these models. */
   only?: ShipModel[];
+  /** For a fleet that keeps to one small place: how big that place is. Seen from so far off that
+   *  the whole place is a pixel or two, its glints dim with distance, or a hundred of them piled
+   *  on one spot would blaze like a star. */
+  knot?: number;
 }
 
 export const M_PER_UNIT = 149597870700 / 1000; // 1 scene unit is 1/1000 AU
@@ -146,7 +150,7 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
     pts.frustumCulled = false;
     pts.position.copy(glintOrigin[fi]);
     group.add(pts);
-    return { pos, geo };
+    return { pos, geo, mat: pts.material };
   });
 
   let clock = 0;
@@ -155,6 +159,8 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
     clock += dt;
     for (let fi = 0; fi < fleets.length; fi++) {
       const list = byFleet[fi], gl = glints[fi];
+      const knot = fleets[fi].knot;
+      if (knot) gl.mat.opacity = 0.95 * Math.min(1, Math.max(0.02, knot * 40 / Math.max(viewer.distanceTo(glintOrigin[fi]), 1e-30)));
       for (let i = 0; i < list.length; i++) {
         const c = list[i];
         let u = (clock - c.t0) / c.dur;

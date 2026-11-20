@@ -96,7 +96,7 @@ Each step is a shippable change. Steps may be split into smaller commits.
 
 - ~~Bug: Earth's night side rendered nearly as bright as day.~~ *Fixed 2026-11-17:* the studio environment meant for ship reflections was lighting every planet, because a material's `envMapIntensity` doesn't scale `scene.environment`. Planets, clouds and rocks now carry their own black environment.
 - **Sound.** Parked at the owner's request. When revisited: synthesised or CC0 audio only, Web Audio positional sound with a convolver reverb per room, footsteps per material, ventilation and crowd murmur layers.
-- Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).
+- ~~Ring-space ship traffic on the Sol scale (ring space keeps ~125 m per unit for now).~~ *Done 2026-11-20:* the ring space is true scale like everything else. The gates (about 1,000 km across) sit on a shell 500,000 km from the Ring Station (5 km across); Medina (2 km) is parked 45 km from it; ships are their true size. Figures are from memory of the books, plausible rather than checked. The speed limit is the gameplay: 30,000 km/s (0.1 c on the dial), so the centre to a gate takes about half a minute and wall to wall under a minute, while the usual slow-down near anything keeps flight round Medina to metres a second. The nearest gate is swapped for a full model with the moving film and the far star's light in the middle. Still open: nothing happens if you try to break the limit (the drive just won't go faster), and the gates' far sides all look alike apart from that light.
 - Hand-flying and hand-walking test pass by a person, not only headless Playwright. *Checklist ready: `docs/HAND-TEST.md` (2026-11-17); needs David.*
 
 ## 3. Hosting options

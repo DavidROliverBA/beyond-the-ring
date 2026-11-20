@@ -890,8 +890,8 @@ async function buildSlowZone(): Promise<Space> {
   // some run out to the charted gates and back, which from anywhere else is a slow drift of sparks.
   const charted = gates.filter((g) => g.nav).map((g): Port => ({ pos: g.pos.clone().addScaledVector(g.normal!, R * 3), inner: R * 0.3, outer: R * 2.5 }));
   const crowd = makeTraffic([
-    { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 8.75 * KM }], n: 80 },
-    { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 5 * KM }, { pos: new V3(), inner: 8.75 * KM, outer: 20 * KM }], n: 25 },
+    { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 8.75 * KM }], n: 80, knot: 9 * KM },
+    { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 5 * KM }, { pos: new V3(), inner: 8.75 * KM, outer: 20 * KM }], n: 25, knot: 45 * KM },
     { ports: [{ pos: medinaPos, inner: 3 * KM, outer: 12 * KM }, ...charted], n: 36, only: ['freighter', 'hauler', 'survey', 'corvette'] },
   ], 4242, SOL_UNIT, 80);
   group.add(crowd.group);
