@@ -7,7 +7,7 @@
 // by each sign say who reads it and which way they are facing.
 
 import * as THREE from 'three';
-import { CELL, Dress, Signs, bin, catwalk, drums, hang, hose, lampPost, lights, post, rail, stack, stand, strip, type Site } from './wear';
+import { CELL, Dress, Signs, tally, bin, catwalk, drums, hang, hose, lampPost, lights, post, rail, stack, stand, strip, type Site } from './wear';
 
 const PI = Math.PI, DARK = 0x2d3238, STEEL = 0x596168, HAZ = 0xd9a514, CLEAR = 'rgba(0,0,0,0)';
 const lay = new THREE.Matrix4().makeRotationX(-PI / 2);
@@ -43,7 +43,7 @@ function hazardBox(k: Site, d: Dress, x0: number, z0: number, x1: number, z1: nu
 
 /** A tool cart: a tray on wheels with a box of tools and a push bar. Solid. */
 function cart(k: Site, d: Dress, x: number, z: number, yaw: number, color = 0xc8662a): boolean {
-  if (!k.clear(x, z, 0.9)) return false;
+  if (!tally('cart', k.clear(x, z, 0.9))) return false;
   const M = k.frame(x, 0, z, yaw);
   d.box(M, 1.2, 0.06, 0.65, 0, 0.3, 0, DARK);
   d.box(M, 1.2, 0.06, 0.65, 0, 0.85, 0, DARK);
@@ -62,17 +62,17 @@ function cart(k: Site, d: Dress, x: number, z: number, yaw: number, color = 0xc8
  * A directory pillar: a post with a lettered board on each listed face. Each face is given
  * as the yaw it faces and its lines. Solid.
  */
-function totem(k: Site, d: Dress, s: Signs, spots: [number, number][], faces: [number, string[]][], o: { w?: number; h?: number; thick?: number; color?: string; cap?: number } = {}): boolean {
-  const w = o.w ?? 0.62, h = o.h ?? 1.5, thick = o.thick ?? w;
+function totem(k: Site, d: Dress, s: Signs, spots: [number, number][], faces: [number, string[]][], o: { w?: number; h?: number; thick?: number; color?: string; cap?: number; tall?: number; body?: number; bg?: string } = {}): boolean {
+  const w = o.w ?? 0.62, h = o.h ?? 1.5, thick = o.thick ?? w, tall = o.tall ?? 3.1;
   const at = spots.find(([x, z]) => k.clear(x, z, 0.75));
-  if (!at) return false;
+  if (!tally('totem', !!at) || !at) return false;
   const [x, z] = at, M = k.frame(x, 0, z);
-  d.box(M, w + 0.06, 3.1, thick + 0.06, 0, 1.55, 0, 0x14181c);
+  d.box(M, w + 0.06, tall, thick + 0.06, 0, tall / 2, 0, o.body ?? 0x14181c);
   d.box(M, w + 0.2, 0.25, thick + 0.2, 0, 0.125, 0, DARK);
-  d.box(M, w + 0.12, 0.07, thick + 0.12, 0, 3.12, 0, o.cap ?? 0xffb347, { glow: 1.4 });
+  d.box(M, w + 0.12, 0.07, thick + 0.12, 0, tall + 0.02, 0, o.cap ?? 0xffb347, { glow: 1.4 });
   for (const [yaw, lines] of faces) {
     const turned = Math.abs(Math.sin(yaw)) > 0.7, out = (turned ? w : thick) / 2 + 0.035;
-    s.add(k.frame(x, 2.2, z, yaw).multiply(new THREE.Matrix4().makeTranslation(0, 0, out)), (turned ? thick : w) - 0.02, h, lines, o.color ?? '#ffd9a0', 'rgba(8,10,14,0.95)');
+    s.add(k.frame(x, tall - 0.15 - h / 2, z, yaw).multiply(new THREE.Matrix4().makeTranslation(0, 0, out)), (turned ? thick : w) - 0.02, h, lines, o.color ?? '#ffd9a0', o.bg ?? 'rgba(8,10,14,0.95)');
   }
   k.block(x, z, w + 0.1, thick + 0.1);
   return true;
@@ -291,12 +291,14 @@ export function dressCeres(k: Site, d: Dress, s: Signs, W: number, Z0: number, Z
   });
   // Front: walking away from the entrance (facing +z). Back: walking home towards it.
   const len = Z1 - Z0;
-  for (const off of [5.4, 62, 122, 171]) {
+  for (const off of [6.5, 62, 122, 171]) {
     const here = Math.round(off / 10) * 10;
-    totem(k, d, s, [[0, Z0 + off], [0.3, Z0 + off + 2.5], [-0.3, Z0 + off - 2.5], [0, Z0 + off + 5]], [
+    // The first stands to one side of the way in; the rest stand in the gutter down the middle.
+    const spots: [number, number][] = off < 10 ? [[5.7, Z0 + off], [-5.7, Z0 + off + 1]] : [[0, Z0 + off], [0.3, Z0 + off + 2.5], [-0.3, Z0 + off - 2.5], [0, Z0 + off + 5]];
+    totem(k, d, s, spots, [
       [PI, ['THE CONCOURSE', 'LEVEL 3 · SPINWARD', `↑ HOMES ${14 + Math.round(off / 12)}–88`, off < 100 ? '↑ SCHOOL 14 · CLINIC' : '↑ PARK END', `↓ MARKET ${here + 30} m`]],
       [0, ['THE CONCOURSE', 'LEVEL 3', `↑ MARKET ${here + 30} m`, '↑ TUBE · DOCKS', `↓ STREET END ${Math.round((len - off) / 10) * 10} m`]],
-    ], { w: 0.95, thick: 0.14, h: 1.45, color: '#2a3a46', cap: 0x9fe0ff });
+    ], { w: 0.95, thick: 0.14, h: 1.3, tall: 2.5, color: '#e6f2ff', bg: 'rgba(28,40,52,0.96)', body: 0x8e989e, cap: 0x9fe0ff });
   }
 }
 
@@ -310,7 +312,7 @@ export function dressGanymede(k: Site, d: Dress, s: Signs) {
   const PX = 0, PZ = 38, PR = 14.6;
   for (let i = 0; i < 32; i++) {
     const a = (i / 32) * PI * 2;
-    d.decal(k.frame(PX + PR * Math.cos(a), 0, PZ + PR * Math.sin(a), Math.atan2(-Math.cos(a), -Math.sin(a))), (PI * 2 * PR) / 32, 0.9, 0, 0.05, 0, CELL.hazard, 0xffffff, 0.85, { flat: true, ru: 2 });
+    d.decal(k.frame(PX + PR * Math.cos(a), 0, PZ + PR * Math.sin(a), Math.atan2(-Math.cos(a), -Math.sin(a))), (PI * 2 * PR) / 32, 0.62, 0, 0.05, 0, CELL.hazard, 0xffffff, 0.85, { flat: true, ru: 6 });
   }
   d.decal(k.frame(0, 0, 31), 9, 12, 0, 0.045, 0, CELL.oil, 0x070605, 0.55, { flat: true });
   for (const [x, z, sz] of [[-2.5, 25.5, 4], [2.2, 24.6, 3.4], [0.4, 27.6, 3], [-6, 28, 3], [5, 44, 3.6], [8.6, 47.6, 3]]) d.decal(k.frame(x, 0, z, x), sz, sz, 0, 0.046, 0, CELL.blotch, SOIL, 0.7, { flat: true });
@@ -437,13 +439,13 @@ export function dressMedina(k: Site, d: Dress, s: Signs, built: Built[], C: numb
   totem(k, d, s, [[-3.8, -441.4], [3.8, -441.4], [-4.6, -439.6]], [
     [PI, ['MEDINA · BOW', '↑ MARKET STREET', '↑ FARMS · MID-DRUM', '← SPINWARD', 'ANTISPINWARD →']],
     [0, ['MEDINA · BOW', '↑ LIFT TO DOCKS', '↑ COMMAND', 'SPINWARD →', '← ANTISPINWARD']],
-  ], { w: 1.0, thick: 0.16, h: 1.45, color: '#ffd9a0', cap: WARM });
+  ], { w: 1.0, thick: 0.16, h: 1.35, tall: 2.7, color: '#ffe9c0', bg: 'rgba(40,30,20,0.95)', body: 0x6a5a48, cap: WARM });
   // Post-and-rail fences where the street runs out into the fields.
   for (const sx of [-1, 1]) { rail(k, d, sx * 5.2, -392, sx * 5.2, -382.5, { color: WOOD, h: 0.95 }); rail(k, d, sx * 5.2, -380.5, sx * 5.2, -372, { color: WOOD, h: 0.95 }); }
 
   // Every building in the drum: a door, a lamp over it, and a path worn to the step.
+  d.group('towns');
   for (const b of built) {
-    d.group(`town${b.town}`);
     const face = Math.floor(k.w() * 4), yaw = face * PI / 2, half = (face % 2 ? b.w : b.d) / 2, across = (face % 2 ? b.d : b.w) * (k.w() - 0.5) * 0.5;
     const M = k.frame(b.x, 0, b.z, yaw);
     d.box(M, 1.0, 2.1, 0.08, across, 1.05, half + 0.02, [0x5a4632, 0x3f5a6a, 0x6a3a32, 0x4a5a42][Math.floor(k.w() * 4)]);
@@ -457,7 +459,6 @@ export function dressMedina(k: Site, d: Dress, s: Signs, built: Built[], C: numb
   // along the drum: read facing spinward (+x), the bow is on your left.
   const WAY: [number, number, string, string][] = [[63.5, 3, 'MID-DRUM', '440 m'], [C / 2 + 3.5, -197, 'FAR SIDE', '240 m'], [-36.5, 437, 'STERN', '880 m']];
   WAY.forEach(([x, z, name, far], i) => {
-    d.group(`way${i}`);
     post(k, d, s, x, z, -PI / 2, [[`BOW LIFT ${far}`, 'l'], [i === 2 ? 'ENGINEERING' : 'STERN', 'r'], [name, 'r', '#9fe0ff']], { h: 3.1, lamp: WARM, w: 2 });
     stack(k, d, x + 1.6, z + 2.6, { n: 2, need: 0.8, cols: [0x8a6a48, 0x7a6248] });
   });

@@ -1779,6 +1779,8 @@ if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: num
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
 // The light probes too: how many are left to fill, and a switch for before-and-after tests.
 if (FRAMES) Object.defineProperty(globalThis, '__bounce', { get: () => walk?.bounce });
+// The place you are walking in: its open floor, places and points, for tests of where you can get to.
+if (FRAMES) Object.defineProperty(globalThis, '__place', { get: () => walk && { free: walk.free, places: walk.places, points: walk.points, spawn: walk.spawn, curveR: walk.curveR } });
 // How much was drawn last frame (draw calls and triangles), for before-and-after comparisons.
 if (FRAMES) { renderer.info.autoReset = false; Object.defineProperty(globalThis, '__info', { get: () => ({ ...renderer.info.render }) }); }
 // For tools/bake-probes.ts: the finished probes of the place you are in, as a file.

@@ -11,7 +11,7 @@ import { buildWalker, debugging, peopleReady, type Around, type Walker } from '.
 import { buildConcourse, terraceFront } from './concourse';
 import { BAKING, Bounce, fits, type ProbeBox } from './probes';
 import type { Spin } from './spin';
-import { Dress, Signs, WEAR_ON, wearRooms, type Site, type Style, type Taken } from './wear';
+import { Dress, Signs, TALLY, WEAR_ON, wearRooms, type Site, type Style, type Taken } from './wear';
 import { dressTycho, dressCeres, dressGanymede, dressMedina, type Built } from './dressing';
 
 /** How much each station's spin gravity turns a walk into the Belter lope (0 walk, 1 full lope). */
@@ -367,11 +367,15 @@ class Kit implements Site {
   clear(x: number, z: number, r: number): boolean {
     if (!this.free(x, z)) return false;
     for (let i = 0; i < 8; i++) if (!this.free(x + Math.cos(i * 0.785) * r, z + Math.sin(i * 0.785) * r)) return false;
-    if (this.nearLane(x, z, r + 0.7) || this.nearFolk(x, z, r + 0.6)) return false;
+    if (this.nearLane(x, z, r + 0.7) || this.nearFolk(x, z, r + 0.4)) return false;
     const p = r + 1.3;
     for (const d of this.doors) if (x > d.x0 - p && x < d.x1 + p && z > d.z0 - p && z < d.z1 + p) return false;
     for (const d of this.doorways) if (Math.abs((x - d.x) * d.nz - (z - d.z) * d.nx) < r + 1.4 && Math.abs((x - d.x) * d.nx + (z - d.z) * d.nz) < 5) return false;
-    for (const c of this.counters) if (Math.hypot(x - c.x, z - c.z) < r + 3.4) return false;
+    // Where a queue would stand: a strip running out from each counter.
+    for (const c of this.counters) {
+      const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw), a = (x - c.x) * fx + (z - c.z) * fz, l = (x - c.x) * fz - (z - c.z) * fx;
+      if (a > -0.9 - r && a < 3.6 + r && Math.abs(l) < 1.4 + r) return false;
+    }
     for (const pt of this.points) if (Math.hypot(x - pt.x, z - pt.z) < r + 1.5) return false;
     for (const pl of this.places) if (Math.hypot(x - pl.x, z - pl.z) < r + 1.6) return false;
     return true;
@@ -397,6 +401,7 @@ class Kit implements Site {
     const { meshes, skip } = d.build();
     this.scene.add(...meshes, ...s.build());
     this.unlit.push(...skip);
+    if (debugging) (globalThis as unknown as { __wear: unknown }).__wear = { things: d.count, meshes: meshes.length, solid: { ...TALLY } };
   }
 
   mat(kind: Surf, tint = 0xffffff): THREE.MeshStandardMaterial {

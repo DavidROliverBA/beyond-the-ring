@@ -430,10 +430,29 @@ export interface Site {
 
 const STEEL = 0x596168, DARK = 0x2d3238;
 
+/** How many of each solid thing found room, and how many were left out because someone or
+ *  something was in the way (shown as __wear with ?debug, for tests). */
+export const TALLY: Record<string, [placed: number, left: number]> = {};
+export function tally(kind: string, ok: boolean): boolean {
+  const t = (TALLY[kind] ??= [0, 0]);
+  t[ok ? 0 : 1]++;
+  return ok;
+}
+
+/** The nearest clear spot to (x, z) within about `reach` metres, or nothing. */
+export function seek(k: Site, x: number, z: number, r: number, reach = 1.8): [number, number] | null {
+  if (k.clear(x, z, r)) return [x, z];
+  for (let i = 1; i <= 18; i++) {
+    const a = i * 2.4, d = (reach * i) / 18, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+    if (k.clear(px, pz, r)) return [px, pz];
+  }
+  return null;
+}
+
 /** A railing between two points: posts, a handrail and a knee rail. Solid if it runs square to the walls. */
 export function rail(k: Site, d: Dress, x0: number, z0: number, x1: number, z1: number, o: { h?: number; color?: number; solid?: boolean; y?: number; high?: boolean; kick?: number } = {}): boolean {
   const len = Math.hypot(x1 - x0, z1 - z0), h = o.h ?? 1.05, col = o.color ?? STEEL, y = o.y ?? 0, solid = o.solid ?? y === 0;
-  if (solid && !k.lineClear(x0, z0, x1, z1)) return false;
+  if (solid && !tally('rail', k.lineClear(x0, z0, x1, z1))) return false;
   const yaw = Math.atan2(-(z1 - z0), x1 - x0), n = Math.max(1, Math.ceil(len / 3.6)), put = { high: o.high };
   for (let i = 0; i < n; i++) {
     const t = (i + 0.5) / n, L = len / n, M = k.frame(x0 + (x1 - x0) * t, y, z0 + (z1 - z0) * t, yaw);
@@ -473,7 +492,9 @@ export function catwalk(k: Site, d: Dress, x: number, z0: number, z1: number, y:
 
 /** A bin with a little spilled round it. Solid. Returns false if there was no room. */
 export function bin(k: Site, d: Dress, x: number, z: number, color = 0x4a5258, litter = 0.6): boolean {
-  if (!k.clear(x, z, 0.7)) return false;
+  const at = seek(k, x, z, 0.6);
+  if (!tally('bin', !!at) || !at) return false;
+  [x, z] = at;
   const M = k.frame(x, 0, z, k.w() * 6);
   d.tube(M, 0.27, 0.82, 0, 0.41, 0, 'y', color);
   d.tube(M, 0.29, 0.06, 0, 0.84, 0, 'y', DARK);
@@ -486,7 +507,9 @@ export function bin(k: Site, d: Dress, x: number, z: number, color = 0x4a5258, l
 
 /** A small stack of crates or sacks. Solid. */
 export function stack(k: Site, d: Dress, x: number, z: number, o: { n?: number; cols?: number[]; sacks?: boolean; need?: number } = {}): boolean {
-  if (!k.clear(x, z, o.need ?? 1.1)) return false;
+  const at = seek(k, x, z, o.need ?? 1.1, 1.4);
+  if (!tally('stack', !!at) || !at) return false;
+  [x, z] = at;
   const cols = o.cols ?? [0x8a5a3a, 0x4a6a7a, 0x7a7468, 0xb08a2e, 0x55634a], w = k.w;
   const M = k.frame(x, 0, z, (w() - 0.5) * 0.6);
   const n = o.n ?? 3;
@@ -507,7 +530,8 @@ export function stack(k: Site, d: Dress, x: number, z: number, o: { n?: number; 
 /** A row of drums against something. Solid. */
 export function drums(k: Site, d: Dress, x: number, z: number, n = 3, along: 'x' | 'z' = 'x', cols = [0x3f6f8a, 0x9a4a32, 0x6a7078, 0xc8a02e]): boolean {
   const L = n * 0.7;
-  if (!k.clear(x, z, 0.6) || !k.clear(x + (along === 'x' ? L / 2 : 0), z + (along === 'z' ? L / 2 : 0), 0.5) || !k.clear(x - (along === 'x' ? L / 2 : 0), z - (along === 'z' ? L / 2 : 0), 0.5)) return false;
+  if (!k.clear(x, z, 0.6) || !k.clear(x + (along === 'x' ? L / 2 : 0), z + (along === 'z' ? L / 2 : 0), 0.5) || !k.clear(x - (along === 'x' ? L / 2 : 0), z - (along === 'z' ? L / 2 : 0), 0.5)) return tally('drums', false);
+  tally('drums', true);
   const M = k.frame(x, 0, z, along === 'x' ? 0 : Math.PI / 2);
   for (let i = 0; i < n; i++) {
     const lx = (i - (n - 1) / 2) * 0.7, col = cols[Math.floor(k.w() * cols.length)];
@@ -527,7 +551,7 @@ export type Arm = [text: string, way: 'l' | 'r', color?: string];
  * back for people coming the other way, with its arrow turned to match.
  */
 export function post(k: Site, d: Dress, s: Signs, x: number, z: number, faces: number, arms: Arm[], o: { h?: number; lamp?: number; solid?: boolean; w?: number } = {}): boolean {
-  if (o.solid !== false && !k.clear(x, z, 0.6)) return false;
+  if (o.solid !== false && !tally('post', k.clear(x, z, 0.6))) return false;
   const h = o.h ?? 3, M = k.frame(x, 0, z, faces), bw = o.w ?? 1.7;
   d.tube(M, 0.055, h, 0, h / 2, 0, 'y', DARK);
   d.tube(M, 0.14, 0.08, 0, 0.04, 0, 'y', DARK);
@@ -612,7 +636,7 @@ export function strip(k: Site, d: Dress, x0: number, z0: number, x1: number, z1:
 /** A market stand under a striped awning, with produce, a lantern and a sign. Solid counter. */
 export function stand(k: Site, d: Dress, s: Signs, x: number, z: number, yaw: number, name: string, c1: number, c2: number, o: { lamp?: number } = {}): boolean {
   const fx = Math.sin(yaw), fz = Math.cos(yaw);
-  if (!k.clear(x, z, 1.5) || !k.free(x + fx * 1.6, z + fz * 1.6)) return false;
+  if (!tally('stand', k.clear(x, z, 1.5) && k.free(x + fx * 1.6, z + fz * 1.6))) return false;
   const M = k.frame(x, 0, z, yaw);
   d.box(M, 2.6, 0.9, 0.8, 0, 0.45, 0, 0x6a5a48);
   d.box(M, 2.7, 0.05, 0.9, 0, 0.92, 0, 0x8a7a64);
