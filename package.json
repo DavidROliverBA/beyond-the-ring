@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "bun --port=5180 ./index.html",
     "build": "bun build ./index.html --outdir dist --minify",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "spike": "bun --port=5192 ./spike/webgpu.html"
   },
   "dependencies": {
     "three": "^0.187.0"

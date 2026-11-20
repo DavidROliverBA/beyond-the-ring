@@ -6,7 +6,9 @@
 //   scene=depth (default) the true-scale depth test; stop=20m|5km|leo; view=beauty|id|truth|check
 //   scene=sol|tycho|medina  benchmark scenes; bench=1 measures them
 //   depth=reversed|log|custom|plain  (WebGPURenderer only)   hp=1 high-precision matrices
+//   r=classic&depth=reversed  the classic renderer with reversed-Z in place of the game's log depth
 //   float=1 slide the world so the camera sits at the origin   post=1 bloom and film finish
+//   ao=1 (with post=1, WebGPURenderer only) adds three's GTAO ambient occlusion   place=N which spot indoors
 // Results land on window.__spike for the Playwright scripts in the scratchpad.
 
 import * as THREE from 'three';
@@ -15,6 +17,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { loadModels, buildModel } from '../src/ships';
 import { loadPeople } from '../src/skinned';
 import { buildInterior } from '../src/interior';
@@ -31,8 +34,12 @@ const VIEW = (q.get('view') ?? 'beauty') as View | 'check';
 const HP = q.get('hp') === '1', FLOAT = q.get('float') === '1', POST = q.get('post') === '1', BENCH = q.get('bench') === '1';
 const AA = q.get('aa') !== '0';
 const classic = R === 'classic';
+/** The classic renderer with reversed-Z and a float depth buffer instead of the game's logarithmic depth. */
+const classicRev = classic && q.get('depth') === 'reversed';
+/** What the classic renderer's far planes are multiplied by: the game's log depth needs its K. */
+const FARK = classic && !classicRev ? glsl.LOGK : 1;
 
-const out: Record<string, unknown> = { ready: false, r: R, depth: classic ? 'game log (LOGK)' : DEPTH, scene: SCENE, stop: STOP, hp: HP, float: FLOAT, post: POST };
+const out: Record<string, unknown> = { ready: false, r: R, depth: classicRev ? 'reversed (float depth target)' : classic ? 'game log (LOGK)' : DEPTH, scene: SCENE, stop: STOP, hp: HP, float: FLOAT, post: POST };
 (globalThis as any).__spike = out;
 const hud = document.getElementById('hud')!;
 const say = (s: string) => { hud.textContent = s; };
@@ -70,11 +77,17 @@ async function main() {
   // ---------------------------------------------------------------- renderer
   let renderer: THREE.WebGLRenderer | GPU.WebGPURenderer;
   let finish: () => Promise<void>;
+  // WebGPURenderer redraws a post chain's scene pass only once per "frame", and counts frames on its
+  // own timer. To time several draws back to back, the benchmark has to tick that counter itself.
+  let nextFrame = () => {};
+  // (On WebGL, reading a pixel back is what truly waits for the graphics card; finish() alone may not.)
+  const px = new Uint8Array(4);
   if (classic) {
-    glsl.patchLogDepth();
-    const r = renderer = new THREE.WebGLRenderer({ canvas, antialias: AA, logarithmicDepthBuffer: true });
+    if (!classicRev) glsl.patchLogDepth();
+    const r = renderer = new THREE.WebGLRenderer({ canvas, antialias: AA, logarithmicDepthBuffer: !classicRev, reversedDepthBuffer: classicRev });
+    if (classicRev) out.reversed = r.capabilities.reversedDepthBuffer;
     const gl = r.getContext();
-    finish = async () => { gl.finish(); };
+    finish = async () => { gl.finish(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
     out.backend = 'WebGLRenderer (WebGL 2)';
   } else {
     if (R === 'webgpu' && !(navigator as any).gpu) throw new Error('This browser has no navigator.gpu (WebGPU is unavailable).');
@@ -109,9 +122,10 @@ async function main() {
       finish = () => be.device.queue.onSubmittedWorkDone();
     } else {
       const gl = be.gl as WebGL2RenderingContext;
-      finish = async () => { gl.finish(); };
+      finish = async () => { gl.finish(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
     }
     r.highPrecision = HP;
+    nextFrame = () => (r as any)._nodes.nodeFrame.update();
   }
   renderer.setPixelRatio(DPR);
   renderer.setSize(W, Hh, false);
@@ -130,7 +144,7 @@ async function main() {
     const kit: Kit = classic
       ? { nightOnly: (m) => glsl.nightOnly(m), atmosphere: glsl.atmosphere }
       : { nightOnly: tsl.nightOnly as Kit['nightOnly'], atmosphere: tsl.atmosphere as unknown as Kit['atmosphere'] };
-    world = buildWorld(kit, classic ? glsl.LOGK : 1);
+    world = buildWorld(kit, FARK);
     scene = world.scene; camera = world.camera;
     camera.aspect = W / Hh;
     world.place(STOP, FLOAT);
@@ -154,11 +168,28 @@ async function main() {
       }
       scene.updateMatrixWorld(true);
     }
+    if (q.get('inst') === '1') {
+      // Sixty rocks around the ship as one instanced draw, the way the game draws belts and gate
+      // rings. Asked for with inst=1, to see how instancing copes with each way of keeping precision.
+      const rocks = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2 * M, 1), new THREE.MeshStandardMaterial({ color: 0x9a8f80, roughness: 1, flatShading: true }), 60);
+      let seed = 3;
+      const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const m = new THREE.Matrix4(), p = new THREE.Vector3(), qq = new THREE.Quaternion(), sc = new THREE.Vector3();
+      for (let i = 0; i < 60; i++) {
+        p.set(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize().multiplyScalar((28 + rand() * 40) * M);
+        qq.setFromEuler(new THREE.Euler(rand() * 6, rand() * 6, rand() * 6));
+        rocks.setMatrixAt(i, m.compose(p, qq, sc.setScalar(0.5 + rand() * 1.5)));
+      }
+      rocks.position.copy(world.ship.position);
+      rocks.frustumCulled = false;
+      world.root.add(rocks);
+      scene.updateMatrixWorld(true);
+    }
     world.show(VIEW === 'check' ? 'id' : VIEW);
   } else {
     const it = await buildInterior(SCENE);
     scene = it.scene;
-    camera = new THREE.PerspectiveCamera(72, W / Hh, 0.08, 12000 * (classic ? glsl.LOGK : 1));
+    camera = new THREE.PerspectiveCamera(72, W / Hh, 0.08, 12000 * FARK);
     // Stand where the game puts you on arrival (main.ts, the walk camera).
     const place = it.places[+(q.get('place') ?? 0)] ?? it.spawn, eye = 1.7;
     camera.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), place.yaw);
@@ -186,7 +217,8 @@ async function main() {
   let draw: () => void;
   if (POST && classic) {
     const r = renderer as THREE.WebGLRenderer;
-    const composer = new EffectComposer(r, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+    // (Reversed-Z only pays off with a float depth buffer, which a canvas cannot have but a target can.)
+    const composer = new EffectComposer(r, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: classicRev ? new THREE.DepthTexture(1, 1, THREE.FloatType) : null }));
     composer.setPixelRatio(DPR);
     composer.setSize(W, Hh);
     composer.addPass(new RenderPass(scene, camera));
@@ -194,7 +226,7 @@ async function main() {
     composer.addPass(new OutputPass());
     draw = () => composer.render();
   } else if (POST) {
-    const post = tsl.postChain(renderer as GPU.WebGPURenderer, scene, camera);
+    const post = tsl.postChain(renderer as GPU.WebGPURenderer, scene, camera, q.get('ao') === '1');
     draw = () => post.render();
   } else draw = () => renderer.render(scene, camera);
 
@@ -209,8 +241,19 @@ async function main() {
     return g.getImageData(0, 0, c.width, c.height);
   };
   if (world && VIEW === 'check') {
-    const rr = renderer as any;
+    let rr = renderer as any;
     renderer.toneMapping = THREE.NoToneMapping;
+    if (classicRev) {
+      // Draw into a target with float depth, then copy it to the screen.
+      const r = renderer as THREE.WebGLRenderer;
+      const rt = new THREE.WebGLRenderTarget(canvas.width, canvas.height, { depthTexture: new THREE.DepthTexture(canvas.width, canvas.height, THREE.FloatType) });
+      const copy = new FullScreenQuad(new THREE.MeshBasicMaterial({ map: rt.texture, toneMapped: false }));
+      rr = {
+        set autoClear(v: boolean) { r.autoClear = v; }, get autoClear() { return r.autoClear; },
+        clearDepth() { r.setRenderTarget(rt); r.clearDepth(); },
+        render(s: THREE.Scene, c: THREE.Camera) { r.setRenderTarget(rt); r.render(s, c); r.setRenderTarget(null); const keep = r.autoClear; r.autoClear = true; copy.render(r); r.autoClear = keep; },
+      };
+    }
     world.show('truth');
     // (Each is drawn once to compile its shaders, then again and copied in the same breath: a
     // WebGPU canvas hands its picture to the screen, and forgets it, as soon as the script pauses.)
@@ -256,22 +299,27 @@ async function main() {
   if (BENCH) {
     say('measuring…');
     await new Promise((r) => setTimeout(r, 1500));
-    for (let i = 0; i < 6; i++) { draw(); await finish(); }
+    for (let i = 0; i < 6; i++) { nextFrame(); draw(); await finish(); }
+    // Count one whole frame's draws (every pass of it, not just the last).
+    info.autoReset = false;
+    info.reset();
+    nextFrame(); draw();
     out.calls = info.render.drawCalls ?? info.render.calls;
     out.triangles = info.render.triangles;
+    info.autoReset = true;
     const cpu: number[] = [], all: number[] = [];
-    const N = 12;
-    for (let k = 0; k < 12; k++) {
+    const N = 20;
+    for (let k = 0; k < 15; k++) {
       await finish();
       const a = performance.now();
-      for (let i = 0; i < N; i++) draw();
+      for (let i = 0; i < N; i++) { nextFrame(); draw(); }
       const b = performance.now();
       await finish();
       const c = performance.now();
       cpu.push((b - a) / N); all.push((c - a) / N);
     }
     cpu.sort((x, y) => x - y); all.sort((x, y) => x - y);
-    out.bench = { frameMs: +all[2].toFixed(2), cpuMs: +cpu[2].toFixed(2), medianMs: +all[6].toFixed(2) };
+    out.bench = { frameMs: +all[7].toFixed(2), cpuMs: +cpu[7].toFixed(2), bestMs: +all[1].toFixed(2), worstMs: +all[13].toFixed(2) };
   }
 
   // ---------------------------------------------------------------- show it

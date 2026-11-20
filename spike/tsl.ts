@@ -6,8 +6,9 @@ import {
   Fn, If, Loop, Discard, float, vec2, vec3, vec4, uniform, texture, uv, time,
   positionLocal, positionView, normalWorld, cameraFar,
   dot, length, sqrt, exp, max, min, normalize, pow, log2, smoothstep, mix, sin, cos, fract, floor, step, atan, clamp,
-  pass, renderOutput, screenUV,
+  pass, renderOutput, screenUV, mrt, output, normalView,
 } from 'three/tsl';
+import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 
 // TSL's own typings are loose about what a node is; this keeps the ports readable.
@@ -134,9 +135,18 @@ export function hologram(map: THREE.Texture): THREE.Material {
 // pass, three's own BloomNode, tone mapping (renderOutput), then look.ts's film finish in TSL.
 // God rays and lens ghosts are not ported here; see docs/WEBGPU-SPIKE.md for what they need.
 export interface Post { render(): void; setScene(s: THREE.Scene, c: THREE.Camera): void }
-export function postChain(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.Camera, grade: [number[], number[], number[]] = [[0.97, 1.0, 1.06], [0.0, 0.004, 0.012], [1.0, 1.0, 1.04]]): Post {
+export function postChain(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.Camera, withAO = false, grade: [number[], number[], number[]] = [[0.97, 1.0, 1.06], [0.0, 0.004, 0.012], [1.0, 1.0, 1.04]]): Post {
   const scenePass = pass(scene, camera, { samples: 4 });
-  const colour = scenePass.getTextureNode();
+  let colour: N = scenePass.getTextureNode();
+  if (withAO) {
+    // Ambient occlusion (three's GTAONode): the scene pass also writes surface directions, and the
+    // occlusion worked out from those and the depth darkens corners and contact edges. For the
+    // spike it simply multiplies the picture; done properly it would dim only the indirect light.
+    scenePass.setMRT(mrt({ output, normal: normalView }));
+    colour = scenePass.getTextureNode('output');
+    const shade = ao(scenePass.getTextureNode('depth'), scenePass.getTextureNode('normal'), camera);
+    colour = colour.mul(shade.getTextureNode().r);
+  }
   const glow = bloom(colour, 0.32, 0.4, 1.0);
   const toned = renderOutput(colour.add(glow));
   // look.ts FINISH: grade, vignette, grain, after tone mapping.
