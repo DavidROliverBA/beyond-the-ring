@@ -11,6 +11,8 @@ import { buildWalker, debugging, peopleReady, type Around, type Walker } from '.
 import { buildConcourse, terraceFront } from './concourse';
 import { BAKING, Bounce, fits, type ProbeBox } from './probes';
 import type { Spin } from './spin';
+import { Dress, Signs, WEAR_ON, wearRooms, type Site, type Style, type Taken } from './wear';
+import { dressTycho, dressCeres, dressGanymede, dressMedina, type Built } from './dressing';
 
 /** How much each station's spin gravity turns a walk into the Belter lope (0 walk, 1 full lope). */
 const LOPE: Record<string, number> = { ceres: 0.6, tycho: 0.5, medina: 0.5, ganymede: 0.8 };
@@ -274,6 +276,8 @@ interface Room extends Rect { name: string; h: number; o: RoomOpts; openings: Op
 interface PutOpts { y?: number; yaw?: number; solid?: boolean }
 
 const M = 0.35;
+/** How many flat strips Medina's drum is drawn with, round its circumference. */
+const DRUM_SIDES = 128;
 /** Whether interiors built from now on get bounce light, and the probes saved for the next
  *  one. Set by buildInterior. */
 let BOUNCE = false, SAVED: ArrayBuffer | null = null;
@@ -288,7 +292,7 @@ type XZ = { x: number; z: number };
  *  served steps out to (`out`) and wanders off to (`rest`) before joining the back again. */
 interface Queue { spots: XZ[]; yaw: number; line: Folk[]; out: XZ; rest: XZ; away?: Folk; phase: 'wait' | 'away' | 'back'; t: number; moves: { f: Folk; to: XZ; t: number }[] }
 
-class Kit {
+class Kit implements Site {
   scene = new THREE.Scene();
   rooms: Room[] = [];
   doors: Rect[] = [];
@@ -329,10 +333,70 @@ class Kit {
   q = rng(7);
   private mats = new Map<string, THREE.MeshStandardMaterial>();
   r = rng(1);
+  /** A third dice, for wear and clutter (see wear.ts): grime never moves the furniture either. */
+  w = rng(3);
+  /** How worn this place is. */
+  style: Style = { grime: 0.5, dirt: 0x1a1410, worn: 0x000000, wornA: 0.2, drips: 0.3, litter: 0.2, posters: 0.2, pipes: [0x6a7078, 0x4a5a62], duct: 0x7a8288 };
+  /** The station's own dressing, run after the rooms are furnished and peopled. */
+  dress?: (d: Dress, s: Signs) => void;
+  /** Where signs already hang, so wall fittings keep clear of them. */
+  taken: Taken[] = [];
 
   constructor(public id: string, public name: string, public blurb: string) {
     this.r = rng(id.length * 131 + id.charCodeAt(0));
     this.q = rng(id.length * 977 + id.charCodeAt(0) * 31 + 5);
+    this.w = rng(id.length * 389 + id.charCodeAt(0) * 17 + 11);
+  }
+
+  /** A frame standing on the floor at (x, z), `y` above it and turned by `yaw`. In a drum it follows the hull. */
+  frame(x: number, y: number, z: number, yaw = 0): THREE.Matrix4 {
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), p = new THREE.Vector3(x, y, z);
+    if (this.curveR) {
+      // The drum is drawn as flat strips, which stand a few centimetres proud of a true
+      // circle between their edges; sit on the strip, or markings on the ground sink into it.
+      const R = this.curveR, th = x / R, seg = (Math.PI * 2 * R) / DRUM_SIDES, u = ((x % seg) + seg) % seg;
+      y += (u * (seg - u)) / (2 * R);
+      p.set((R - y) * Math.sin(th), -(R - y) * Math.cos(th), z);
+      q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), th));
+    }
+    return new THREE.Matrix4().compose(p, q, new THREE.Vector3(1, 1, 1));
+  }
+
+  /** Open floor with `r` of elbow room that nobody is using: not a door, a walker's lane, a
+   *  queue's place, a reading post or somewhere you are put down. For new solid clutter. */
+  clear(x: number, z: number, r: number): boolean {
+    if (!this.free(x, z)) return false;
+    for (let i = 0; i < 8; i++) if (!this.free(x + Math.cos(i * 0.785) * r, z + Math.sin(i * 0.785) * r)) return false;
+    if (this.nearLane(x, z, r + 0.7) || this.nearFolk(x, z, r + 0.6)) return false;
+    const p = r + 1.3;
+    for (const d of this.doors) if (x > d.x0 - p && x < d.x1 + p && z > d.z0 - p && z < d.z1 + p) return false;
+    for (const d of this.doorways) if (Math.abs((x - d.x) * d.nz - (z - d.z) * d.nx) < r + 1.4 && Math.abs((x - d.x) * d.nx + (z - d.z) * d.nz) < 5) return false;
+    for (const c of this.counters) if (Math.hypot(x - c.x, z - c.z) < r + 3.4) return false;
+    for (const pt of this.points) if (Math.hypot(x - pt.x, z - pt.z) < r + 1.5) return false;
+    for (const pl of this.places) if (Math.hypot(x - pl.x, z - pl.z) < r + 1.6) return false;
+    return true;
+  }
+
+  /** A straight line of open floor with nobody standing on it or pacing along it. For new railings. */
+  lineClear(x0: number, z0: number, x1: number, z1: number): boolean {
+    const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.4);
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + ((x1 - x0) * i) / n, z = z0 + ((z1 - z0) * i) / n;
+      if (!this.free(x, z) || this.nearLane(x, z, 0.9) || this.nearFolk(x, z, 0.75)) return false;
+      for (const d of this.doors) if (x > d.x0 - 0.6 && x < d.x1 + 0.6 && z > d.z0 - 0.6 && z < d.z1 + 0.6) return false;
+    }
+    return true;
+  }
+
+  /** The wear pass: what every room gets, then the station's own dressing, as a few merged meshes. */
+  wear() {
+    if (!WEAR_ON) return;
+    const d = new Dress(), s = new Signs();
+    if (!this.curveR) wearRooms(this, d, this.rooms, this.style, this.taken);
+    this.dress?.(d, s);
+    const { meshes, skip } = d.build();
+    this.scene.add(...meshes, ...s.build());
+    this.unlit.push(...skip);
   }
 
   mat(kind: Surf, tint = 0xffffff): THREE.MeshStandardMaterial {
@@ -539,6 +603,7 @@ class Kit {
   sign(text: string | string[], x: number, y: number, z: number, yaw: number, w: number, h: number, color = '#8fdcff', bg = 'rgba(0,0,0,0)') {
     const lines = Array.isArray(text) ? text : [text];
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: textTexture(lines, color, bg, w / h), transparent: true }));
+    this.taken.push({ x, y, z, w, h });
     return this.place(m, x, y, z, yaw);
   }
 
@@ -1154,6 +1219,9 @@ class Kit {
     }
     if (!boxes.length) this.bounce = false;
     this.neon();
+    // Wear and clutter go in after the furniture, the stalls and the people, and keep out of
+    // their way; then the people are given things to do around all of it.
+    this.wear();
     this.behave();
     // A place in the middle of a room may be under a parked ship or a table: nudge it to open floor.
     // It also wants elbow room, so you do not arrive nose to nose with someone.
@@ -1181,7 +1249,7 @@ class Kit {
       const shell = m.geometry.type === 'PlaneGeometry' || m.geometry.type === 'CircleGeometry' || mat.side === THREE.BackSide;
       if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
       const size = m.geometry.boundingSphere!.radius * Math.max(m.scale.x, m.scale.y, m.scale.z);
-      m.castShadow = !shell && size < 40;
+      m.castShadow = !shell && size < 40 && !m.userData.noShadow;
     });
     const key = new THREE.DirectionalLight(this.keyColor, this.keyPower);
     key.castShadow = true;
@@ -1355,7 +1423,8 @@ function tycho(): Interior {
   k.scene.add(sun);
 
   // Corridor.
-  k.sign(['← WORKSHOP', 'BAR · OPS →'], -2.95, 2.3, 60, Math.PI / 2, 2.6, 0.7, '#c8662a', 'rgba(10,12,16,0.8)');
+  // (Facing this wall, up the corridor is to your left and the bay to your right.)
+  k.sign(['← WORKSHOP · BAR · OPS', 'DOCKING BAY 7 →'], -2.95, 2.3, 60, Math.PI / 2, 2.6, 0.7, '#c8662a', 'rgba(10,12,16,0.8)');
   k.lamp(0, 3.3, 62, 0xf2f8ff, 18, 16);
   k.lamp(0, 3.3, 78, 0xf2f8ff, 18, 16);
   k.lamp(0, 3.3, 91, 0xf2f8ff, 18, 16);
@@ -1441,6 +1510,9 @@ function tycho(): Interior {
   k.anims.push((t) => sparks.forEach((s, i) => (s.material.opacity = Math.sin(t * (7 + i)) * Math.sin(t * 1.3 + i * 2) > 0.45 ? 1 : 0)));
   k.crowd(-18, 98, 18, 106, 5);
 
+  // A working yard kept clean: light scuffing, little litter, tidy pipework.
+  k.style = { grime: 0.28, dirt: 0x1c2024, worn: 0x20262c, wornA: 0.16, drips: 0.08, litter: 0.03, posters: 0.06, pipes: [0x8a9198, 0xc8662a, 0x5a7a9a], duct: 0xb8c0c6, rooms: { 'Docking bay 7': 0.5, 'Engineering workshop': 0.55 } };
+  k.dress = (d, s) => dressTycho(k, d, s);
   return k.done({ name: 'Docking bay 7', x: 0, z: 38, yaw: Math.PI });
 }
 
@@ -1608,6 +1680,9 @@ function ceres(): Interior {
       if (i % 4 === 2) for (let b = 0; b < 3; b++) bikes.push([x - Math.sign(x) * 1.25, z - 1 + b * 0.7, Math.PI / 2 + (k.r() - 0.5) * 0.3]);
     }
     k.scene.add(buildConcourse(k.r, { W: CW, z0: CZ0, z1: CZ1, wallH: CH, planters, bikes }));
+    // Old, crowded and short of water for cleaning: grime everywhere but the station house.
+    k.style = { grime: 0.9, dirt: 0x1a120a, worn: 0x8a7a68, wornA: 0.2, drips: 0.8, litter: 0.7, posters: 0.8, pipes: [0x6a4a3a, 0x4a5a62, 0x7a6a3a], duct: 0x5d5b55, rooms: { 'Star Helix station house': 0.3 } };
+    k.dress = (d, s) => dressCeres(k, d, s, CW, CZ0, CZ1, planters);
     // The gutter down the middle, and a band of darker paving each side of it.
     for (const [x, w, c] of [[0, 0.45, 0x2f3438], [-2.2, 0.12, 0x6f757a], [2.2, 0.12, 0x6f757a]] as const) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, CZ1 - CZ0 - 2), k.flat(c, { roughness: 0.6 }));
@@ -1689,7 +1764,7 @@ function medina(): Interior {
   const tex = surf('fields').clone();
   tex.repeat.set(6, 4);
   tex.needsUpdate = true;
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, 128, 16, true).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 0.95 }));
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(R, R, L, DRUM_SIDES, 16, true).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 0.95 }));
   k.scene.add(drum);
   const sunTube = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, L * 0.94, 12).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }));
   k.scene.add(sunTube);
@@ -1739,6 +1814,7 @@ function medina(): Interior {
 
   // Low buildings in clusters; they were laid out as a town and never demolished.
   const lit = k.flat(0xffe9b8, { emissive: 0xffe9b8, emissiveIntensity: 0.9 });
+  const built: Built[] = [];
   for (let c = 0; c < 16; c++) {
     const cx = c === 0 ? 0 : (k.r() - 0.5) * C, cz = c === 0 ? -430 : (k.r() - 0.5) * (L - 140);
     for (let i = 0; i < 6; i++) {
@@ -1746,6 +1822,7 @@ function medina(): Interior {
       const x = cx + (k.r() - 0.5) * 60, z = cz + (k.r() - 0.5) * 60;
       if (c === 0 && Math.abs(x) < 16 && Math.abs(z + 440) < 34) continue;
       k.box(w, h, d, [0xd9d4c8, 0xc8bfae, 0xb8c2c8, 0xe2d9c4][Math.floor(k.r() * 4)], x, z);
+      built.push({ x, z, w, d, h, town: c });
       k.box(w + 0.6, 0.3, d + 0.6, 0x7a6a5a, x, z, { y: h, solid: false });
       for (let f = 0; f < h / 3 - 0.5; f++) k.box(w * 0.7, 0.9, d + 0.08, lit, x, z, { y: 1.3 + f * 3, solid: false });
     }
@@ -1781,6 +1858,7 @@ function medina(): Interior {
   // The whole drum in one coarse box of probes. The light in here changes slowly, and what a
   // probe sees in every direction is lit farmland, which is exactly the drum's fill light.
   k.volumes.push({ x0: -R, x1: R, y0: -R, y1: R, z0: -L / 2, z1: L / 2, nx: 6, ny: 6, nz: 8 });
+  k.dress = (d, s) => dressMedina(k, d, s, built, C);
   return k.done({ name: 'Bow lift', x: 0, z: -438, yaw: Math.PI });
 }
 
@@ -1891,6 +1969,7 @@ async function ganymede(): Promise<Interior> {
     'Gravity here is about a seventh of Earth\'s. Crops grow tall and thin, water arcs lazily out of the irrigation heads, and a dropped tool takes a full second and a half to reach the soil.');
   // One low box of probes for the whole dome: sunlight coming back up off the soil and crops.
   k.volumes.push({ x0: -R, x1: R, y0: 0, y1: 10, z0: -R, z1: R, nx: 10, ny: 1, nz: 10 });
+  k.dress = (d, s) => dressGanymede(k, d, s);
   k.places.push({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 }, { name: 'Centre of the dome', x: 0, z: -4, yaw: 0 }, { name: 'Far edge', x: 0, z: -54, yaw: 0 });
   return k.done({ name: 'Landing pad', x: 10, z: 50, yaw: 0.3 });
 }

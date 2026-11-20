@@ -65,6 +65,8 @@ composer.addPass(look.finish);
 function draw(s: THREE.Scene, c: THREE.Camera) {
   renderPass.scene = s;
   renderPass.camera = c;
+  // (With ?debug the counts of what was drawn are kept for the whole frame, not just its last pass.)
+  if (!renderer.info.autoReset) renderer.info.reset();
   composer.render();
 }
 
@@ -1777,6 +1779,8 @@ if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: num
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
 // The light probes too: how many are left to fill, and a switch for before-and-after tests.
 if (FRAMES) Object.defineProperty(globalThis, '__bounce', { get: () => walk?.bounce });
+// How much was drawn last frame (draw calls and triangles), for before-and-after comparisons.
+if (FRAMES) { renderer.info.autoReset = false; Object.defineProperty(globalThis, '__info', { get: () => ({ ...renderer.info.render }) }); }
 // For tools/bake-probes.ts: the finished probes of the place you are in, as a file.
 if (FRAMES) Object.assign(globalThis, { __saveProbes: () => walk?.bounce?.done ? Array.from(walk.bounce.save(renderer)) : null });
 
