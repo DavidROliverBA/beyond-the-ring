@@ -1741,6 +1741,8 @@ if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
 if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip }) });
+// For tests: put you down somewhere else in the place you are walking, facing `yaw`.
+if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null }) });
 // The light probes too: how many are left to fill, and a switch for before-and-after tests.
 if (FRAMES) Object.defineProperty(globalThis, '__bounce', { get: () => walk?.bounce });

@@ -1233,16 +1233,19 @@ class Kit {
             dx += Math.sin(YAW[i]) * 0.5; dz += Math.cos(YAW[i]) * 0.5;
           }
           const a = dx * s + dz * c;
-          if (a < 0.05 || a > 2.6) continue;
+          // From just behind the shoulder: people being passed still count for keeping clear.
+          if (a < -0.6 || a > 2.6) continue;
           const l = dx * c - dz * s;
           if (l > 1.6 || l < -1.6) continue;
           if (m < 8) ls[m++] = l;
-          if (l < 0.42 && l > -0.42 && a < best) best = a;
+          // You take up a little more room than they do (see clearOfPeople).
+          const wide = i < 0 ? 0.6 : 0.42;
+          if (a > 0.05 && l < wide && l > -wide && a < best) best = a;
         }
         around.a = best; around.n = m;
       },
     };
-    if (debugging) (globalThis as unknown as { __folk: () => unknown }).__folk = () => this.folk.map((f) => ({ x: f.w.flat.x, z: f.w.flat.z, yaw: f.w.flat.yaw, state: f.w.state(), job: f.job ?? (f.stand ? 'stand' : 'pace') }));
+    if (debugging) (globalThis as unknown as { __folk: () => unknown }).__folk = () => this.folk.map((f) => ({ x: f.w.flat.x, z: f.w.flat.z, yaw: f.w.flat.yaw, state: f.w.state(), glance: f.w.glance(), job: f.job ?? (f.stand ? 'stand' : 'pace') }));
     return {
       id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR, bounce,
       free: (x, z) => this.free(x, z),

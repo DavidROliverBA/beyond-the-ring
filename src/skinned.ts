@@ -211,6 +211,8 @@ export interface Walker {
   /** What they are doing: 'stand', 'walk', 'turn', 'stop' (slowing to a halt) or 'yield' (waiting
    *  for someone to get out of the way). */
   state(): string;
+  /** How far the head is turned towards you just now, in radians (for tests). */
+  glance(): number;
   /** True from being sent somewhere until they have arrived and stopped. */
   busy(): boolean;
   /** Walk through these points and stop on the last, then turn to `face`. `polite` people only
@@ -561,6 +563,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   return {
     group, body, update, flat,
     state: () => state,
+    glance: () => gaze,
     busy: () => path !== null,
     walkTo: (p, opt = {}) => {
       if (beat > 0 || !p.length) return;
