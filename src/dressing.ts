@@ -451,7 +451,7 @@ export function dressMedina(k: Site, d: Dress, s: Signs, built: Built[], C: numb
     d.box(M, 1.0, 2.1, 0.08, across, 1.05, half + 0.02, [0x5a4632, 0x3f5a6a, 0x6a3a32, 0x4a5a42][Math.floor(k.w() * 4)]);
     d.box(M, 1.5, 0.08, 0.7, across, 2.3, half + 0.3, 0x7a6a5a);
     d.ball(M, 0.11, 0.14, 0.11, across + 0.75, 2.0, half + 0.14, WARM, { glow: 1.5 });
-    d.decal(M, 2.2, 3.4, across, 0.03, half + 1.7, CELL.path, 0xcdbb94, 0.5, { flat: true });
+    d.decal(M, 1.8, 2.4, across, 0.05, half + 1.2, CELL.path, 0xcdbb94, 0.55, { flat: true });
     if (k.w() < 0.5) d.box(M, 0.9, 0.5, 0.45, across - 1.4, 0.25, half + 0.3, 0x7a6248);
   }
 

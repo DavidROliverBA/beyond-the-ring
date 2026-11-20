@@ -25,6 +25,9 @@ export const CELL = {
 interface Turn { rx?: number; ry?: number; rz?: number }
 interface Put extends Turn { /** Glows: how bright (1 is the plain colour). */ glow?: number; /** Up out of reach: casts no shadow. */ high?: boolean }
 
+/** Colours darker than this are stains: drawn without lighting, which is cheaper and looks the same. */
+const STAIN = 0.03;
+
 class Buf {
   pos: number[] = []; nor: number[] = []; col: number[] = []; uv: number[] = [];
   mesh(mat: THREE.Material, alpha = false): THREE.Mesh | null {
@@ -200,16 +203,16 @@ function sheet(): THREE.CanvasTexture {
       x.restore();
     }
   });
-  // 14 A sprayed tag.
+  // 14 A sprayed tag: a made-up scrawl (a zigzag, a loop and an underline), with runs of paint.
   cell(CELL.tag, () => {
     x.strokeStyle = '#fff'; x.lineCap = 'round'; x.lineJoin = 'round'; x.shadowColor = '#fff'; x.shadowBlur = 5;
     x.lineWidth = 11;
-    x.beginPath(); x.arc(128, 104, 62, 0.5, 5.9); x.stroke();
-    x.beginPath(); x.moveTo(96, 140); x.lineTo(128, 60); x.lineTo(160, 140); x.moveTo(108, 112); x.lineTo(150, 112); x.stroke();
+    x.beginPath(); x.moveTo(34, 150); x.lineTo(66, 54); x.lineTo(98, 132); x.lineTo(128, 48); x.lineTo(158, 140); x.stroke();
+    x.beginPath(); x.ellipse(196, 96, 28, 44, 0.2, 0.6, 6.6); x.stroke();
     x.lineWidth = 6;
-    x.beginPath(); x.moveTo(30, 206); x.bezierCurveTo(80, 180, 110, 236, 150, 204); x.bezierCurveTo(180, 184, 200, 226, 232, 198); x.stroke();
+    x.beginPath(); x.moveTo(26, 196); x.bezierCurveTo(80, 170, 110, 226, 150, 194); x.bezierCurveTo(180, 174, 200, 216, 234, 186); x.stroke();
     x.shadowBlur = 0;
-    for (let i = 0; i < 9; i++) { const px = 70 + r() * 120; x.fillStyle = 'rgba(255,255,255,0.7)'; x.fillRect(px, 150 + r() * 20, 3, 14 + r() * 40); }
+    for (let i = 0; i < 9; i++) { const px = 50 + r() * 160; x.fillStyle = 'rgba(255,255,255,0.7)'; x.fillRect(px, 140 + r() * 20, 3, 14 + r() * 40); }
   });
   // 15 A rust-brown water stain running down.
   cell(CELL.rust, () => {
@@ -227,7 +230,7 @@ function sheet(): THREE.CanvasTexture {
   return (sheetTex = t);
 }
 
-interface Set4 { solid: Buf; high: Buf; glow: Buf; decal: Buf }
+interface Set4 { solid: Buf; high: Buf; glow: Buf; decal: Buf; stain: Buf }
 
 /** Collects boxes, tubes and flat markings and turns them into a few meshes per room. */
 export class Dress {
@@ -239,7 +242,7 @@ export class Dress {
   /** Things added from here on belong to this room (so rooms out of sight are not drawn). */
   group(key: string): Set4 {
     let s = this.sets.get(key);
-    if (!s) this.sets.set(key, (s = { solid: new Buf(), high: new Buf(), glow: new Buf(), decal: new Buf() }));
+    if (!s) this.sets.set(key, (s = { solid: new Buf(), high: new Buf(), glow: new Buf(), decal: new Buf(), stain: new Buf() }));
     return (this.now = s);
   }
 
@@ -289,7 +292,7 @@ export class Dress {
    * facing +z of the frame; `flat` lays it on the floor instead (its top towards -z, then turned
    * by `ry`). Big ones are cut into pieces about 3 m across so bounce light has corners to land on.
    */
-  decal(M: THREE.Matrix4, w: number, h: number, x: number, y: number, z: number, cell: number, color: number, alpha = 1, o: Turn & { flat?: boolean; /** Repeat the picture this many times across / up. */ ru?: number; rv?: number } = {}) {
+  decal(M: THREE.Matrix4, w: number, h: number, x: number, y: number, z: number, cell: number, color: number, alpha = 1, o: Turn & { flat?: boolean; /** Repeat the picture this many times across / up. */ ru?: number; rv?: number; /** Use only this part of the picture's width (0 to 1). */ us?: [number, number] } = {}) {
     _e.set((o.flat ? -Math.PI / 2 : 0) + (o.rx ?? 0), o.ry ?? 0, o.rz ?? 0, 'YXZ');
     _l.compose(_p.set(x, y, z), _q.setFromEuler(_e), _s.set(1, 1, 1));
     _m.multiplyMatrices(M, _l);
@@ -297,7 +300,7 @@ export class Dress {
     _v.set(0, 0, 1).applyMatrix3(_n).normalize();
     const nx = _v.x, ny = _v.y, nz = _v.z;
     _c.set(color);
-    const b = this.now.decal, pad = 3 / (GRID * PX);
+    const b = 0.2126 * _c.r + 0.7152 * _c.g + 0.0722 * _c.b < STAIN ? this.now.stain : this.now.decal, pad = 3 / (GRID * PX);
     const u0 = (cell % GRID) / GRID + pad, u1 = (cell % GRID + 1) / GRID - pad;
     const v1 = 1 - Math.floor(cell / GRID) / GRID - pad, v0 = 1 - (Math.floor(cell / GRID) + 1) / GRID + pad;
     const ru = o.ru ?? 1, rv = o.rv ?? 1;
@@ -314,7 +317,8 @@ export class Dress {
     for (let i = 0; i < cu; i++) for (let j = 0; j < cv; j++) {
       // Where this piece sits within one repeat of the picture.
       const a0 = frac((i * ru) / cu), a1 = a0 + ru / cu, b0 = frac((j * rv) / cv), b1 = b0 + rv / cv;
-      const U = (t: number) => u0 + (u1 - u0) * t, V = (t: number) => v0 + (v1 - v0) * t;
+      const us0 = o.us?.[0] ?? 0, us1 = o.us?.[1] ?? 1;
+      const U = (t: number) => u0 + (u1 - u0) * (us0 + (us1 - us0) * t), V = (t: number) => v0 + (v1 - v0) * t;
       for (const [ci, cj, tu, tv] of [[0, 0, a0, b0], [1, 0, a1, b0], [1, 1, a1, b1], [0, 0, a0, b0], [1, 1, a1, b1], [0, 1, a0, b1]] as const) {
         corner(i + ci, j + cj);
         b.uv.push(U(tu), V(tv));
@@ -327,14 +331,18 @@ export class Dress {
   build(): { meshes: THREE.Mesh[]; skip: THREE.Mesh[] } {
     const solidMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.2 });
     const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-    const decalMat = new THREE.MeshStandardMaterial({ map: sheet(), vertexColors: true, transparent: true, depthWrite: false, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    // Markings are see-through and lie over a lot of floor, so they are kept cheap to draw:
+    // simple matt lighting for paint, and none at all for dark stains.
+    const marks = { map: sheet(), vertexColors: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 };
+    const decalMat = new THREE.MeshLambertMaterial(marks), stainMat = new THREE.MeshBasicMaterial(marks);
     const meshes: THREE.Mesh[] = [], skip: THREE.Mesh[] = [];
     for (const [key, s] of this.sets) {
-      const solid = s.solid.mesh(solidMat), high = s.high.mesh(solidMat), glow = s.glow.mesh(glowMat), decal = s.decal.mesh(decalMat, true);
+      const solid = s.solid.mesh(solidMat), high = s.high.mesh(solidMat), glow = s.glow.mesh(glowMat), decal = s.decal.mesh(decalMat, true), stain = s.stain.mesh(stainMat, true);
       if (solid) { solid.name = `wear:${key}`; meshes.push(solid); }
       if (high) { high.name = `wear-high:${key}`; high.userData.noShadow = true; meshes.push(high); }
       if (glow) { glow.name = `wear-glow:${key}`; meshes.push(glow); }
-      if (decal) { decal.name = `wear-marks:${key}`; decal.renderOrder = 2; meshes.push(decal); skip.push(decal); }
+      if (stain) { stain.name = `wear-stains:${key}`; stain.renderOrder = 2; meshes.push(stain); skip.push(stain); }
+      if (decal) { decal.name = `wear-marks:${key}`; decal.renderOrder = 3; meshes.push(decal); skip.push(decal); }
     }
     return { meshes, skip };
   }
@@ -405,7 +413,7 @@ export class Signs {
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 8;
       const m = s.buf.mesh(new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.02 }));
-      if (m) { m.name = 'wear-signs'; m.renderOrder = 3; out.push(m); }
+      if (m) { m.name = 'wear-signs'; m.renderOrder = 4; out.push(m); }
     }
     return out;
   }
@@ -426,6 +434,8 @@ export interface Site {
   block(x: number, z: number, w: number, d: number): void;
   /** The dice for wear: its own, so nothing here moves the furniture or the people. */
   w: () => number;
+  /** True in a drum, where the floor is flat strips set at an angle to each other. */
+  curved?: boolean;
 }
 
 const STEEL = 0x596168, DARK = 0x2d3238;
@@ -629,6 +639,15 @@ export function strip(k: Site, d: Dress, x0: number, z0: number, x1: number, z1:
     const t = (i + 0.5) / n, M = k.frame(x0 + (x1 - x0) * t, 0, z0 + (z1 - z0) * t, yaw);
     // Warning stripes repeat across the picture, so they are laid sideways along the line.
     if (across) d.decal(M, L, wide * 1.6, 0, o.y ?? 0.022, 0, cell, color, alpha, { flat: true, ry: Math.PI / 2, ru: Math.max(1, Math.round(L / (o.per ?? wide * 1.6))) });
+    else if (k.curved) {
+      // A drum's floor is flat strips meeting at a slight angle, so a wide marking is laid as
+      // narrow ones side by side, each lying on the strip under it.
+      const m = Math.max(2, 2 * Math.ceil(wide / 2.4)), cx = x0 + (x1 - x0) * t, cz = z0 + (z1 - z0) * t;
+      for (let j = 0; j < m; j++) {
+        const off = -wide / 2 + ((j + 0.5) * wide) / m;
+        d.decal(k.frame(cx + off * Math.cos(yaw), 0, cz - off * Math.sin(yaw), yaw), wide / m, L, 0, o.y ?? 0.022, 0, cell, color, alpha, { flat: true, rv: Math.max(1, Math.round(L / (o.per ?? wide * 2))), us: [j / m, (j + 1) / m] });
+      }
+    }
     else d.decal(M, wide, L, 0, o.y ?? 0.022, 0, cell, color, alpha, { flat: true, rv: Math.max(1, Math.round(L / (o.per ?? wide * 2))) });
   }
 }
@@ -702,6 +721,8 @@ export function wearRooms(k: Site, d: Dress, rooms: WRoom[], st: Style, taken: T
     d.group(room.name);
     if (room.o.open) continue;
     const g = st.rooms?.[room.name] ?? st.grime * (room.o.calm ? 0.4 : 1);
+    // A room cleaner than the station is also tidier.
+    const tidy = Math.min(1, g / Math.max(0.01, st.grime));
     const wide = x1 - x0, deep = z1 - z0, area = wide * deep, corridor = Math.min(wide, deep) <= 6.5;
     // A frame on a wall: x runs along it, y up, z out into the room.
     const onWall = (side: Side, along: number, y: number) =>
@@ -740,12 +761,12 @@ export function wearRooms(k: Site, d: Dress, rooms: WRoom[], st: Style, taken: T
         const roll = w();
         if (roll < 0.1 && open && !busy(side, mid - 0.5, mid + 0.5, 0.15, 1.15)) d.decal(onWall(side, mid, 0.65), 0.9, 0.9, 0, 0, 0.022, CELL.hatch, 0xffffff, 1);
         else if (roll < 0.19 && h > 3.1 && !busy(side, mid - 0.55, mid + 0.55, 2.0, 2.8)) d.decal(onWall(side, mid, Math.min(2.45, h - 0.75)), 1.0, 1.0, 0, 0, 0.022, CELL.vent, 0xffffff, 1);
-        else if (roll < 0.19 + st.posters * 0.2 && open && !busy(side, mid - 0.8, mid + 0.8, 1.0, 2.4)) {
+        else if (roll < 0.19 + st.posters * tidy * 0.2 && open && !busy(side, mid - 0.8, mid + 0.8, 1.0, 2.4)) {
           if (w() < 0.5) d.decal(onWall(side, mid, 1.7), 1.3, 1.3, 0, 0, 0.02, CELL.posters, 0xffffff, 0.95);
           else d.decal(onWall(side, mid, 1.6), 1.7, 1.7, 0, 0, 0.02, CELL.tag, [0xd9d4c8, 0xc8662a, 0x7fb8d8, 0xb8483a][Math.floor(w() * 4)], 0.6);
         }
         if (w() < 0.12 + g * 0.2) d.decal(onWall(side, mid + (w() - 0.5), 1 + w() * Math.min(1.6, h - 2)), 1.2, 1.2, 0, 0, 0.018, CELL.chips, st.dirt, 0.3 + g * 0.3, { rz: w() * 6 });
-        if (open && w() < st.litter * 0.3) { const [lx, lz] = inFront(side, mid, 0.7); d.decal(ID, 1.5, 1.5, lx, 0.024, lz, CELL.litter, 0xffffff, 0.9, { flat: true, ry: w() * 6.28 }); }
+        if (open && w() < st.litter * tidy * 0.3) { const [lx, lz] = inFront(side, mid, 0.7); d.decal(ID, 1.5, 1.5, lx, 0.024, lz, CELL.litter, 0xffffff, 0.9, { flat: true, ry: w() * 6.28 }); }
       }
     }
 

@@ -353,10 +353,11 @@ class Kit implements Site {
     const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), p = new THREE.Vector3(x, y, z);
     if (this.curveR) {
       // The drum is drawn as flat strips, which stand a few centimetres proud of a true
-      // circle between their edges; sit on the strip, or markings on the ground sink into it.
-      const R = this.curveR, th = x / R, seg = (Math.PI * 2 * R) / DRUM_SIDES, u = ((x % seg) + seg) % seg;
-      y += (u * (seg - u)) / (2 * R);
-      p.set((R - y) * Math.sin(th), -(R - y) * Math.cos(th), z);
+      // circle between their edges. Stand on the strip itself, tilted as it is, or markings
+      // on the ground sink into it.
+      const R = this.curveR, a = (Math.PI * 2) / DRUM_SIDES, seg = R * a, i = Math.floor(x / seg);
+      const th = (i + 0.5) * a, t = x - (i + 0.5) * seg, Rc = R * Math.cos(a / 2), sn = Math.sin(th), cs = Math.cos(th);
+      p.set(Rc * sn + t * cs - y * sn, -Rc * cs + t * sn + y * cs, z);
       q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), th));
     }
     return new THREE.Matrix4().compose(p, q, new THREE.Vector3(1, 1, 1));
@@ -391,6 +392,8 @@ class Kit implements Site {
     }
     return true;
   }
+
+  get curved() { return !!this.curveR; }
 
   /** The wear pass: what every room gets, then the station's own dressing, as a few merged meshes. */
   wear() {
