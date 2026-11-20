@@ -23,6 +23,14 @@ const SOL: Shot[] = [
   { id: 'ring', from: [5, 0.6, 0.2], to: [2.6, 0.2, 0.05], secs: 11 },
 ];
 
+/** The ring space: the station, Medina, then out to the wall for two of the gates (seen from inside). */
+const SLOW: Shot[] = [
+  { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 10 },
+  { id: 'medina', from: [4.2, 1.0, 0.25], to: [2.8, 0.5, 0.1], secs: 11 },
+  { id: 'g0', from: [7, 0.5, 0.2], to: [3, 0.15, 0.05], secs: 11, caption: 'The way home: a thousand kilometres across, and behind it the Sun.' },
+  { id: 'g412', from: [5, -0.7, 0.15], to: [2.4, -0.2, 0.05], secs: 10 },
+];
+
 /** Any other system: the star, then its planets, stations and oddities, alternating sides. */
 function genericShots(things: Target[]): Shot[] {
   const pick = things.filter((t) => ['star', 'planet', 'station', 'artifact', 'dwarf'].includes(t.kind) && t.radius > 0).slice(0, 8);
@@ -59,7 +67,7 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
     start(spaceId, things, sunPos) {
       list = things;
       sun = sunPos;
-      shots = (spaceId === 'sol' ? SOL : genericShots(things)).filter((s) => things.some((x) => x.id === s.id));
+      shots = (spaceId === 'sol' ? SOL : spaceId === 'slow' ? SLOW : genericShots(things)).filter((s) => things.some((x) => x.id === s.id));
       i = 0;
       tour.active = shots.length > 0;
       if (tour.active) begin();

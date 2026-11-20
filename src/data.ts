@@ -7,7 +7,9 @@ import { rng, type Stop, type TexSpec } from './textures';
 /** One astronomical unit in scene units. Distances are true to scale; bodies are drawn far larger than life. */
 export const AU = 1000;
 export const GATE_COUNT = 1373;
-export const SLOW_RADIUS = 4000;
+/** The ring space is a bubble about a million kilometres across (from memory of the books), in the same
+ *  true-scale units as everything else: half a million kilometres from the station to the gates. */
+export const SLOW_RADIUS = (500000 / 149597870.7) * AU;
 
 export type Kind = 'star' | 'planet' | 'moon' | 'dwarf' | 'asteroid' | 'station' | 'ship' | 'artifact' | 'gate';
 export type Model = 'platform' | 'diamond' | 'neutron' | ShipModel;

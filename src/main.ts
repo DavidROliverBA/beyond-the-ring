@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeTraffic, type Fleet, type Port } from './traffic';
+import { SOL_UNIT, makeTraffic, type Fleet, type Port } from './traffic';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -770,11 +770,27 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   };
 }
 
+// The ring space, true to scale like everything else: a unit is 1/1000 AU, so a metre is SOL_UNIT.
+// The figures are from memory of the books and show (the wiki turns automated readers away), so
+// treat them as plausible rather than exact: a bubble about a million kilometres across, gates
+// about a thousand kilometres across on its edge, a station about five kilometres across at the
+// centre, and Medina (two kilometres long) parked a few tens of kilometres from it.
+const KM = 1000 * SOL_UNIT;
+const HUB_R = 2.5 * KM;
+const GATE_R = 500 * KM;
+/** The speed limit in here. The station's real limit is far lower (hundreds of metres a second,
+ *  from memory), which would make the half-million kilometres to a gate a trip of weeks. Time is
+ *  squeezed instead: at this limit the centre to a gate is under half a minute, a tenth of the
+ *  speed of light on the dial, and still twenty-five thousand times slower than the drive allows
+ *  outside. Close to anything the usual rule holds you to a crawl, so Medina's traffic is not a blur. */
+const SLOW_LIMIT = 30000 * KM;
+
 async function buildSlowZone(): Promise<Space> {
   const group = new THREE.Group();
   const labels = document.createElement('div');
   const things: Thing[] = [];
   const ctx: BuildCtx = { spin: [], timed: [], anim: [], lods: [] };
+  // No star in here: the station at the centre is the lamp, and it reaches the walls undimmed.
   group.add(new THREE.AmbientLight(0x4a5f88, 0.5));
   group.add(new THREE.PointLight(0x7fb8ff, 3, 0, 0));
 
@@ -782,21 +798,22 @@ async function buildSlowZone(): Promise<Space> {
   const core = new THREE.Group();
   const tex = (await paintBody({ style: 'lava', palette: [[0, '#05080f'], [1, '#12203a']], seed: 808, scale: 3, accent: '#4fc0ff' }, 1024, 512))!;
   const mat = new THREE.MeshStandardMaterial({ map: canvasTex(tex.color), emissiveMap: canvasTex(tex.lights!), emissive: 0xffffff, emissiveIntensity: 1.6, roughness: 0.5, metalness: 0.3 });
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(45, 64, 32), mat);
-  core.add(ball, glowSprite(0x3f9cff, 420, 0.8));
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(HUB_R, 64, 32), mat);
+  core.add(ball, glowSprite(0x3f9cff, HUB_R * 9.3, 0.8));
   group.add(core);
   ctx.spin.push({ o: ball, r: 0.02 });
   const station: Thing = {
     id: 'station', name: 'Ring Station', sub: 'Artefact · centre of the ring space', kind: 'artifact',
-    desc: 'The sphere at the middle of everything. It holds the gates open and sets the speed limit in here — go too fast and it simply stops you.',
-    pos: new V3(), radius: 45, range: Infinity, solid: true, nav: true, indent: false,
+    desc: 'The sphere at the middle of everything, five kilometres across. It holds the gates open and sets the speed limit in here — go too fast and it simply stops you.',
+    pos: new V3(), radius: HUB_R, range: Infinity, solid: true, nav: true, indent: false,
   };
   things.push(station);
   addLabel({ labels }, station, 'artifact');
 
-  const medinaPos = new V3(330, 40, 150);
+  // Medina, about 45 km out from the station.
+  const medinaPos = new V3(41.25, 5, 18.75).multiplyScalar(KM);
   const medina = buildModel('medina');
-  medina.scale.setScalar(16);
+  medina.scale.setScalar(2 * KM);
   medina.position.copy(medinaPos);
   medina.rotation.y = 0.7;
   group.add(medina);
@@ -804,32 +821,28 @@ async function buildSlowZone(): Promise<Space> {
   const mth: Thing = {
     id: 'medina', name: 'Medina Station', sub: 'Station · the only port in the ring space', kind: 'station',
     desc: 'Built as a generation ship, refitted as a warship, and now the traffic control and trading post for thirteen hundred worlds.',
-    pos: medinaPos, radius: 7, range: Infinity, solid: true, nav: true, indent: false, dock: 'medina',
+    // (Its label goes once you are well away, or it would sit on top of the station's all the way to the gates.)
+    pos: medinaPos, radius: 0.875 * KM, range: 5000 * KM, solid: true, nav: true, indent: false, dock: 'medina',
   };
   things.push(mth);
   addLabel({ labels }, mth, 'station');
 
-  // Here a unit is about 125 m: Medina is two kilometres across and the ships round it a few tens of metres to a few hundred.
-  const crowd = makeTraffic([
-    { ports: [{ pos: medinaPos, inner: 14, outer: 70 }], n: 80 },
-    { ports: [{ pos: medinaPos, inner: 14, outer: 40 }, { pos: new V3(), inner: 70, outer: 160 }], n: 25 },
-  ], 4242, 1 / 125, 80);
-  group.add(crowd.group);
-  ctx.anim.push((dt) => crowd.tick(dt, ship.pos));
-
-  // The gates.
-  const R = 28;
+  // The gates: one low-detail hoop and film each, drawn together. From the centre a gate is two
+  // pixels across, so each also gets a dot of light; the nearest one is swapped for a full model below.
+  const R = GATE_R;
   const torus = new THREE.InstancedMesh(
-    new THREE.TorusGeometry(R, R * 0.06, 8, 40),
+    new THREE.TorusGeometry(R, R * 0.06, 6, 32),
     new THREE.MeshStandardMaterial({ color: 0x56687c, emissive: 0x0d3355, metalness: 0.7, roughness: 0.4 }),
     GATE_COUNT,
   );
   const film = new THREE.InstancedMesh(
-    new THREE.CircleGeometry(R * 0.94, 32),
+    new THREE.CircleGeometry(R * 0.94, 24),
     new THREE.MeshBasicMaterial({ color: 0x1a4a88, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }),
     GATE_COUNT,
   );
-  const dots = new Float32Array(GATE_COUNT * 3), cols = new Float32Array(GATE_COUNT * 3);
+  // (One more dot than there are gates: the last is the station, so it can be found from the wall.)
+  const dots = new Float32Array((GATE_COUNT + 1) * 3), cols = new Float32Array((GATE_COUNT + 1) * 3);
+  cols.set([0.5, 0.8, 1], GATE_COUNT * 3);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new V3(1, 1, 1);
   const gates: Thing[] = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
@@ -857,19 +870,32 @@ async function buildSlowZone(): Promise<Space> {
     things.push(th);
     if (named) addLabel({ labels }, th, 'gate');
   }
-  // The racer that found the speed limit, still hanging where the station stopped it.
+  // The racer that found the speed limit, still hanging where the station stopped it: a little
+  // way in from the Sol gate and off to one side of the lane.
   const yq: Thing = {
     id: 'yque', name: 'Y Que', sub: 'Slingshot racer · derelict', kind: 'ship',
     desc: 'A Belter kid\'s home-built racer. He aimed it through the Sol Ring at full burn to impress a girl. The ship was stopped dead in an instant; he was not. That was how everyone learned there is a speed limit in here.',
-    pos: gates[0].pos.clone().multiplyScalar(0.975).add(new V3(18, 0, 9)), radius: 1.2, range: 1500, solid: true, nav: true, indent: true,
+    pos: gates[0].pos.clone().addScaledVector(gates[0].normal!, R * 3).add(new V3(0.5, 0, 0.25).multiplyScalar(R)),
+    radius: 0.015 * KM, range: R * 20, solid: true, nav: true, indent: true,
   };
   const wreck = buildModel('wreck');
-  wreck.scale.setScalar(3);
+  wreck.scale.setScalar(0.03 * KM);
   wreck.position.copy(yq.pos);
   wreck.rotation.set(0.6, 1.1, 0.3);
   group.add(wreck);
   things.push(yq);
   addLabel({ labels }, yq, 'ship');
+
+  // Ships, their true size. Most fuss round Medina and the station at tens of metres a second;
+  // some run out to the charted gates and back, which from anywhere else is a slow drift of sparks.
+  const charted = gates.filter((g) => g.nav).map((g): Port => ({ pos: g.pos.clone().addScaledVector(g.normal!, R * 3), inner: R * 0.3, outer: R * 2.5 }));
+  const crowd = makeTraffic([
+    { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 8.75 * KM }], n: 80 },
+    { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 5 * KM }, { pos: new V3(), inner: 8.75 * KM, outer: 20 * KM }], n: 25 },
+    { ports: [{ pos: medinaPos, inner: 3 * KM, outer: 12 * KM }, ...charted], n: 36, only: ['freighter', 'hauler', 'survey', 'corvette'] },
+  ], 4242, SOL_UNIT, 80);
+  group.add(crowd.group);
+  ctx.anim.push((dt) => crowd.tick(dt, ship.pos));
 
   torus.frustumCulled = film.frustumCulled = false;
   group.add(torus, film);
@@ -882,13 +908,55 @@ async function buildSlowZone(): Promise<Space> {
   pts.frustumCulled = false;
   group.add(pts);
 
+  // The gate you are nearest gets the full model: a round hoop with its lamps, the moving film,
+  // and in the middle the light of the star on the far side. It also sits at its own position
+  // rather than in the shared list, so it holds still as you fly through (the shared list keeps
+  // places to about forty metres out here, which is fine from afar and no good close to).
+  const close = makeGateObject(R, ctx);
+  const halo = close.children[close.children.length - 1] as THREE.Sprite;
+  const beyond = glowSprite(0xffffff, R * 0.7, 0.85);
+  close.add(beyond);
+  close.visible = false;
+  group.add(close);
+  const SWAP = R * 80;
+  const gone = new THREE.Matrix4().makeScale(0, 0, 0), kept = new THREE.Matrix4();
+  let shown = -1;
+  const show = (i: number) => {
+    if (shown >= 0) { torus.setMatrixAt(shown, kept); film.setMatrixAt(shown, kept); }
+    shown = i;
+    close.visible = i >= 0;
+    if (i >= 0) {
+      torus.getMatrixAt(i, kept);
+      torus.setMatrixAt(i, gone);
+      film.setMatrixAt(i, gone);
+      close.position.copy(gates[i].pos);
+      close.quaternion.setFromUnitVectors(FWD_Z, gates[i].normal!);
+      beyond.material.color.set(i === 0 ? SOL.light : genSystem(i).light);
+    }
+    torus.instanceMatrix.needsUpdate = film.instanceMatrix.needsUpdate = true;
+  };
+  ctx.anim.push(() => {
+    // Nobody is near a gate until they are near the wall, so most frames stop here.
+    let best = -1, bd = SWAP * SWAP;
+    if (ship.pos.length() > SLOW_RADIUS - SWAP) {
+      for (let i = 0; i < GATE_COUNT; i++) {
+        const d = gates[i].pos.distanceToSquared(ship.pos);
+        if (d < bd) { bd = d; best = i; }
+      }
+    }
+    if (best !== shown) show(best);
+    // Its halo comes up as you close in, so the change from the far hoop is not a jump.
+    if (best >= 0) halo.material.opacity = 0.5 * clamp(1.25 - 1.25 * Math.sqrt(bd) / SWAP, 0, 1);
+  });
+
   return {
     id: 'slow', name: 'The Ring Space', subtitle: `${GATE_COUNT} gates · no stars`,
     blurb: 'A starless bubble a million kilometres across. Every light on the wall is a door to another sun.',
-    group, labels, things, gates, maxSpeed: 500, sky: false, bound: SLOW_RADIUS + 160, lods: [],
-    tick: (_t, dt) => {
+    group, labels, things, gates, maxSpeed: SLOW_LIMIT, sky: false, bound: SLOW_RADIUS + R * 5, lods: [],
+    tick: (t, dt) => {
       for (const s of ctx.spin) s.o.rotation.y += s.r * dt;
       for (const a of ctx.anim) a(dt);
+      for (const mt of ctx.timed) mt.uniforms.time.value = t;
     },
   };
 }
@@ -1109,7 +1177,8 @@ function startTour() {
   tourSave = { pos: ship.pos.clone(), q: ship.q.clone() };
   auto = null;
   ship.speed = ship.throttle = 0;
-  tour.start(space.id, space.things, space.things.find((t) => t.kind === 'star')?.pos ?? null);
+  // (The ring space has no star; its station is the lamp, so shots there are framed round it.)
+  tour.start(space.id, space.things, space.things.find((t) => t.kind === 'star')?.pos ?? (space.id === 'slow' ? ZERO : null));
 }
 function stopTour() {
   if (!tour.active && !tourSave) return;
@@ -1321,7 +1390,7 @@ function speedCap(): number {
       c = 1.2 * d * (1 + far * far) + 0.3 * th.radius + 1e-12;
     }
     if (c < cap) cap = c;
-    if (th.kind !== 'gate' || th.range > 0 || dist < 500) {
+    if (th.kind !== 'gate' || th.range > 0 || dist < th.radius * 18) {
       const score = (dist - th.radius) / (th.kind === 'gate' ? 1 : Math.max(1, th.radius));
       if (score < nd) { nd = score; nearest = th; }
     }
@@ -1735,7 +1804,8 @@ function updateHud(dt: number) {
   $('mode').classList.toggle('auto', !!auto);
 
   const near = nearest as Thing | null;
-  const close = near && near.pos.distanceTo(ship.pos) < near.radius * 10 + 30 ? near : null;
+  // (The slack is for Sol's planets; in the ring space it would be the whole bubble.)
+  const close = near && near.pos.distanceTo(ship.pos) < near.radius * 10 + (space.id === 'slow' ? 0 : 30) ? near : null;
   const focus = auto?.thing ?? aimed ?? close;
   const card = $('card');
   if (focus) {
@@ -1816,7 +1886,7 @@ function frame(now: number) {
   shipModel.position.copy(ship.pos);
   shipModel.quaternion.copy(ship.q);
   shipModel.visible = chase;
-  const thrust = clamp(Math.abs(ship.speed) / Math.max(1, space.maxSpeed) * 6 + Math.abs(ship.throttle), 0, 1);
+  const thrust = clamp(Math.abs(ship.speed) / space.maxSpeed * 6 + Math.abs(ship.throttle), 0, 1);
   plume.scale.set(1, 1, 0.15 + thrust * 1.6 + Math.sin(clock * 40) * 0.04);
   (plume.material as THREE.MeshBasicMaterial).opacity = 0.12 + thrust * 0.45;
 
