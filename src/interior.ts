@@ -1230,6 +1230,9 @@ class Kit {
           if (i >= 0 && MOVING[i]) {
             // Someone walking the same way is not in the way unless I am about to tread on them.
             if (Math.cos(YAW[i] - yaw) > 0.5 && dx * s + dz * c > 1) continue;
+            // Where they really are still counts for not treading on them.
+            const a0 = dx * s + dz * c, l0 = dx * c - dz * s;
+            if (a0 > 0.05 && a0 < best && l0 < 0.42 && l0 > -0.42) best = a0;
             dx += Math.sin(YAW[i]) * 0.5; dz += Math.cos(YAW[i]) * 0.5;
           }
           const a = dx * s + dz * c;

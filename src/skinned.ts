@@ -179,6 +179,9 @@ const LANE = 0.9, STOP_P = 0.4, TURN_PACE = 0.65;
 const LOOK = 2.6, GAP = 0.7, SIDE = 0.75, DRIFT = 0.9, NEAR = 1.15, STOP = 0.55;
 /** How fast someone following a route swings round to their next point (radians a second). */
 const SWING = 2.4;
+/** Seconds between one look ahead and the next, and somewhere to keep the sidesteps being weighed up. */
+const THINK = 0.12;
+const tries = new Float32Array(17);
 const wrapA = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -335,6 +338,8 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   /** The line they are walking, before any sidestep (`off`, metres to their left). */
   const pos = new THREE.Vector3(x, 0, z);
   let off = 0, slow = 1, cap = Infinity, held = 0;
+  /** For `sense`: time to the next look, the gap to whoever is ahead, and the sidestep to aim for. */
+  let think = q() * THINK, gap = Infinity, aim = 0;
   const patience = 2.5 + q() * 2.5;
   const pace = (f: number) => { walk.setEffectiveTimeScale(f / period); lope.setEffectiveTimeScale(f / period); };
   const go = () => {
@@ -358,6 +363,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   const advance = (step: number) => {
     pos.x += Math.sin(group.rotation.y) * step;
     pos.z += Math.cos(group.rotation.y) * step;
+    gap -= step;
   };
 
   /** Look ahead. Sets `slow` (1 = carry on, 0 = stop) and `cap` (how far they may move this
@@ -367,32 +373,48 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
    *  head-on each go to their own right and pass. Once past, or if their own line clears the
    *  others anyway, they drift back to it. 'hold' keeps whatever sidestep they have and 'back'
    *  returns to the line regardless. The drift is only as fast as the legs are moving, so nobody
-   *  slides sideways while standing. */
+   *  slides sideways while standing.
+   *  The looking itself happens about eight times a second, not every frame (it is the dear
+   *  part: measured 2026-11-20, looking every frame cost the market 12 ms a frame). In between,
+   *  the gap to whoever is ahead is counted down by the distance walked. */
   const sense = (dt: number, a: Around | undefined, g: number, step: 'aside' | 'hold' | 'back') => {
-    slow = 1; cap = Infinity;
-    let want = 0;
-    if (a) {
+    if (a && (think -= dt) <= 0) {
+      think = THINK;
       const yw = group.rotation.y;
       a.ahead(group.position.x, group.position.z, yw);
-      if (a.n && step !== 'back') {
-        want = off;
-        if (step === 'aside') {
-          // Try my own line, then a gap's width either side of each person ahead. `ls` holds
-          // where they are to the left of me; add `off` for where they are from my line.
-          let best = Infinity;
-          const tryAt = (t: number) => {
-            const cost = Math.abs(t) + (t > 0 ? 0.1 : 0);
-            if (cost >= best || Math.abs(t) > SIDE) return;
-            for (let i = 0; i < a.n; i++) if (Math.abs(t - off - a.ls[i]) < GAP - 0.02) return;
-            if (t !== 0 && !a.free(pos.x + Math.cos(yw) * t, pos.z - Math.sin(yw) * t)) return;
-            best = cost; want = t;
-          };
-          tryAt(0);
-          for (let i = 0; i < a.n; i++) { tryAt(off + a.ls[i] - GAP); tryAt(off + a.ls[i] + GAP); }
+      gap = a.a;
+      aim = 0;
+      if (a.n) {
+        // Places to try: my own line, then a gap's width either side of each person ahead.
+        // (`ls` holds where they are to the left of me; add `off` for where they are from my
+        // line.) Cross off any that is too far out or too close to someone, then take the
+        // cheapest that is open floor: nearest the line, the right a little cheaper.
+        let m = 0;
+        tries[m++] = 0;
+        for (let i = 0; i < a.n; i++) { tries[m++] = off + a.ls[i] - GAP; tries[m++] = off + a.ls[i] + GAP; }
+        for (let j = 0; j < m; j++) {
+          const t = tries[j];
+          let bad = Math.abs(t) > SIDE;
+          for (let i = 0; i < a.n && !bad; i++) bad = Math.abs(t - off - a.ls[i]) < GAP - 0.02;
+          if (bad) tries[j] = NaN;
+        }
+        aim = off;
+        for (let go3 = 0; go3 < 3; go3++) {
+          let best = -1, cost = Infinity;
+          for (let j = 0; j < m; j++) {
+            const t = tries[j], c = Math.abs(t) + (t > 0 ? 0.1 : 0);
+            if (c < cost) { cost = c; best = j; }
+          }
+          if (best < 0) break;
+          const t = tries[best];
+          if (t === 0 || a.free(pos.x + Math.cos(yw) * t, pos.z - Math.sin(yw) * t)) { aim = t; break; }
+          tries[best] = NaN;
         }
       }
-      if (a.a < NEAR) { slow = clamp((a.a - STOP) / (NEAR - STOP), 0, 1); cap = Math.max(0, a.a - STOP); }
     }
+    slow = 1; cap = Infinity;
+    if (gap < NEAR) { slow = clamp((gap - STOP) / (NEAR - STOP), 0, 1); cap = Math.max(0, gap - STOP); }
+    const want = step === 'aside' ? aim : step === 'hold' ? off : 0;
     const d = DRIFT * g * dt;
     off += clamp(want - off, -d, d);
   };
