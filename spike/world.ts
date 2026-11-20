@@ -50,6 +50,8 @@ export interface World {
   /** Draw the picture the depth buffer should give, worked out without trusting it. */
   drawTruth(renderer: { autoClear: boolean; clear(): void; clearDepth(): void; render(s: THREE.Scene, c: THREE.Camera): void }): void;
   draw(renderer: { autoClear: boolean; render(s: THREE.Scene, c: THREE.Camera): void }): void;
+  /** Every material the scene can show, in any view. */
+  materials(): THREE.Material[];
   /** Camera position in world units (kept in JavaScript's 64-bit numbers). */
   eye: THREE.Vector3;
 }
@@ -68,10 +70,13 @@ export function buildWorld(kit: Kit, farK = 1): World {
   const side = new V3().crossVectors(new V3(0, 1, 0), sunDir).normalize();
 
   // Every body has a beauty material and a flat "which object is this" colour for the depth check.
-  interface Part { o: THREE.Mesh; beauty: THREE.Material; flat: THREE.Material; order: number }
+  // (The hand-ordered picture has its own copies with the depth test off, rather than flipping the
+  // switch on shared ones: a renderer may not rebuild a shader when only that switch changes.)
+  interface Part { o: THREE.Mesh; beauty: THREE.Material; flat: THREE.Material; blind: THREE.Material; order: number }
   const parts: Part[] = [];
   const flat = (c: number, side: THREE.Side = THREE.FrontSide) => new THREE.MeshBasicMaterial({ color: c, side, toneMapped: false });
-  const add = (o: THREE.Mesh, id: number, order: number) => { parts.push({ o, beauty: o.material as THREE.Material, flat: flat(id), order }); root.add(o); return o; };
+  const blind = (m: THREE.Material) => { const b = m.clone(); b.depthTest = false; b.depthWrite = false; return b; };
+  const add = (o: THREE.Mesh, id: number, order: number) => { const f = flat(id); parts.push({ o, beauty: o.material as THREE.Material, flat: f, blind: blind(f), order }); root.add(o); return o; };
 
   const sunMat = new THREE.MeshBasicMaterial();
   sunMat.color.setScalar(1.7);
@@ -97,7 +102,7 @@ export function buildWorld(kit: Kit, farK = 1): World {
 
   const cellGeo = new THREE.PlaneGeometry(EARTH_R * 0.05, EARTH_R * 0.05);
   const cellMat = new THREE.MeshBasicMaterial({ color: 0xbfd0ff, transparent: true, opacity: 0.0, depthWrite: false });
-  const cellFlat = flat(0xff00ff);
+  const cellFlat = flat(0xff00ff), cellBlind = blind(cellFlat);
   const cells: THREE.Mesh[] = [];
   let seed = 11;
   const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -109,7 +114,7 @@ export function buildWorld(kit: Kit, farK = 1): World {
     cell.quaternion.setFromUnitVectors(new V3(0, 0, 1), up);
     root.add(cell);
     cells.push(cell);
-    parts.push({ o: cell, beauty: cellMat, flat: cellFlat, order: 4 });
+    parts.push({ o: cell, beauty: cellMat, flat: cellFlat, blind: cellBlind, order: 4 });
   }
 
   // The air: the game's scattering shell.
@@ -146,6 +151,7 @@ export function buildWorld(kit: Kit, farK = 1): World {
 
   const w: World = {
     scene, camera, root, ship, eye,
+    materials: () => [...new Set([...parts.flatMap((p) => [p.beauty, p.flat, p.blind]), shipFlat, airMat, ...[...shipBeauty.values()].flat()])],
     place(stop, float) {
       floating = float;
       // Along which direction we look, where the ship is, and how far back the camera sits.
@@ -192,9 +198,7 @@ export function buildWorld(kit: Kit, farK = 1): World {
     show(view) {
       const truth = view === 'truth', beauty = view === 'beauty';
       for (const p of parts) {
-        p.o.material = beauty ? p.beauty : p.flat;
-        p.flat.depthTest = !truth;
-        p.flat.depthWrite = !truth;
+        p.o.material = beauty ? p.beauty : truth ? p.blind : p.flat;
         p.o.renderOrder = truth ? p.order : 0;
       }
       air.visible = beauty;

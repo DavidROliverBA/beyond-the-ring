@@ -24,10 +24,11 @@ export const logDepth = (): N => {
   return log2(w.mul(LOGK).add(1)).div(log2(cameraFar.mul(LOGK).add(1)));
 };
 
-/** Give every material in a scene the scaled logarithmic depth. Classic materials keep the
- *  property when the renderer turns them into node materials. */
-export function applyLogDepth(root: THREE.Object3D) {
+/** Give materials the scaled logarithmic depth. Classic materials keep the property when the
+ *  renderer turns them into node materials. */
+export function applyLogDepth(root: THREE.Object3D, more: THREE.Material[] = []) {
   const node = logDepth();
+  for (const m of more) (m as N).depthNode = node;
   root.traverse((o) => {
     const mats = (o as THREE.Mesh).material;
     for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) (m as N).depthNode = node;

@@ -78,10 +78,26 @@ async function main() {
     out.backend = 'WebGLRenderer (WebGL 2)';
   } else {
     if (R === 'webgpu' && !(navigator as any).gpu) throw new Error('This browser has no navigator.gpu (WebGPU is unavailable).');
+    // three asks for a "compatibility" adapter, which older Chromium (131, the one Playwright ships
+    // here) answers with nothing even though it has a perfectly good WebGPU adapter. If that
+    // happens, ask the plain way ourselves and hand three the device.
+    let device: any;
+    const gpu = (navigator as any).gpu;
+    if (R === 'webgpu' && !(await gpu.requestAdapter({ featureLevel: 'compatibility' }))) {
+      const adapter = await gpu.requestAdapter();
+      if (!adapter) throw new Error('navigator.gpu is there but gives no adapter.');
+      device = await adapter.requestDevice({ requiredFeatures: [...adapter.features].filter((f: string) => !f.startsWith('chromium-')) });   // no experimental extras
+      // This device is a full ("core") one; say so in the way newer browsers do, or three treats it as limited.
+      const real = device.features;
+      Object.defineProperty(device, 'features', { value: { has: (n: string) => n === 'core-features-and-limits' || real.has(n), forEach: (f: any) => real.forEach(f), [Symbol.iterator]: () => real[Symbol.iterator]() } });
+      out.ownDevice = true;
+    }
     const r = renderer = new GPU.WebGPURenderer({
-      canvas, antialias: AA, forceWebGL: R === 'webgl2',
+      canvas, antialias: AA, forceWebGL: R === 'webgl2', device,
       reversedDepthBuffer: DEPTH === 'reversed', logarithmicDepthBuffer: DEPTH === 'log',
     });
+    // Asked for WebGPU by name: fail loudly with the real reason rather than quietly using WebGL 2.
+    if (R === 'webgpu') (r as any)._getFallback = null;
     await r.init();
     const be = r.backend as any;
     out.backend = be.isWebGPUBackend ? 'WebGPURenderer (WebGPU)' : 'WebGPURenderer (WebGL 2 fallback)';
@@ -164,7 +180,7 @@ async function main() {
     }
   }
   camera.updateProjectionMatrix();
-  if (!classic && DEPTH === 'custom') tsl.applyLogDepth(scene);
+  if (!classic && DEPTH === 'custom') tsl.applyLogDepth(scene, (world?.materials() ?? []) as any);
 
   // ---------------------------------------------------------------- post chain
   let draw: () => void;
@@ -196,14 +212,16 @@ async function main() {
     const rr = renderer as any;
     renderer.toneMapping = THREE.NoToneMapping;
     world.show('truth');
-    world.drawTruth(rr);
+    // (Each is drawn once to compile its shaders, then again and copied in the same breath: a
+    // WebGPU canvas hands its picture to the screen, and forgets it, as soon as the script pauses.)
     world.drawTruth(rr);
     await finish();
+    world.drawTruth(rr);
     const truth = grab();
     world.show('id');
     world.draw(rr);
-    world.draw(rr);
     await finish();
+    world.draw(rr);
     const got = grab();
     let bad = 0, shipPx = 0, lit = 0;
     const over = document.getElementById('over') as HTMLCanvasElement;
@@ -220,6 +238,8 @@ async function main() {
       img.data[i] = wrong ? 255 : got.data[i] * 0.45; img.data[i + 1] = wrong ? 0 : got.data[i + 1] * 0.45; img.data[i + 2] = wrong ? 0 : got.data[i + 2] * 0.45; img.data[i + 3] = 255;
     }
     og.putImageData(img, 0, 0);
+    // show=truth leaves the hand-ordered picture on screen instead, to look at.
+    if (q.get('show') === 'truth') { over.style.display = 'none'; world.show('truth'); const again = () => { world!.drawTruth(rr); requestAnimationFrame(again); }; again(); }
     const total = got.width * got.height;
     out.check = { wrongPixels: bad, wrongPercent: +(100 * bad / total).toFixed(4), pixels: total, shipPixels: shipPx, drawnPixels: lit };
     say(`${out.backend}  depth: ${out.depth}  stop: ${STOP}\nDEPTH CHECK: ${bad} wrong pixels of ${total} (${(100 * bad / total).toFixed(3)}%)  [ship covers ${shipPx}]\nwrong pixels are painted red`);
