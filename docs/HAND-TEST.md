@@ -28,6 +28,16 @@ Note what felt wrong and where. "Fine" is a useful answer too.
 - [ ] Tycho, Ganymede and Medina (the drum, from the ring space): people stand upright, nothing floats.
 - [ ] Photo mode on foot.
 
+## 3b. Spin gravity (5 minutes)
+Ceres, Tycho and Medina make their gravity by turning, so which way you run matters. Watch the location panel: it shows your weight in g as you move.
+- [ ] Medina, "Mid-drum". Turn to face round the drum (the ground rising ahead of you) and run (Shift + W). One way you should feel heavy: quick short strides, eyes a touch lower, about 0.9 g on the panel. Turn round and run the other way: long slow floating bounds, about 0.05 g, and you take longer to stop. Is the floating pleasant or queasy?
+- [ ] Medina: face along the drum (towards an end cap) and run for five seconds, aiming at something far off. You should be carried a couple of metres to one side, always the same side whichever end you face. Noticeable, but easy to steer against? Walking should not be carried at all.
+- [ ] Medina: look up and round. The ground should curve up and over on both sides, and your feet should stay down wherever you walk round the drum.
+- [ ] Tycho, the ring corridor: run its length both ways. Heavier one way (about 0.6 g), lighter the other (about 0.15 g).
+- [ ] Ceres, the Concourse: run away from the entrance, then back. A gentler version: about 0.4 g out, 0.2 g back, strides a little longer on the way back. Is it enough to notice without the panel?
+- [ ] Ganymede is a moon, not a wheel: nothing changes with direction there.
+- [ ] `?spin=off` in the address puts walking back as it was; `?spin=real` shows the true sizes (Ceres: nothing to feel). Does the default feel better than off?
+
 ## 4. Things to report
 - Any freeze or stutter, and where.
 - Anything that looks wrong at a glance: shapes, lighting, scale.

@@ -934,7 +934,7 @@ let walk: Interior | null = null;
 let nearPoint: Point | null = null;
 // (`weight` is how heavy you are just now against standing still, `eye` how high your eyes are
 // and `drift` how fast your strides are carrying you spinward: all three come from spin.ts.)
-const walker = { x: 0, z: 0, yaw: 0, pitch: 0, bob: 0, vx: 0, vz: 0, weight: 1, eye: 1.7, drift: 0 };
+const walker = { x: 0, z: 0, yaw: 0, pitch: 0, bob: 0, vx: 0, vz: 0, weight: 1, eye: 1.7, drift: 0, rise: 0 };
 let lodBusy = false;
 
 const loadingEl = $('loading');
@@ -1553,7 +1553,9 @@ function walkStep(dt: number) {
     // now, short and quick when you are heavy. You also stand a little taller when light and
     // sink a little into your knees when heavy.
     if (speed > 0) walker.bob += (dt * Math.PI * 2) / fl.step;
-    eye = 1.7 + 0.05 * clamp(1 - walker.weight, -1, 1) - Math.cos(walker.bob) * fl.rise * 0.5;
+    // (The height of the hop is eased, so pushing against a wall does not make the view judder.)
+    walker.rise += (fl.rise - walker.rise) * (1 - Math.exp(-dt * 6));
+    eye = 1.7 + 0.05 * clamp(1 - walker.weight, -1, 1) - Math.cos(walker.bob) * walker.rise * 0.5;
   } else {
     walker.bob += dt * speed * (run ? 1.3 : 1.9);
     eye = 1.7 + Math.sin(walker.bob) * 0.03 * Math.min(1, speed / 4);

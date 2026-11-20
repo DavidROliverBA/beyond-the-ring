@@ -67,7 +67,9 @@ export function feel(s: Spin, vx: number, vz: number): Feel {
   const step = Math.sqrt((8 * hop) / g) + CONTACT;
   // Seen from outside, a hop is a straight line across a corner of the circle while the floor
   // goes round the arc. The line is the shorter way, so you land ahead of where you left.
-  const up = Math.sqrt(2 * g * hop);
+  // Only a run has both feet off the floor: a walk always has one down, and is not carried.
+  const air = Math.min(1, Math.max(0, (speed - 4.5) / 3.5));
+  const up = Math.sqrt(2 * g * hop) * air * air * (3 - 2 * air);
   const a = 2 * Math.atan2(up, round);
   const drift = (DRIFT_SHOW * R * (a - Math.sin(a))) / step;
   return { weight, step, rise: hop * HEAD_SHARE, drift };
