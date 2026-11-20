@@ -1011,7 +1011,7 @@ class Kit {
     // threes, turn to face the middle and talk (the talking itself is in skinned.ts).
     const pool = this.folk.filter(idle);
     for (const f of pool) {
-      if (f.job || q() > 0.55) continue;
+      if (f.job || q() > 0.3) continue;   // about a third of a crowd ends up talking
       const a = f.w.flat, here = this.roomAt(a.x, a.z);
       let g: Folk | undefined, best = this.curveR ? 2.6 : 4.5;
       for (const o of pool) {
