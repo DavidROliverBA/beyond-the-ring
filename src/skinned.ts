@@ -399,7 +399,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
           if (bad) tries[j] = NaN;
         }
         aim = off;
-        for (let go3 = 0; go3 < 3; go3++) {
+        for (let attempt = 0; attempt < 3; attempt++) {
           let best = -1, cost = Infinity;
           for (let j = 0; j < m; j++) {
             const t = tries[j], c = Math.abs(t) + (t > 0 ? 0.1 : 0);

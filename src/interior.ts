@@ -977,6 +977,9 @@ class Kit {
         for (let i = 0; i < 40 && !rest; i++) {
           const a = q() * 6.283, d = 3 + q() * 5, p = { x: o.x + Math.cos(a) * d, z: o.z + Math.sin(a) * d };
           if (spots.some((sp) => Math.hypot(sp.x - p.x, sp.z - p.z) < 1.8)) continue;
+          // Behind the end of the line and on the side they stepped out to, so neither the walk
+          // away nor the walk back cuts through the queue.
+          if ((p.x - tail.x) * fx + (p.z - tail.z) * fz < 0.6 || ((p.x - tail.x) * fz - (p.z - tail.z) * fx) * sd < 0.9) continue;
           if (this.spot(p) && this.clearLine(o, p) && this.clearLine(p, tail)) { out = o; rest = p; }
         }
         if (rest) break;
