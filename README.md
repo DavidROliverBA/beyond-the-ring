@@ -74,7 +74,7 @@ To jump, fly through the middle of a ring.
 - TypeScript and [three.js](https://threejs.org), with no framework. `src/main.ts` holds flight, docking, walking and the display.
 - `src/data.ts` describes Sol by hand and generates every other system from its gate number.
 - `src/photos.ts` and `assets/tex` hold the photographic planet maps; `src/textures.ts` paints every other world in code.
-- `src/interior.ts` is a small kit of rooms, props and people, and the four interiors made from it. `src/concourse.ts` builds the Ceres street and `src/people.ts` the crowd.
+- `src/interior.ts` is a small kit of rooms, props and people, and the four interiors made from it. `src/concourse.ts` builds the Ceres street and `src/people.ts` the crowd. `src/wear.ts` and `src/dressing.ts` add the grime, clutter, railings, signs and strings of lights, as a few merged meshes per room.
 - `src/traffic.ts` flies the ships on their routes.
 - The ship and station models are built by script in [Blender](https://www.blender.org). To rebuild them:
 

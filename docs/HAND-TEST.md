@@ -38,6 +38,20 @@ Ceres, Tycho and Medina make their gravity by turning, so which way you run matt
 - [ ] Ganymede is a moon, not a wheel: nothing changes with direction there.
 - [ ] `?spin=off` in the address puts walking back as it was; `?spin=real` shows the true sizes (Ceres: nothing to feel). Does the default feel better than off?
 
+## 3c. Layout and wear (10 minutes)
+Every station now has grime, clutter, railings and signs that tell you where things are. `?wear=off` in the address shows each place as it was, for comparison.
+- [ ] Tycho, docking bay: the berth is boxed in warning stripes, there are catwalks along both walls and a sign over the corridor door. Does it read as a working bay, or as clutter?
+- [ ] Tycho, ring corridor: follow the blue line on the floor from the bay door. It should take you to the bar. The green one goes to Operations, the orange one runs the whole corridor. Read the hanging signs walking both ways: do the arrows point the right way from where you stand?
+- [ ] Tycho, yard gallery: the handrail and the viewers at the window. Can you still walk the length of the window?
+- [ ] Ceres, dock to market: walk from the ship through the rails, the scanner arch and past the desk. Nothing should snag you. In the Medina, find the directory pillar near the middle and check one arrow on each face against where the door really is.
+- [ ] Ceres, the Medina: bins, sacks by the stalls, litter, drips on the rock. Dirty enough? Too dirty? Do the queues at the stalls still form with the bins about?
+- [ ] Ceres, tube station: the yellow line and rails at the platform edge.
+- [ ] Ceres, the Concourse: should still look clean and bright. Worn paths down both sides, bins by planters, a directory to one side of the way in and three more down the middle.
+- [ ] Ganymede: walk from the pad through the gate and down the path. The lights should be gentle under the sun, not neon. Does the stand by the gate look like it belongs?
+- [ ] Medina, bow lift: the market street with its strings of bulbs. Walk round a stand and up to a counter. At "Mid-drum" there is a signpost: face round the drum the way the ground rises ahead and the bow should be on your left.
+- [ ] Anywhere: did you get stuck on anything, or find something standing in a doorway or in a person?
+- [ ] Frame rate: does any station feel slower than before?
+
 ## 4. Things to report
 - Any freeze or stutter, and where.
 - Anything that looks wrong at a glance: shapes, lighting, scale.
