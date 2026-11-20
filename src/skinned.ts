@@ -176,7 +176,7 @@ const LANE = 0.9, STOP_P = 0.4, TURN_PACE = 0.65;
 /** Getting round each other. A walker looks LOOK metres ahead; anything nearer its line than GAP
  *  is in the way, and it drifts sideways (up to SIDE metres, at DRIFT m/s) to pass. If the thing
  *  is still dead ahead inside NEAR metres it slows, and stops at STOP metres. */
-const LOOK = 2.6, GAP = 0.75, SIDE = 0.7, DRIFT = 0.9, NEAR = 1.15, STOP = 0.55;
+const LOOK = 2.6, GAP = 0.7, SIDE = 0.75, DRIFT = 0.9, NEAR = 1.15, STOP = 0.55;
 /** How fast someone following a route swings round to their next point (radians a second). */
 const SWING = 2.4;
 const wrapA = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
@@ -188,11 +188,16 @@ export interface Around {
   /** Where you are standing. */
   px: number;
   pz: number;
-  /** Find the nearest person (or you) in the way of someone at (x, z) heading `yaw`. The answer
-   *  lands in `a` (metres ahead; Infinity if the way is clear) and `l` (metres to their left). */
+  /** Look ahead for someone at (x, z) heading `yaw`. `a` is how many metres ahead the nearest
+   *  person (or you) squarely in their way is, Infinity if nobody; `ls` lists how far to their
+   *  left (minus for right) each of the first `n` people in front of them is, in the way or
+   *  near enough to matter when stepping aside. */
   ahead(x: number, z: number, yaw: number): void;
   a: number;
-  l: number;
+  n: number;
+  ls: Float32Array;
+  /** Which person is being updated (set by the interior), so they do not see themselves. */
+  self: number;
   free(x: number, z: number): boolean;
 }
 
@@ -327,7 +332,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   let mobile = beat > 0;
   /** The line they are walking, before any sidestep (`off`, metres to their left). */
   const pos = new THREE.Vector3(x, 0, z);
-  let off = 0, slow = 1, held = 0;
+  let off = 0, slow = 1, cap = Infinity, held = 0;
   const patience = 2.5 + q() * 2.5;
   const pace = (f: number) => { walk.setEffectiveTimeScale(f / period); lope.setEffectiveTimeScale(f / period); };
   const go = () => {
@@ -353,26 +358,38 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
     pos.z += Math.cos(group.rotation.y) * step;
   };
 
-  /** Look ahead. Sets `slow` (1 = carry on, 0 = stop) and, if `sidestep`, drifts to one side of
-   *  whoever is in the way: away from them, or to the right if they are dead ahead, so two people
-   *  meeting head-on each go to their own right and pass. The drift is only as fast as the legs
-   *  are moving, so nobody slides sideways while standing. */
-  const sense = (dt: number, a: Around | undefined, g: number, sidestep: boolean) => {
-    slow = 1;
+  /** Look ahead. Sets `slow` (1 = carry on, 0 = stop) and `cap` (how far they may move this
+   *  update, so a long step never lands on someone). With `step` 'aside' they also drift to one
+   *  side of whoever is in the way: to the nearest place beside their own line that clears
+   *  everyone ahead, preferring the right when it is much the same, so two people meeting
+   *  head-on each go to their own right and pass. Once past, or if their own line clears the
+   *  others anyway, they drift back to it. 'hold' keeps whatever sidestep they have and 'back'
+   *  returns to the line regardless. The drift is only as fast as the legs are moving, so nobody
+   *  slides sideways while standing. */
+  const sense = (dt: number, a: Around | undefined, g: number, step: 'aside' | 'hold' | 'back') => {
+    slow = 1; cap = Infinity;
     let want = 0;
     if (a) {
       const yw = group.rotation.y;
       a.ahead(group.position.x, group.position.z, yw);
-      if (a.a < LOOK) {
-        const l = a.l, al = Math.abs(l);
+      if (a.n && step !== 'back') {
         want = off;
-        if (sidestep && al < GAP) {
-          want = clamp(off + (l > 0.04 ? -1 : l < -0.04 ? 1 : -1) * (GAP - al), -SIDE, SIDE);
-          // Not into a wall or a table.
-          if (!a.free(pos.x + Math.cos(yw) * want, pos.z - Math.sin(yw) * want)) want = off;
+        if (step === 'aside') {
+          // Try my own line, then a gap's width either side of each person ahead. `ls` holds
+          // where they are to the left of me; add `off` for where they are from my line.
+          let best = Infinity;
+          const tryAt = (t: number) => {
+            const cost = Math.abs(t) + (t > 0 ? 0.1 : 0);
+            if (cost >= best || Math.abs(t) > SIDE) return;
+            for (let i = 0; i < a.n; i++) if (Math.abs(t - off - a.ls[i]) < GAP - 0.02) return;
+            if (t !== 0 && !a.free(pos.x + Math.cos(yw) * t, pos.z - Math.sin(yw) * t)) return;
+            best = cost; want = t;
+          };
+          tryAt(0);
+          for (let i = 0; i < a.n; i++) { tryAt(off + a.ls[i] - GAP); tryAt(off + a.ls[i] + GAP); }
         }
-        if (a.a < NEAR && al < 0.5) slow = clamp((a.a - STOP) / (NEAR - STOP), 0, 1);
       }
+      if (a.a < NEAR) { slow = clamp((a.a - STOP) / (NEAR - STOP), 0, 1); cap = Math.max(0, a.a - STOP); }
     }
     const d = DRIFT * g * dt;
     off += clamp(want - off, -d, d);
@@ -397,11 +414,12 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   const lanes = (dt: number, a?: Around) => {
     // Move only as much as the legs are walking: no gliding while the stride fades in or out.
     const g = striding();
-    if (state === 'walk' || state === 'yield') sense(dt, a, g, state === 'walk');
-    else if (state === 'turn') { sense(dt, a, g, false); slow = Math.max(0.4, slow); }
+    if (state === 'walk' || state === 'yield') sense(dt, a, g, state === 'walk' ? 'aside' : 'hold');
+    // A turn is on known open floor: get back on the line for it, and never quite stop in it.
+    else if (state === 'turn') { sense(dt, a, g, 'back'); slow = Math.max(0.3, slow); }
     const f = state === 'turn' ? TURN_PACE * slow : state === 'walk' || state === 'yield' ? slow : 1;
     const step = speed * g * dt * f;
-    if (state !== 'stand') advance(step);
+    if (state !== 'stand') advance(state === 'turn' ? step : Math.min(step, cap));
     if (state === 'walk') {
       if (slow < 0.25) { halt('yield'); held = 0; }
       else {
@@ -452,7 +470,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   };
   const route = (dt: number, a?: Around) => {
     const g = striding();
-    if (state === 'walk' || state === 'yield') sense(dt, a, g, !polite && state === 'walk');
+    if (state === 'walk' || state === 'yield') sense(dt, a, g, !polite && state === 'walk' ? 'aside' : 'hold');
     if (state === 'walk' && path) {
       const p = path[pi], dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz), last = pi === path.length - 1;
       if (d < (last ? stopDist + 0.04 : 0.5)) {
@@ -464,7 +482,7 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
       if (slow < 0.25) { halt('yield'); held = 0; return; }
       const f = Math.max(0.3, slow * Math.max(0.3, Math.cos(err)));
       pace(f);
-      advance(speed * g * dt * f);
+      advance(Math.min(speed * g * dt * f, cap));
     } else if (state === 'stop') {
       advance(speed * g * dt);
       if (g < 0.01) arrive();

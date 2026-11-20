@@ -308,7 +308,7 @@ class Kit {
   /** Places a queue could form: where its first person stands, and the way it runs back from there. */
   counters: { x: number; z: number; yaw: number }[] = [];
   queues: Queue[] = [];
-  strollers: { f: Folk; t: number }[] = [];
+  strollers: { f: Folk; t: number; to?: XZ }[] = [];
   /** A dice for what people do. The dice that lays out the rooms (`r`) is left alone, so
    *  behaviour never moves the furniture or the lights the saved light probes were made for. */
   q = rng(7);
@@ -704,6 +704,7 @@ class Kit {
         const ux = d > 0.01 ? dx / d : 1, uz = d > 0.01 ? dz / d : 0, nx = cx + ux * 1.9, nz = cz + uz * 1.9;
         if (!this.free(nx, nz)) continue;
         p.x = nx; p.z = nz;
+        f.w.flat.x = nx; f.w.flat.z = nz;
         f.stand.shadow.position.x = nx; f.stand.shadow.position.z = nz;
         Object.assign(f.stand.rect, { x0: nx - 0.15, x1: nx + 0.15, z0: nz - 0.15, z1: nz + 0.15 });
       }
@@ -926,6 +927,8 @@ class Kit {
       const z0 = Math.max(other.z0 + 1.2, far.z - 20), z1 = Math.min(other.z1 - 1.2, far.z + 20);
       for (let i = 0; i < 25; i++) {
         const to = { x: x0 + q() * (x1 - x0), z: z0 + q() * (z1 - z0) };
+        // Not where another stroller is already heading.
+        if (this.strollers.some((s) => s.to && Math.hypot(s.to.x - to.x, s.to.z - to.z) < 1.4)) continue;
         if (this.spot(to) && this.clearLine(far, to)) return [near, far, to];
       }
     }
@@ -937,6 +940,17 @@ class Kit {
     const q = this.q;
     const idle = (f: Folk) => !!f.loose && !!f.stand && !f.job;
     const dist = (f: Folk, p: XZ) => Math.hypot(f.w.flat.x - p.x, f.w.flat.z - p.z);
+
+    // First, nobody stands in a walker's lane. (Bystanders were scattered after the lanes were
+    // chosen, and some landed in them.) Each moves to the nearest clear spot.
+    if (!this.curveR) for (const f of this.folk) {
+      if (!idle(f) || !this.nearLane(f.w.flat.x, f.w.flat.z, 0.7)) continue;
+      const { x, z } = f.w.flat;
+      for (let i = 0; i < 60; i++) {
+        const a = i * 2.4, d = 0.7 + i * 0.05;
+        if (this.shift(f, x + Math.cos(a) * d, z + Math.sin(a) * d)) break;
+      }
+    }
 
     // Queues at some of the stalls and counters: two to four people in a line. Every so often
     // the one at the front is served and walks off, the rest shuffle up, and after a while the
@@ -962,6 +976,7 @@ class Kit {
         if (!this.free(o.x, o.z) || this.nearFolk(o.x, o.z, 0.6)) continue;
         for (let i = 0; i < 40 && !rest; i++) {
           const a = q() * 6.283, d = 3 + q() * 5, p = { x: o.x + Math.cos(a) * d, z: o.z + Math.sin(a) * d };
+          if (spots.some((sp) => Math.hypot(sp.x - p.x, sp.z - p.z) < 1.8)) continue;
           if (this.spot(p) && this.clearLine(o, p) && this.clearLine(p, tail)) { out = o; rest = p; }
         }
         if (rest) break;
@@ -993,7 +1008,7 @@ class Kit {
     // threes, turn to face the middle and talk (the talking itself is in skinned.ts).
     const pool = this.folk.filter(idle);
     for (const f of pool) {
-      if (f.job || q() > 0.7) continue;
+      if (f.job || q() > 0.55) continue;
       const a = f.w.flat, here = this.roomAt(a.x, a.z);
       let g: Folk | undefined, best = this.curveR ? 2.6 : 4.5;
       for (const o of pool) {
@@ -1037,7 +1052,7 @@ class Kit {
       if (s.f.w.busy() || (s.t -= dt) > 0) continue;
       const p = this.plan(s.f.w.flat.x, s.f.w.flat.z);
       // The wait before the walk after this one starts counting when they arrive.
-      if (p) { s.f.w.walkTo(p, { face: q() * 6.283 }); s.t = 5 + q() * 16; } else s.t = 4;
+      if (p) { s.to = p[2]; s.f.w.walkTo(p, { face: q() * 6.283 }); s.t = 5 + q() * 16; } else s.t = 4;
     }
     for (const Q of this.queues) {
       for (const m of Q.moves) if (m.t > 0 && (m.t -= dt) <= 0) m.f.w.walkTo([m.to], { face: Q.yaw, polite: true });
@@ -1198,24 +1213,33 @@ class Kit {
     const n = this.folk.length;
     const X = new Float32Array(n), Z = new Float32Array(n), YAW = new Float32Array(n), MOVING = new Uint8Array(n);
     const around: Around = {
-      px: 0, pz: 0, a: Infinity, l: 0,
+      px: 0, pz: 0, a: Infinity, n: 0, ls: new Float32Array(8), self: -1,
       free: (x, z) => this.free(x, z),
       ahead: (x, z, yaw) => {
-        const s = Math.sin(yaw), c = Math.cos(yaw);
-        let best = Infinity, bl = 0;
+        const s = Math.sin(yaw), c = Math.cos(yaw), ls = around.ls;
+        let best = Infinity, m = 0;
         for (let i = -1; i < n; i++) {
-          // -1 is you.
-          const dx = (i < 0 ? around.px : X[i]) - x, dz = (i < 0 ? around.pz : Z[i]) - z;
-          if (dx > 3 || dx < -3 || dz > 3 || dz < -3 || dx * dx + dz * dz < 1e-6) continue;
+          if (i === around.self) continue;
+          // -1 is you. Someone walking is taken to be half a metre further on than they are:
+          // where they will be by the time it matters, which is what lets people who are
+          // about to cross paths see each other coming.
+          let dx: number, dz: number;
+          if (i < 0) { dx = around.px - x; dz = around.pz - z; }
+          else { dx = X[i] - x; dz = Z[i] - z; }
+          if (dx > 3.5 || dx < -3.5 || dz > 3.5 || dz < -3.5) continue;
+          if (i >= 0 && MOVING[i]) {
+            // Someone walking the same way is not in the way unless I am about to tread on them.
+            if (Math.cos(YAW[i] - yaw) > 0.5 && dx * s + dz * c > 1) continue;
+            dx += Math.sin(YAW[i]) * 0.5; dz += Math.cos(YAW[i]) * 0.5;
+          }
           const a = dx * s + dz * c;
-          if (a < 0.05 || a >= best) continue;
+          if (a < 0.05 || a > 2.6) continue;
           const l = dx * c - dz * s;
-          if (l > 1 || l < -1) continue;
-          // Someone walking the same way a little ahead is not in the way.
-          if (i >= 0 && MOVING[i] && a > 1 && Math.cos(YAW[i] - yaw) > 0.5) continue;
-          best = a; bl = l;
+          if (l > 1.6 || l < -1.6) continue;
+          if (m < 8) ls[m++] = l;
+          if (l < 0.42 && l > -0.42 && a < best) best = a;
         }
-        around.a = best; around.l = bl;
+        around.a = best; around.n = m;
       },
     };
     if (debugging) (globalThis as unknown as { __folk: () => unknown }).__folk = () => this.folk.map((f) => ({ x: f.w.flat.x, z: f.w.flat.z, yaw: f.w.flat.yaw, state: f.w.state(), job: f.job ?? (f.stand ? 'stand' : 'pace') }));
@@ -1249,7 +1273,7 @@ class Kit {
           const d2 = f.w.group.position.distanceToSquared(cam);
           const every = d2 < 400 ? 1 : d2 < 2025 ? 2 : d2 < 8100 ? 4 : 8;
           f.w.body.castShadow = d2 < 625;
-          if ((frame + f.i) % every === 0) { f.w.update(f.acc, around); f.acc = 0; }
+          if ((frame + f.i) % every === 0) { around.self = f.i; f.w.update(f.acc, around); f.acc = 0; }
         }
         for (const a of this.anims) a(t, dt);
         this.stars?.position.copy(cam);
