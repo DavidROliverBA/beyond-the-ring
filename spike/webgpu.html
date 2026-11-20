@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Beyond the Ring: WebGPU spike</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #cfe; font: 13px ui-monospace, Menlo, monospace; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #over { pointer-events: none; display: none; }
+  #hud { position: absolute; left: 10px; top: 8px; white-space: pre; text-shadow: 0 0 4px #000, 0 0 2px #000; z-index: 2; }
+  #menu { position: absolute; right: 10px; top: 8px; z-index: 2; text-align: right; line-height: 1.7; }
+  #menu a { color: #8cf; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<canvas id="over"></canvas>
+<div id="hud">loading…</div>
+<div id="menu"></div>
+<script type="module" src="./webgpu.ts"></script>
+</body>
+</html>
