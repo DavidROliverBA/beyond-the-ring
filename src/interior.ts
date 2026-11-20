@@ -7,7 +7,7 @@ import { buildModel, glowSprite, playerShip } from './ships';
 import { scan, type ScanName } from './materials';
 import { PHOTOS } from './photos';
 import { buildPerson } from './people';
-import { buildWalker, peopleReady, type Walker } from './skinned';
+import { buildWalker, debugging, peopleReady, type Around, type Walker } from './skinned';
 import { buildConcourse, terraceFront } from './concourse';
 import { BAKING, Bounce, fits, type ProbeBox } from './probes';
 
@@ -265,6 +265,14 @@ let BOUNCE = false, SAVED: ArrayBuffer | null = null;
 /** With bounce light the flat fill light can drop to this much of itself: the probes do its job. */
 const FILL = 0.45;
 
+/** One person in an interior. `stand` is there while they are a fixture: the patch of shade under
+ *  them and the bit of floor they take up. `loose` marks a bystander; `job` what they were given. */
+interface Folk { w: Walker; acc: number; i: number; stand?: { shadow: THREE.Group; rect: Rect }; loose?: boolean; job?: 'talk' | 'queue' | 'stroll' }
+type XZ = { x: number; z: number };
+/** A queue: the spots in order from the counter, who is in it, and where the one who has been
+ *  served steps out to (`out`) and wanders off to (`rest`) before joining the back again. */
+interface Queue { spots: XZ[]; yaw: number; line: Folk[]; out: XZ; rest: XZ; away?: Folk; phase: 'wait' | 'away' | 'back'; t: number; moves: { f: Folk; to: XZ; t: number }[] }
+
 class Kit {
   scene = new THREE.Scene();
   rooms: Room[] = [];
@@ -292,12 +300,24 @@ class Kit {
   /** Things the light probes should not see: people (they move) and the painted-on shade. */
   unlit: THREE.Object3D[] = [];
   bounce = BOUNCE;
-  folk: { w: Walker; acc: number; i: number; stand?: { shadow: THREE.Group; rect: Rect } }[] = [];
+  folk: Folk[] = [];
+  /** Doorways between rooms: the middle of each, and the way through it from room `a` to room `b`. */
+  doorways: { x: number; z: number; nx: number; nz: number; a: Room; b: Room }[] = [];
+  /** The lines the pacing walkers keep to (both lanes), so nobody is told to stand in them. */
+  lanes: { x: number; z: number; fx: number; fz: number; len: number }[] = [];
+  /** Places a queue could form: where its first person stands, and the way it runs back from there. */
+  counters: { x: number; z: number; yaw: number }[] = [];
+  queues: Queue[] = [];
+  strollers: { f: Folk; t: number }[] = [];
+  /** A dice for what people do. The dice that lays out the rooms (`r`) is left alone, so
+   *  behaviour never moves the furniture or the lights the saved light probes were made for. */
+  q = rng(7);
   private mats = new Map<string, THREE.MeshStandardMaterial>();
   r = rng(1);
 
   constructor(public id: string, public name: string, public blurb: string) {
     this.r = rng(id.length * 131 + id.charCodeAt(0));
+    this.q = rng(id.length * 977 + id.charCodeAt(0) * 31 + 5);
   }
 
   mat(kind: Surf, tint = 0xffffff): THREE.MeshStandardMaterial {
@@ -355,10 +375,12 @@ class Kit {
       const [l, r] = a.x1 === b.x0 ? [a, b] : [b, a];
       mk(l, 'e', r.name); mk(r, 'w', l.name);
       this.doors.push({ x0: l.x1 - 0.6, x1: l.x1 + 0.6, z0: lo + M, z1: hi - M });
+      this.doorways.push({ x: l.x1, z: at, nx: 1, nz: 0, a: l, b: r });
     } else if (a.z1 === b.z0 || b.z1 === a.z0) {
       const [n, s] = a.z1 === b.z0 ? [a, b] : [b, a];
       mk(n, 's', s.name); mk(s, 'n', n.name);
       this.doors.push({ x0: lo + M, x1: hi - M, z0: n.z1 - 0.6, z1: n.z1 + 0.6 });
+      this.doorways.push({ x: at, z: n.z1, nx: 0, nz: 1, a: n, b: s });
     } else {
       throw new Error(`${a.name} and ${b.name} do not share a wall`);
     }
@@ -584,7 +606,10 @@ class Kit {
     if (!w) return;
     this.unlit.push(w.group);
     let stand: { shadow: THREE.Group; rect: Rect } | undefined;
-    if (side) this.scene.add(w.group);
+    if (side) {
+      this.scene.add(w.group);
+      for (const off of [0, side * 0.9]) this.lanes.push({ x: x + sx * off, z: z + sz * off, fx, fz, len: beat });
+    }
     else {
       this.place(w.group, x, 0, z, yaw);
       const shadow = this.contact(x, z, 1.0, 1.0, 0, 0.5);
@@ -599,7 +624,10 @@ class Kit {
     for (let i = 0, tries = 0; i < n && tries < n * 20; tries++) {
       const x = x0 + this.r() * (x1 - x0), z = z0 + this.r() * (z1 - z0);
       if (!this.free(x, z)) continue;
+      const before = this.folk.length;
       this.person(x, z, undefined, belter && this.r() < 0.8, this.r() < 0.3);
+      // Bystanders with nowhere to be: the ones `behave` may give something to do.
+      if (this.folk.length > before) this.folk[before].loose = true;
       i++;
     }
   }
@@ -821,7 +849,220 @@ class Kit {
     const [px, pz] = at(0, -0.8);
     this.person(px, pz, yaw, this.r() < 0.5, false);
     this.blocks.pop();
+    const [qx, qz] = at(0, 1.05);
+    this.counters.push({ x: qx, z: qz, yaw });
   }
+
+  // ---- what the crowd does: queues, people wandering from room to room, and conversations.
+  // All of it is given to bystanders who were already standing about, so there is nobody extra
+  // to draw; and it all happens after the rooms are dressed, with its own dice.
+
+  private nearLane(x: number, z: number, pad = 0.85) {
+    for (const l of this.lanes) {
+      const t = Math.min(l.len, Math.max(0, (x - l.x) * l.fx + (z - l.z) * l.fz));
+      if (Math.hypot(x - l.x - l.fx * t, z - l.z - l.fz * t) < pad) return true;
+    }
+    return false;
+  }
+  private nearFolk(x: number, z: number, pad: number, but?: Folk) {
+    for (const f of this.folk) if (f !== but && Math.hypot(f.w.flat.x - x, f.w.flat.z - z) < pad) return true;
+    return false;
+  }
+  /** Open floor all the way from one point to another. */
+  private clearLine(a: XZ, b: XZ) {
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.4);
+    for (let i = 0; i <= n; i++) if (!this.free(a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n)) return false;
+    return true;
+  }
+  /** A spot to stand: open floor with elbow room, out of the walkers' lanes and not on top of anyone. */
+  private spot(p: XZ, but?: Folk) {
+    if (!this.free(p.x, p.z) || this.nearLane(p.x, p.z) || this.nearFolk(p.x, p.z, 0.95, but)) return false;
+    for (let i = 0; i < 4; i++) if (!this.free(p.x + Math.cos(i * 1.571) * 0.5, p.z + Math.sin(i * 1.571) * 0.5)) return false;
+    return true;
+  }
+  /** Run `fn` as if this person were not standing there (their own feet block the floor otherwise). */
+  private without<T>(f: Folk, fn: () => T): T {
+    if (!f.stand) return fn();
+    const r = f.stand.rect, keep = { ...r };
+    r.x0 = r.x1 = r.z0 = r.z1 = 1e9;
+    const out = fn();
+    Object.assign(r, keep);
+    return out;
+  }
+  /** A fixture becomes someone who can walk: the floor under them is free again. */
+  private release(f: Folk) {
+    if (!f.stand) return;
+    const i = this.blocks.indexOf(f.stand.rect);
+    if (i >= 0) this.blocks.splice(i, 1);
+    f.stand.shadow.visible = false;
+    f.stand = undefined;
+  }
+  /** Move a standing person (flat floors only), taking their shade and their bit of floor along. */
+  private shift(f: Folk, x: number, z: number) {
+    if (this.curveR || !f.stand || !this.without(f, () => this.spot({ x, z }, f))) return false;
+    f.w.setPose(x, z, f.w.flat.yaw);
+    f.stand.shadow.position.x = x; f.stand.shadow.position.z = z;
+    Object.assign(f.stand.rect, { x0: x - 0.15, x1: x + 0.15, z0: z - 0.15, z1: z + 0.15 });
+    return true;
+  }
+  private turn(f: Folk, yaw: number) {
+    if (this.curveR) { f.w.flat.yaw = yaw; this.place(f.w.group, f.w.flat.x, 0, f.w.flat.z, yaw); }
+    else f.w.setPose(f.w.flat.x, f.w.flat.z, yaw);
+  }
+
+  /** A walk from (x, z) through one of this room's doors to a spot in the room beyond: the point
+   *  before the door, the point after it, and the spot. Nothing if no door can be reached in a
+   *  straight line over open floor, or no spot turns up. */
+  private plan(x: number, z: number): XZ[] | null {
+    const q = this.q;
+    const room = this.rooms.find((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+    const ds = room ? this.doorways.filter((d) => d.a === room || d.b === room) : [];
+    for (let n = 0; n < 3 && ds.length; n++) {
+      const d = ds[Math.floor(q() * ds.length)], sg = d.a === room ? -1 : 1, other = d.a === room ? d.b : d.a;
+      const near = { x: d.x + d.nx * sg * 1.3, z: d.z + d.nz * sg * 1.3 }, far = { x: d.x - d.nx * sg * 1.3, z: d.z - d.nz * sg * 1.3 };
+      if (!this.clearLine({ x, z }, near) || !this.clearLine(near, far)) continue;
+      // Somewhere within about twenty metres of the door, so a walk is a walk and not a hike.
+      const x0 = Math.max(other.x0 + 1.2, far.x - 20), x1 = Math.min(other.x1 - 1.2, far.x + 20);
+      const z0 = Math.max(other.z0 + 1.2, far.z - 20), z1 = Math.min(other.z1 - 1.2, far.z + 20);
+      for (let i = 0; i < 25; i++) {
+        const to = { x: x0 + q() * (x1 - x0), z: z0 + q() * (z1 - z0) };
+        if (this.spot(to) && this.clearLine(far, to)) return [near, far, to];
+      }
+    }
+    return null;
+  }
+
+  behave() {
+    if (!peopleReady()) return;
+    const q = this.q;
+    const idle = (f: Folk) => !!f.loose && !!f.stand && !f.job;
+    const dist = (f: Folk, p: XZ) => Math.hypot(f.w.flat.x - p.x, f.w.flat.z - p.z);
+
+    // Queues at some of the stalls and counters: two to four people in a line. Every so often
+    // the one at the front is served and walks off, the rest shuffle up, and after a while the
+    // one who left joins the back.
+    if (!this.curveR) for (const c of this.counters) {
+      if (this.queues.length >= 4 || q() > 0.75) continue;
+      const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw), want = 2 + Math.floor(q() * 3);
+      const spots: XZ[] = [];
+      for (let i = 0; i < want; i++) {
+        const p = { x: c.x + fx * i * 0.8, z: c.z + fz * i * 0.8 };
+        if (!this.free(p.x, p.z) || this.nearLane(p.x, p.z) || this.nearFolk(p.x, p.z, 0.75)) break;
+        spots.push(p);
+      }
+      const pool = this.folk.filter(idle).filter((f) => dist(f, c) < 16).sort((a, b) => dist(a, c) - dist(b, c));
+      spots.length = Math.min(spots.length, pool.length);
+      if (spots.length < 2) continue;
+      // Where the served one goes: a step to one side, then a spot a few metres off with a
+      // clear walk there and a clear walk back to the end of the line.
+      const tail = spots[spots.length - 1];
+      let out: XZ | undefined, rest: XZ | undefined;
+      for (const sd of q() < 0.5 ? [1, -1] : [-1, 1]) {
+        const o = { x: spots[0].x + fz * sd * 1.1, z: spots[0].z - fx * sd * 1.1 };
+        if (!this.free(o.x, o.z) || this.nearFolk(o.x, o.z, 0.6)) continue;
+        for (let i = 0; i < 40 && !rest; i++) {
+          const a = q() * 6.283, d = 3 + q() * 5, p = { x: o.x + Math.cos(a) * d, z: o.z + Math.sin(a) * d };
+          if (this.spot(p) && this.clearLine(o, p) && this.clearLine(p, tail)) { out = o; rest = p; }
+        }
+        if (rest) break;
+      }
+      if (!out || !rest) continue;
+      const line = pool.slice(0, spots.length);
+      line.forEach((f, i) => { this.release(f); f.job = 'queue'; f.w.setPose(spots[i].x, spots[i].z, c.yaw + Math.PI); });
+      this.queues.push({ spots, yaw: c.yaw + Math.PI, line, out, rest, phase: 'wait', t: 4 + q() * 8, moves: [] });
+    }
+
+    // Strollers: a few bystanders who wander from room to room through the doors (see direct).
+    if (!this.curveR && this.doorways.length) {
+      const want = Math.min(10, Math.round(this.doorways.length * 1.5));
+      const pool = this.folk.filter(idle).map((f) => ({ f, k: q() })).sort((a, b) => a.k - b.k);
+      for (const { f } of pool) {
+        if (this.strollers.length >= want) break;
+        // Only those who can reach a door from where they stand.
+        const room = this.rooms.find((r) => f.w.flat.x >= r.x0 && f.w.flat.x <= r.x1 && f.w.flat.z >= r.z0 && f.w.flat.z <= r.z1);
+        const ok = room && this.without(f, () => this.doorways.some((d) => (d.a === room || d.b === room)
+          && this.clearLine(f.w.flat, { x: d.x + d.nx * (d.a === room ? -1.3 : 1.3), z: d.z + d.nz * (d.a === room ? -1.3 : 1.3) })));
+        if (!ok) continue;
+        this.release(f);
+        f.job = 'stroll';
+        this.strollers.push({ f, t: q() * 14 });
+      }
+    }
+
+    // Conversations: bystanders who happen to be near each other close up into twos and
+    // threes, turn to face the middle and talk (the talking itself is in skinned.ts).
+    const pool = this.folk.filter(idle);
+    for (const f of pool) {
+      if (f.job || q() > 0.7) continue;
+      const a = f.w.flat, here = this.roomAt(a.x, a.z);
+      let g: Folk | undefined, best = this.curveR ? 2.6 : 4.5;
+      for (const o of pool) {
+        const d = dist(o, a);
+        if (o !== f && !o.job && d < best && this.roomAt(o.w.flat.x, o.w.flat.z) === here) { best = d; g = o; }
+      }
+      if (!g) continue;
+      const b = g.w.flat;
+      // Talking distance is a little over a metre. If the other can't come that close, a pair
+      // already within a couple of metres will still do.
+      if (best > 1.5 || best < 0.95) {
+        const ux = (b.x - a.x) / (best || 1), uz = (b.z - a.z) / (best || 1), d = 1.05 + q() * 0.3;
+        if (!this.shift(g, a.x + ux * d, a.z + uz * d) && (best > 2.6 || best < 0.8)) continue;
+      }
+      const group = [f, g];
+      const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+      if (!this.curveR && q() < 0.4) {
+        let o3: Folk | undefined, b3 = 3.5;
+        for (const o of pool) { const d = dist(o, { x: mx, z: mz }); if (!o.job && !group.includes(o) && d < b3) { b3 = d; o3 = o; } }
+        if (o3) {
+          // The third stands off to one side of the pair, whichever side they are already on.
+          const px = -(b.z - a.z), pz = b.x - a.x, pl = Math.hypot(px, pz) || 1;
+          const sd = (o3.w.flat.x - mx) * px + (o3.w.flat.z - mz) * pz > 0 ? 1 : -1;
+          if (this.shift(o3, mx + (px / pl) * sd * 1.0, mz + (pz / pl) * sd * 1.0)) group.push(o3);
+        }
+      }
+      const cx = group.reduce((s, m) => s + m.w.flat.x, 0) / group.length, cz = group.reduce((s, m) => s + m.w.flat.z, 0) / group.length;
+      const period = (5 + q() * 5) * group.length;
+      group.forEach((m, i) => {
+        m.job = 'talk';
+        this.turn(m, Math.atan2(cx - m.w.flat.x, cz - m.w.flat.z) + (q() - 0.5) * 0.3);
+        m.w.talk(i, group.length, period);
+      });
+    }
+  }
+
+  /** Each frame: send strollers on their next walk and move the queues along. */
+  direct(dt: number) {
+    const q = this.q;
+    for (const s of this.strollers) {
+      if (s.f.w.busy() || (s.t -= dt) > 0) continue;
+      const p = this.plan(s.f.w.flat.x, s.f.w.flat.z);
+      // The wait before the walk after this one starts counting when they arrive.
+      if (p) { s.f.w.walkTo(p, { face: q() * 6.283 }); s.t = 5 + q() * 16; } else s.t = 4;
+    }
+    for (const Q of this.queues) {
+      for (const m of Q.moves) if (m.t > 0 && (m.t -= dt) <= 0) m.f.w.walkTo([m.to], { face: Q.yaw, polite: true });
+      if (Q.phase === 'wait') {
+        if ((Q.t -= dt) > 0 || Q.line.some((f) => f.w.busy())) continue;
+        // Served. The one at the front steps out and walks off; the others shuffle up, each a
+        // moment after the one in front of them.
+        const f = Q.line.shift()!;
+        Q.away = f;
+        f.w.walkTo([Q.out, Q.rest]);
+        Q.moves = Q.line.map((g, i) => ({ f: g, to: Q.spots[i], t: 1.2 + i * 0.7 }));
+        Q.phase = 'away';
+        Q.t = 6 + q() * 10;
+      } else if (Q.phase === 'away') {
+        if (Q.away!.w.busy() || (Q.t -= dt) > 0) continue;
+        Q.away!.w.walkTo([Q.spots[Q.line.length]], { face: Q.yaw, polite: true });
+        Q.line.push(Q.away!);
+        Q.phase = 'back';
+      } else if (!Q.away!.w.busy()) {
+        Q.phase = 'wait';
+        Q.t = 5 + q() * 10;
+      }
+    }
+  }
+
 
   /** Your own ship on the pad, with the way back aboard. */
   parkShip(x: number, z: number, yaw: number) {
@@ -880,6 +1121,7 @@ class Kit {
     }
     if (!boxes.length) this.bounce = false;
     this.neon();
+    this.behave();
     // A place in the middle of a room may be under a parked ship or a table: nudge it to open floor.
     // It also wants elbow room, so you do not arrive nose to nose with someone.
     const roomy = (x: number, z: number) => {
@@ -949,6 +1191,34 @@ class Kit {
       if (!BAKING) bounce.load(SAVED!);
     }
     let frame = 0;
+    // What each person can see of the others (see Around in skinned.ts). There are at most a
+    // couple of hundred people and only the ones walking look, so a plain pass over everyone
+    // with a quick box test is cheaper than keeping a grid up to date: a few thousand
+    // subtractions a frame.
+    const n = this.folk.length;
+    const X = new Float32Array(n), Z = new Float32Array(n), YAW = new Float32Array(n), MOVING = new Uint8Array(n);
+    const around: Around = {
+      px: 0, pz: 0, a: Infinity, l: 0,
+      free: (x, z) => this.free(x, z),
+      ahead: (x, z, yaw) => {
+        const s = Math.sin(yaw), c = Math.cos(yaw);
+        let best = Infinity, bl = 0;
+        for (let i = -1; i < n; i++) {
+          // -1 is you.
+          const dx = (i < 0 ? around.px : X[i]) - x, dz = (i < 0 ? around.pz : Z[i]) - z;
+          if (dx > 3 || dx < -3 || dz > 3 || dz < -3 || dx * dx + dz * dz < 1e-6) continue;
+          const a = dx * s + dz * c;
+          if (a < 0.05 || a >= best) continue;
+          const l = dx * c - dz * s;
+          if (l > 1 || l < -1) continue;
+          // Someone walking the same way a little ahead is not in the way.
+          if (i >= 0 && MOVING[i] && a > 1 && Math.cos(YAW[i] - yaw) > 0.5) continue;
+          best = a; bl = l;
+        }
+        around.a = best; around.l = bl;
+      },
+    };
+    if (debugging) (globalThis as unknown as { __folk: () => unknown }).__folk = () => this.folk.map((f) => ({ x: f.w.flat.x, z: f.w.flat.z, yaw: f.w.flat.yaw, state: f.w.state(), job: f.job ?? (f.stand ? 'stand' : 'pace') }));
     return {
       id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR, bounce,
       free: (x, z) => this.free(x, z),
@@ -965,12 +1235,21 @@ class Kit {
         // People near you animate every frame; further off, every 2nd, 4th or 8th frame, catching
         // up on the time they skipped. Only those close by cast shadows.
         frame++;
+        // Where everyone is this frame, for looking where they are going. In a drum your place
+        // on the floor is how far round the hull you are.
+        if (this.curveR) { around.px = Math.atan2(cam.x, -cam.y) * this.curveR; around.pz = cam.z; }
+        else { around.px = cam.x; around.pz = cam.z; }
+        for (let i = 0; i < n; i++) {
+          const w = this.folk[i].w, st = w.state();
+          X[i] = w.flat.x; Z[i] = w.flat.z; YAW[i] = w.flat.yaw; MOVING[i] = st === 'walk' || st === 'turn' ? 1 : 0;
+        }
+        this.direct(dt);
         for (const f of this.folk) {
           f.acc += dt;
           const d2 = f.w.group.position.distanceToSquared(cam);
           const every = d2 < 400 ? 1 : d2 < 2025 ? 2 : d2 < 8100 ? 4 : 8;
           f.w.body.castShadow = d2 < 625;
-          if ((frame + f.i) % every === 0) { f.w.update(f.acc); f.acc = 0; }
+          if ((frame + f.i) % every === 0) { f.w.update(f.acc, around); f.acc = 0; }
         }
         for (const a of this.anims) a(t, dt);
         this.stars?.position.copy(cam);
@@ -1047,6 +1326,8 @@ function tycho(): Interior {
   k.lamp(12, 3.5, 65, 0xff9a5a, 60, 18);
   k.lamp(20, 3.5, 60, 0x6fa8ff, 40, 14);
   k.crowd(5, 58, 23, 72, 9);
+  // People wait their turn at the bar, between two of the stools.
+  k.counters.push({ x: 17.6, z: 59.45, yaw: 0 });
   k.placard(5.5, 60, Math.PI / 2, 'Blauwe Blome',
     'The bar everyone on Tycho ends up in. Engineers off shift, ship crews waiting on a refit, and the occasional OPA officer pretending to be neither. The whiskey is grown in a vat and nobody mentions it.');
 
@@ -1185,6 +1466,7 @@ function ceres(): Interior {
     k.sign(label, x, 2.45, z - 0.72, Math.PI, 3.4, 0.5, neon, 'rgba(8,6,4,0.8)');
     for (let i = 0; i < 5; i++) k.box(0.4, 0.3, 0.4, [0xc9a23a, 0x8a3a2a, 0x4a7a4a, 0xdfe8f2][i % 4], x - 1.3 + i * 0.65, z, { y: 1, solid: false });
     k.person(x + (k.r() - 0.5), z - 1.3, 0, true);
+    k.counters.push({ x, z: z + 1.3, yaw: 0 });
   }
   k.cyl(2.2, 0.7, 0x4a443c, 0, 70);
   const trunk = k.cyl(0.18, 3.6, 0x4a3a2a, 0, 70, { y: 0.7, solid: false });

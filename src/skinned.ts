@@ -19,6 +19,7 @@ let file: GLTF | null = null;
 /** With ?debug in the address, walkers report where they are and what they're doing (for tests). */
 const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
 const debugList: { name: string; get: () => { x: number; z: number; yaw: number; state: string; leg: number } }[] = [];
+export const debugging = DEBUG;
 if (DEBUG) (globalThis as unknown as { __walkers: typeof debugList }).__walkers = debugList;
 
 // The body arrives as one mesh per material, named `part` or `part@tag` (see person.py). The part
@@ -172,11 +173,48 @@ const FADE = 0.5;
 /** Gap between the two lanes a walker paces, the share of turns that start from a standstill,
  *  and how much they slow down in the turn. */
 const LANE = 0.9, STOP_P = 0.4, TURN_PACE = 0.65;
+/** Getting round each other. A walker looks LOOK metres ahead; anything nearer its line than GAP
+ *  is in the way, and it drifts sideways (up to SIDE metres, at DRIFT m/s) to pass. If the thing
+ *  is still dead ahead inside NEAR metres it slows, and stops at STOP metres. */
+const LOOK = 2.6, GAP = 0.75, SIDE = 0.7, DRIFT = 0.9, NEAR = 1.15, STOP = 0.55;
+/** How fast someone following a route swings round to their next point (radians a second). */
+const SWING = 2.4;
+const wrapA = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+
+/** What a person can sense of the place around them. The interior fills this in and hands it to
+ *  everyone on each update (see Kit.tick in interior.ts). All positions are floor coordinates. */
+export interface Around {
+  /** Where you are standing. */
+  px: number;
+  pz: number;
+  /** Find the nearest person (or you) in the way of someone at (x, z) heading `yaw`. The answer
+   *  lands in `a` (metres ahead; Infinity if the way is clear) and `l` (metres to their left). */
+  ahead(x: number, z: number, yaw: number): void;
+  a: number;
+  l: number;
+  free(x: number, z: number): boolean;
+}
 
 export interface Walker {
   group: THREE.Group;
   body: THREE.SkinnedMesh;
-  update(dt: number): void;
+  update(dt: number, around?: Around): void;
+  /** Where they are on the floor and which way they face. In a drum the model itself is wrapped
+   *  round the hull, so this is the only place the flat position is kept. */
+  flat: { x: number; z: number; yaw: number };
+  /** What they are doing: 'stand', 'walk', 'turn', 'stop' (slowing to a halt) or 'yield' (waiting
+   *  for someone to get out of the way). */
+  state(): string;
+  /** True from being sent somewhere until they have arrived and stopped. */
+  busy(): boolean;
+  /** Walk through these points and stop on the last, then turn to `face`. `polite` people only
+   *  slow down for others and never step sideways (a queue). `done` is called on arrival. */
+  walkTo(path: { x: number; z: number }[], o?: { face?: number; polite?: boolean; done?: () => void }): void;
+  /** Pick them up and put them down somewhere else, standing. */
+  setPose(x: number, z: number, yaw: number): void;
+  /** Join a conversation: `slot` of `of` people who take turns speaking, one round every `period` seconds. */
+  talk(slot: number, of: number, period: number): void;
 }
 
 export interface WalkerOpts {
@@ -251,6 +289,22 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   }
   group.position.set(x, 0, z);
   group.rotation.y = yaw;
+  const flat = { x, z, yaw };
+
+  // Two extra joints, one under the neck and one under the head, that nothing in the clips
+  // touches. Turning them turns the head on top of whatever the clip is doing, with no need to
+  // undo it afterwards. (The clips only turn bones, so a bone's position is ours to move.)
+  const joint = (name: string) => {
+    const b = root.getObjectByName(name);
+    if (!b || !b.parent) return null;
+    const j = new THREE.Object3D();
+    j.position.copy(b.position);
+    b.parent.add(j);
+    j.add(b);
+    b.position.set(0, 0, 0);
+    return j;
+  };
+  const neckTurn = joint('neck'), headTurn = joint('head');
 
   const mixer = new THREE.AnimationMixer(root);
   const clip = (n: string) => mixer.clipAction(THREE.AnimationClip.findByName(file!.animations, n)!);
@@ -265,19 +319,16 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
   idle.play();
   idle.time = r() * idle.getClip().duration;
 
+  // ---- walking. Everyone can walk; who does, and where, is decided below and by the interior.
   const beat = o.beat ?? 0;
-  if (beat <= 0) return { group, body, update: (dt) => mixer.update(dt) };
-
-  // Pace a loop of two lanes: walk to the far end, U-turn in a small arc onto the next lane,
-  // walk back, U-turn again. Now and then stop at the end, stand a while, then step off into the turn.
-  const lane = (o.lane ?? 1) * LANE;
-  const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  const side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); // turning +rotation.y swings towards here
-  const start = new THREE.Vector3(x, 0, z);
-  const turnR = Math.abs(lane) / 2;
-  const turnSpin = Math.sign(lane);
-  let leg = 0, turned = 0, wait = r() * 3, pendingTurn = false, willStop = r() < STOP_P;
-  let state: 'stand' | 'turn' | 'walk' | 'stop' = 'stand';
+  type State = 'stand' | 'turn' | 'walk' | 'stop' | 'yield';
+  let state: State = 'stand';
+  /** Once someone has walked, their model follows `pos`; until then it stays where it was put. */
+  let mobile = beat > 0;
+  /** The line they are walking, before any sidestep (`off`, metres to their left). */
+  const pos = new THREE.Vector3(x, 0, z);
+  let off = 0, slow = 1, held = 0;
+  const patience = 2.5 + q() * 2.5;
   const pace = (f: number) => { walk.setEffectiveTimeScale(f / period); lope.setEffectiveTimeScale(f / period); };
   const go = () => {
     // Fade from standing into the stride. Both gait clips restart together so they stay in step.
@@ -288,53 +339,231 @@ export function buildWalker(r: Rand, x: number, z: number, yaw: number, o: Walke
     idle.fadeOut(FADE);
     state = 'walk';
   };
-  const halt = () => {
+  const halt = (to: State = 'stop') => {
     walk.fadeOut(FADE); lope.fadeOut(FADE);
     idle.enabled = true; idle.weight = 1;
     idle.fadeIn(FADE);
-    state = 'stop';
+    state = to;
   };
-  const startTurn = () => { state = 'turn'; turned = 0; pace(TURN_PACE); };
   // How far you travel while the stride fades out, so the stop lands on the end mark.
   const stopDist = (speed * FADE) / 2;
+  const striding = () => Math.min(1, walk.getEffectiveWeight() + lope.getEffectiveWeight());
+  const advance = (step: number) => {
+    pos.x += Math.sin(group.rotation.y) * step;
+    pos.z += Math.cos(group.rotation.y) * step;
+  };
+
+  /** Look ahead. Sets `slow` (1 = carry on, 0 = stop) and, if `sidestep`, drifts to one side of
+   *  whoever is in the way: away from them, or to the right if they are dead ahead, so two people
+   *  meeting head-on each go to their own right and pass. The drift is only as fast as the legs
+   *  are moving, so nobody slides sideways while standing. */
+  const sense = (dt: number, a: Around | undefined, g: number, sidestep: boolean) => {
+    slow = 1;
+    let want = 0;
+    if (a) {
+      const yw = group.rotation.y;
+      a.ahead(group.position.x, group.position.z, yw);
+      if (a.a < LOOK) {
+        const l = a.l, al = Math.abs(l);
+        want = off;
+        if (sidestep && al < GAP) {
+          want = clamp(off + (l > 0.04 ? -1 : l < -0.04 ? 1 : -1) * (GAP - al), -SIDE, SIDE);
+          // Not into a wall or a table.
+          if (!a.free(pos.x + Math.cos(yw) * want, pos.z - Math.sin(yw) * want)) want = off;
+        }
+        if (a.a < NEAR && al < 0.5) slow = clamp((a.a - STOP) / (NEAR - STOP), 0, 1);
+      }
+    }
+    const d = DRIFT * g * dt;
+    off += clamp(want - off, -d, d);
+  };
+
+  // ---- pacing a loop of two lanes: walk to the far end, U-turn in a small arc onto the next
+  // lane, walk back, U-turn again. Now and then stop at the end, stand a while, then step off
+  // into the turn. Someone in the way: go round; if that fails, wait; if that fails, turn back.
+  const lane = (o.lane ?? 1) * LANE;
+  const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const side = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); // turning +rotation.y swings towards here
+  const start = new THREE.Vector3(x, 0, z);
+  const turnR = Math.abs(lane) / 2;
+  const turnSpin = Math.sign(lane);
+  let leg = 0, turned = 0, wait = 0, pendingTurn = false, willStop = false;
+  if (beat > 0) { wait = r() * 3; willStop = r() < STOP_P; }
+  const startTurn = () => { state = 'turn'; turned = 0; pace(TURN_PACE); };
   const v = new THREE.Vector3();
-  const along = () => v.copy(group.position).sub(start).dot(fwd);
+  const along = () => v.copy(pos).sub(start).dot(fwd);
   const left = () => (leg === 0 ? beat - along() : along());
 
-  const update = (dt: number) => {
-    mixer.update(dt);
+  const lanes = (dt: number, a?: Around) => {
     // Move only as much as the legs are walking: no gliding while the stride fades in or out.
-    const g = Math.min(1, walk.getEffectiveWeight() + lope.getEffectiveWeight());
-    const step = speed * g * dt * (state === 'turn' ? TURN_PACE : 1);
-    if (state !== 'stand') {
-      group.position.x += Math.sin(group.rotation.y) * step;
-      group.position.z += Math.cos(group.rotation.y) * step;
-    }
+    const g = striding();
+    if (state === 'walk' || state === 'yield') sense(dt, a, g, state === 'walk');
+    else if (state === 'turn') { sense(dt, a, g, false); slow = Math.max(0.4, slow); }
+    const f = state === 'turn' ? TURN_PACE * slow : state === 'walk' || state === 'yield' ? slow : 1;
+    const step = speed * g * dt * f;
+    if (state !== 'stand') advance(step);
     if (state === 'walk') {
-      // Begin the turn (or the stop) early enough that the arc ends on the line's end mark.
-      if (left() <= turnR + (willStop ? stopDist : 0)) { if (willStop) halt(); else startTurn(); }
+      if (slow < 0.25) { halt('yield'); held = 0; }
+      else {
+        pace(Math.max(0.35, slow));
+        // Begin the turn (or the stop) early enough that the arc ends on the line's end mark.
+        if (left() <= turnR + (willStop ? stopDist : 0)) { if (willStop) halt(); else startTurn(); }
+      }
+    } else if (state === 'yield') {
+      held += dt;
+      if (slow > 0.9 && held > 0.6) go();
+      else if (held > patience) { go(); startTurn(); }
     } else if (state === 'stop') {
       if (g < 0.01) { state = 'stand'; wait = 1.5 + r() * 3.5; pendingTurn = true; }
     } else if (state === 'stand') {
       if ((wait -= dt) <= 0) { go(); if (pendingTurn) startTurn(); pendingTurn = false; }
     } else {
-      const a = Math.min(Math.PI - turned, step / turnR);
-      group.rotation.y += a * turnSpin;
-      turned += a;
+      pace(TURN_PACE * slow);
+      const t = Math.min(Math.PI - turned, step / turnR);
+      group.rotation.y += t * turnSpin;
+      turned += t;
       if (turned >= Math.PI - 1e-4) {
         // Square up on the new lane so small errors never add up.
         leg ^= 1;
         group.rotation.y = yaw + leg * Math.PI;
         const a0 = along();
-        group.position.copy(start).addScaledVector(fwd, a0).addScaledVector(side, leg ? lane : 0);
+        pos.copy(start).addScaledVector(fwd, a0).addScaledVector(side, leg ? lane : 0);
+        // The sidestep was measured to the left of the old heading; keep it where it is.
+        off = -off;
         pace(1);
         willStop = r() < STOP_P;
         state = 'walk';
       }
     }
   };
-  if (DEBUG) debugList.push({ name: `w${debugList.length}`, get: () => ({ x: group.position.x, z: group.position.z, yaw: group.rotation.y, state, leg }) });
+
+  // ---- following a route: the interior sends some people from place to place (through doors,
+  // up to a stall, forward in a queue). They swing round towards each point in turn, slowing in
+  // the swing, and stop on the last.
+  let path: { x: number; z: number }[] | null = null, pi = 0;
+  let face: number | null = null, polite = false, done: (() => void) | undefined;
+  const arrive = () => {
+    // By now the stride has faded (or is fading) into standing.
+    state = 'stand';
+    path = null;
+    const cb = done;
+    done = undefined;
+    cb?.();
+  };
+  const route = (dt: number, a?: Around) => {
+    const g = striding();
+    if (state === 'walk' || state === 'yield') sense(dt, a, g, !polite && state === 'walk');
+    if (state === 'walk' && path) {
+      const p = path[pi], dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz), last = pi === path.length - 1;
+      if (d < (last ? stopDist + 0.04 : 0.5)) {
+        if (last) halt(); else pi++;
+        return;
+      }
+      const err = wrapA(Math.atan2(dx, dz) - group.rotation.y);
+      group.rotation.y += clamp(err, -SWING * dt, SWING * dt);
+      if (slow < 0.25) { halt('yield'); held = 0; return; }
+      const f = Math.max(0.3, slow * Math.max(0.3, Math.cos(err)));
+      pace(f);
+      advance(speed * g * dt * f);
+    } else if (state === 'stop') {
+      advance(speed * g * dt);
+      if (g < 0.01) arrive();
+    } else if (state === 'yield') {
+      held += dt;
+      if (slow > 0.9 && held > 0.6) go();
+      // Still blocked: this will do. Stop here.
+      else if (held > patience) arrive();
+    } else if (face !== null) {
+      const err = wrapA(face - group.rotation.y);
+      group.rotation.y += clamp(err, -1.6 * dt, 1.6 * dt);
+      if (Math.abs(err) < 0.01) face = null;
+    }
+  };
+
+  // ---- the head: a glance at you now and then, and the nods and small gestures of talking.
+  let gaze = 0, gazeOn = false, gazeT = q() * 4;
+  let chat: { slot: number; of: number; period: number; t: number; e: number; ph: number; spine: THREE.Object3D | null; upper: THREE.Object3D | null; fore: THREE.Object3D | null } | null = null;
+  const manner = (dt: number, a?: Around) => {
+    if (!headTurn || !neckTurn) return;
+    let want = 0, nod = 0, wag = 0;
+    if (a) {
+      const dx = a.px - flat.x, dz = a.pz - flat.z, d2 = dx * dx + dz * dz;
+      if (d2 < 36) {
+        // Which way you are from where they face. Nobody looks over their shoulder.
+        const b = wrapA(Math.atan2(dx, dz) - flat.yaw);
+        if ((gazeT -= dt) <= 0) {
+          gazeOn = !gazeOn && d2 < 25 && Math.abs(b) < 1.8 && q() < (chat ? 0.3 : state === 'stand' ? 0.7 : 0.45);
+          gazeT = gazeOn ? 1.2 + q() * 2.8 : 1.5 + q() * 4;
+        }
+        if (gazeOn && Math.abs(b) < 2.1) want = clamp(b, -1.1, 1.1); else gazeOn = false;
+      } else gazeOn = false;
+    }
+    if (chat) {
+      const c = chat, t = (c.t += dt);
+      // Whose turn it is to speak goes round the group. The speaker moves more: the head bobs
+      // with the words and a hand comes up; the others nod now and then.
+      const turn = (t / c.period + c.slot / c.of) % 1 < 1 / c.of;
+      c.e += ((turn ? 1 : 0) - c.e) * (1 - Math.exp(-dt * 3));
+      const e = c.e;
+      nod = e * (0.05 * Math.sin(t * 5.3 + c.ph) + 0.03 * Math.sin(t * 2.1)) + (1 - e) * 0.09 * Math.max(0, Math.sin(t * 0.9 + c.ph)) ** 3 * Math.sin(t * 6.5);
+      wag = e * 0.1 * Math.sin(t * 1.3 + c.ph);
+      // Weight shifting from foot to foot.
+      c.spine?.rotation.set(0, 0.06 * Math.sin(t * 0.45 + c.ph), 0.025 * Math.sin(t * 0.31 + c.ph * 2));
+      if (c.fore && c.upper) {
+        const lift = e * Math.max(0, Math.sin(t * 0.8 + c.ph)) * (0.7 + 0.25 * Math.sin(t * 3.1 + c.ph));
+        c.fore.rotation.x = lift;
+        c.upper.rotation.x = -lift * 0.3;
+      }
+    }
+    gaze += (want - gaze) * (1 - Math.exp(-dt * 5));
+    neckTurn.rotation.y = (gaze + wag) * 0.35;
+    headTurn.rotation.set(nod, (gaze + wag) * 0.65, 0);
+  };
+
+  const update = (dt: number, a?: Around) => {
+    mixer.update(dt);
+    if (beat > 0) lanes(dt, a);
+    else if (mobile) route(dt, a);
+    if (mobile) {
+      const yw = group.rotation.y;
+      group.position.set(pos.x + Math.cos(yw) * off, 0, pos.z - Math.sin(yw) * off);
+      flat.x = group.position.x; flat.z = group.position.z; flat.yaw = yw;
+    }
+    manner(dt, a);
+  };
+  let listed = false;
+  const list = () => {
+    if (!DEBUG || listed) return;
+    listed = true;
+    debugList.push({ name: `${beat > 0 ? 'w' : 'r'}${debugList.length}`, get: () => ({ x: group.position.x, z: group.position.z, yaw: group.rotation.y, state, leg }) });
+  };
+  if (beat > 0) list();
   // Start some already walking.
-  if (r() < 0.6) go();
-  return { group, body, update };
+  if (beat > 0 && r() < 0.6) go();
+  return {
+    group, body, update, flat,
+    state: () => state,
+    busy: () => path !== null,
+    walkTo: (p, opt = {}) => {
+      if (beat > 0 || !p.length) return;
+      mobile = true;
+      list();
+      path = p; pi = 0;
+      face = opt.face ?? null; polite = !!opt.polite; done = opt.done;
+      if (state !== 'walk') go();
+    },
+    setPose: (px, pz, pyaw) => {
+      pos.set(px, 0, pz);
+      off = 0;
+      group.position.copy(pos);
+      group.rotation.y = pyaw;
+      flat.x = px; flat.z = pz; flat.yaw = pyaw;
+    },
+    talk: (slot, of, per) => {
+      // Most people talk with a hand, one or the other.
+      const hand = q() < 0.75 ? (q() < 0.6 ? 'R' : 'L') : '';
+      chat = { slot, of, period: per, t: q() * 20, e: 0, ph: q() * 6.28, spine: joint('spine'), upper: hand ? joint('upperarm_' + hand) : null, fore: hand ? joint('forearm_' + hand) : null };
+      idle.timeScale = 0.8 + q() * 0.4;
+    },
+  };
 }
