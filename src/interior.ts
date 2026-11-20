@@ -10,9 +10,22 @@ import { buildPerson } from './people';
 import { buildWalker, debugging, peopleReady, type Around, type Walker } from './skinned';
 import { buildConcourse, terraceFront } from './concourse';
 import { BAKING, Bounce, fits, type ProbeBox } from './probes';
+import type { Spin } from './spin';
 
 /** How much each station's spin gravity turns a walk into the Belter lope (0 walk, 1 full lope). */
 const LOPE: Record<string, number> = { ceres: 0.6, tycho: 0.5, medina: 0.5, ganymede: 0.8 };
+/**
+ * How each spun station turns (see spin.ts): radius to the floor, gravity on it, and which way
+ * on the floor plan the floor is moving. Lighter gravity here goes with more lope above.
+ * Ceres really is 470 km to the floor, which nobody on foot could feel, so it is felt as a
+ * 1.5 km wheel. Its Concourse and Tycho's ring corridor both run with the spin (+z); Medina's
+ * drum goes round in +x. Ganymede is a moon: its gravity is real, so it is not here.
+ */
+const SPIN: Record<string, Spin> = {
+  ceres: { R: 470_000, g: 0.3, feelR: 1500, sx: 0, sz: 1 },
+  tycho: { R: 250, g: 0.35, feelR: 250, sx: 0, sz: 1 },
+  medina: { R: 250, g: 0.35, feelR: 250, sx: 1, sz: 0 },
+};
 
 export interface Point { x: number; z: number; r: number; title: string; text: string; kind: 'info' | 'exit' }
 export interface Place { name: string; x: number; z: number; yaw: number }
@@ -26,6 +39,8 @@ export interface Interior {
   points: Point[];
   /** Set when the floor is the inside of a spinning drum of this radius. */
   curveR?: number;
+  /** Set when gravity here comes from the place turning (see spin.ts). */
+  spin?: Spin;
   free(x: number, z: number): boolean;
   roomAt(x: number, z: number): string;
   /** Push a point out of anyone standing or walking there (flat interiors only). */
@@ -1253,7 +1268,7 @@ class Kit {
     };
     if (debugging) (globalThis as unknown as { __folk: () => unknown }).__folk = () => this.folk.map((f) => ({ x: f.w.flat.x, z: f.w.flat.z, yaw: f.w.flat.yaw, state: f.w.state(), glance: f.w.glance(), job: f.job ?? (f.stand ? 'stand' : 'pace') }));
     return {
-      id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR, bounce,
+      id: this.id, name: this.name, blurb: this.blurb, scene: this.scene, spawn, places: this.places, points: this.points, curveR: this.curveR, spin: SPIN[this.id], bounce,
       free: (x, z) => this.free(x, z),
       roomAt: (x, z) => this.roomAt(x, z),
       clearOfPeople: (x, z, r) => {
@@ -1345,7 +1360,7 @@ function tycho(): Interior {
   k.lamp(0, 3.3, 78, 0xf2f8ff, 18, 16);
   k.lamp(0, 3.3, 91, 0xf2f8ff, 18, 16);
   k.placard(2.4, 74.5, -Math.PI / 2, 'Spin gravity',
-    'The floor under you is the inside of a ring. It turns, and you are pressed outward against it; "down" is away from the hub. Pour a drink and the stream bends sideways as it falls. Belters learn to pour off-centre before they learn to walk.');
+    'The floor under you is the inside of a ring. It turns, and you are pressed outward against it; "down" is away from the hub. Pour a drink and the stream bends sideways as it falls. Belters learn to pour off-centre before they learn to walk. The corridor outside runs with the spin: run along it the way the ring turns and you weigh more, run the other way and you weigh less and your strides stretch out. The readout by the clock shows it.');
   k.crowd(-2, 54, 2, 94, 4);
 
   // The bar.
@@ -1632,7 +1647,7 @@ function ceres(): Interior {
     k.placard(3.2, CZ0 + 5, Math.PI, 'The Concourse',
       'Most of Ceres does not live in the docks or the market. It lives on streets like this one: homes stacked in terraces up the curve of the rock, shops underneath, and a ceiling of light panels made up to look like a sky nobody here has ever stood under. The plants are real and are counted in the air budget.');
     k.placard(-3.2, CZ0 + 44, Math.PI, 'Living on the curve',
-      'The street is level because it follows the spin; the terraces climb because the wall does. Homes higher up the curve are a little lighter underfoot and a little cheaper. Belters raised here grow tall and slight, and find a planet\'s full gravity hard to bear.');
+      'The street is level because it follows the spin; the terraces climb because the wall does. Homes higher up the curve are a little lighter underfoot and a little cheaper. Belters raised here grow tall and slight, and find a planet\'s full gravity hard to bear. Run along the street away from the entrance, the way the rock turns, and you are a little heavier; run back and you are a little lighter.');
     // Daylight in here, the dark of the tunnels everywhere else: blend as you walk through the door.
     const dayFog = new THREE.Color(0xbfd0df), daySky = new THREE.Color(0xe8f1fb), dayKey = new THREE.Color(0xfff6e8);
     let base: { fog: THREE.Color; dens: number; hemi: number; sky: THREE.Color; key: number; keyC: THREE.Color } | null = null;
@@ -1746,7 +1761,7 @@ function medina(): Interior {
   k.points.push({ x: 0, z: -444, r: 3.5, title: 'Lift to the docks', text: 'Your ship is berthed at the bow. Press E to ride up the spoke and undock.', kind: 'exit' });
 
   k.placard(8, -436, Math.PI, 'The drum',
-    'You are standing on the inside of a cylinder about half a kilometre across. It turns, and the turning holds you to the floor. Look up: that is not sky, it is more ground, with people on it looking up at you. The bright line along the axis is the sun.');
+    'You are standing on the inside of a cylinder about half a kilometre across. It turns, and the turning holds you to the floor. Look up: that is not sky, it is more ground, with people on it looking up at you. The bright line along the axis is the sun. The floor is going round at about thirty metres a second. Run round the drum with it and you weigh more than double; run hard against it and you almost cancel the turning, weigh next to nothing and cross the fields in long, slow bounds. Run along the drum instead and each stride lands a little to one side.');
   k.placard(-8, -436, Math.PI, 'From Nauvoo to Medina',
     'Built at Tycho as the Nauvoo, a ship meant to carry a Mormon colony to another star across a century of travel: hence the farmland. Commandeered before it ever left, refitted as the warship Behemoth, flown through the Ring, and finally parked here as Medina Station.');
   k.placard(12, -410, -Math.PI / 2, 'Thirteen hundred doors',

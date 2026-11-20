@@ -14,6 +14,7 @@ import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel
 import { buildInterior, type Interior, type Point } from './interior';
 import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
+import { SPIN_ON, feel } from './spin';
 import { createLook } from './look';
 import { addLightning } from './lightning';
 import { createTour } from './tour';
@@ -931,7 +932,9 @@ const camQ = new THREE.Quaternion();
 // On foot inside a station.
 let walk: Interior | null = null;
 let nearPoint: Point | null = null;
-const walker = { x: 0, z: 0, yaw: 0, pitch: 0, bob: 0, vx: 0, vz: 0 };
+// (`weight` is how heavy you are just now against standing still, `eye` how high your eyes are
+// and `drift` how fast your strides are carrying you spinward: all three come from spin.ts.)
+const walker = { x: 0, z: 0, yaw: 0, pitch: 0, bob: 0, vx: 0, vz: 0, weight: 1, eye: 1.7, drift: 0 };
 let lodBusy = false;
 
 const loadingEl = $('loading');
@@ -1514,7 +1517,15 @@ function walkStep(dt: number) {
     tx = (-sin * f + cos * r) * v;
     tz = (-cos * f - sin * r) * v;
   }
-  const ease = 1 - Math.exp(-dt * (tx || tz ? 9 : 12));
+  // Where gravity is spin, how you are moving changes how much you weigh (see spin.ts). The
+  // weight follows over a third of a second or so, as your legs find out.
+  const sp = SPIN_ON ? it.spin : undefined;
+  const fl = sp ? feel(sp, walker.vx, walker.vz) : null;
+  walker.weight += ((fl ? fl.weight : 1) - walker.weight) * (1 - Math.exp(-dt * 3));
+  walker.drift = fl ? fl.drift : 0;
+  // Light feet grip less, so you are slower to get going, to turn and to stop; heavy ones bite.
+  const grip = clamp(Math.sqrt(walker.weight), 0.55, 1.2);
+  const ease = 1 - Math.exp(-dt * (tx || tz ? 9 : 12) * grip);
   walker.vx += (tx - walker.vx) * ease;
   walker.vz += (tz - walker.vz) * ease;
   const speed = Math.hypot(walker.vx, walker.vz);
@@ -1526,12 +1537,28 @@ function walkStep(dt: number) {
     if (it.free(walker.x + dx, walker.z)) walker.x += dx; else walker.vx *= 0.5;
     if (it.free(walker.x, walker.z + dz)) walker.z += dz; else walker.vz *= 0.5;
   }
+  // Each stride leaves the floor for a moment and comes down a little spinward. It is a nudge
+  // to where you land, not a push on your speed, and a wall simply stops it.
+  if (sp && walker.drift > 0) {
+    const dx = sp.sx * walker.drift * dt, dz = sp.sz * walker.drift * dt;
+    if (it.free(walker.x + dx, walker.z + dz)) { walker.x += dx; walker.z += dz; }
+  }
   // People are solid too: step round them rather than through.
   const [px, pz] = it.clearOfPeople(walker.x, walker.z, 0.3);
   if (it.free(px, pz)) { walker.x = px; walker.z = pz; }
   // The head bobs with each stride, more when running, not at all when standing.
-  walker.bob += dt * speed * (run ? 1.3 : 1.9);
-  const eye = 1.7 + Math.sin(walker.bob) * 0.03 * Math.min(1, speed / 4);
+  let eye: number;
+  if (fl) {
+    // In spin gravity each stride is a slow hop: longer and floatier the lighter you are just
+    // now, short and quick when you are heavy. You also stand a little taller when light and
+    // sink a little into your knees when heavy.
+    if (speed > 0) walker.bob += (dt * Math.PI * 2) / fl.step;
+    eye = 1.7 + 0.05 * clamp(1 - walker.weight, -1, 1) - Math.cos(walker.bob) * fl.rise * 0.5;
+  } else {
+    walker.bob += dt * speed * (run ? 1.3 : 1.9);
+    eye = 1.7 + Math.sin(walker.bob) * 0.03 * Math.min(1, speed / 4);
+  }
+  walker.eye = eye;
   const q = walkCam.quaternion.setFromAxisAngle(_a.set(0, 1, 0), walker.yaw).multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), walker.pitch));
   if (it.curveR) {
     const R = it.curveR, th = walker.x / R;
@@ -1680,7 +1707,9 @@ function updateHud(dt: number) {
     $('loc-near').textContent = walk.roomAt(walker.x, walker.z);
     // Station time runs on your own clock, so a late-night visit finds the place on its night shift.
     const now = new Date();
-    $('loc-sub').textContent = `On foot · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time`;
+    // Where gravity is spin, show what you weigh this moment: it moves as you run with or against the turn.
+    const g = SPIN_ON && walk.spin ? ` · ${(walk.spin.g * walker.weight).toFixed(2)} g` : '';
+    $('loc-sub').textContent = `On foot${g} · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time`;
     const pt = nearPoint as Point | null;
     $('card').style.display = pt ? 'block' : 'none';
     if (pt) {
@@ -1743,7 +1772,7 @@ if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
 if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
-if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null }) });
+if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
 // The light probes too: how many are left to fill, and a switch for before-and-after tests.
 if (FRAMES) Object.defineProperty(globalThis, '__bounce', { get: () => walk?.bounce });
 // For tools/bake-probes.ts: the finished probes of the place you are in, as a file.
