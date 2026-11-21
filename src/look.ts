@@ -253,7 +253,9 @@ export function createLook(bloom: UnrealBloomPass): Look {
       rayK += (want - rayK) * (1 - Math.exp(-dt * 6));
       lens.uniforms.rays.value = this.enabled ? rayK : 0;
       rays.enabled = this.enabled && rayK > 0.002;
-      lens.uniforms.amount.value = sun ? 0.3 : 0.12;
+      // Ghosts, halo and starburst come from whatever is brightest, so a bright planet raised them too. Only the star
+      // should: they follow the star being in view (as the rays do), and stay faint otherwise.
+      lens.uniforms.amount.value = sun ? 0.03 + 0.27 * Math.min(1, rayK * 1.5) : 0.03;
     },
   };
 }
