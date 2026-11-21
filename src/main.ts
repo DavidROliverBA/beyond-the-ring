@@ -18,6 +18,8 @@ import { SPIN_ON, feel } from './spin';
 import { createLook } from './look';
 import { addLightning } from './lightning';
 import { createTour } from './tour';
+import { FLIP_SECS, planTrip } from './course';
+import { createMap } from './starmap';
 import { makeSky } from './sky';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
@@ -262,6 +264,8 @@ interface Thing {
   solid: boolean;
   nav: boolean;
   indent: boolean;
+  /** The body this one orbits, for the map. */
+  parent?: string;
   label?: HTMLDivElement;
   normal?: V3;
   to?: { space: string; gate: string };
@@ -654,7 +658,7 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
     if (b.orbit > 0 && b.kind !== 'ship') group.add(orbitLine(base, b.orbit, b.lift ?? 0, b.parent ? 0.14 : 0.3));
     const th: Thing = {
       id: b.id, name: b.name, sub: b.sub, desc: b.desc, kind: b.kind, pos, radius: b.radius,
-      range: b.range ?? Infinity, solid: true, nav: true, indent: !!b.parent, dock: b.dock,
+      range: b.range ?? Infinity, solid: true, nav: true, indent: !!b.parent, parent: b.parent, dock: b.dock,
     };
     things.push(th);
     addLabel({ labels }, th, b.kind);
@@ -955,7 +959,6 @@ interface Brake { phase: 'flip' | 'burn' | 'back'; t: number; dir: V3; q0: THREE
 let brake: Brake | null = null;
 /** What the drive is doing this frame, 0 (off) to 1 (full burn); the plume follows it. */
 let engine = 0;
-const FLIP_SECS = 5.5;      // end over end, drive off
 const BRAKE_SECS = 7;       // a manual burn to a stop
 const smoother = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
 let aimed: Thing | null = null;
@@ -1060,12 +1063,8 @@ function engage(th: Thing) {
   if (busy) return;
   const point = viewpoint(th);
   brake = null;
-  // Plan the trip: a hop takes ten seconds or so, a crossing of the system about half a minute. With the
-  // flip taking its share, the burns each last half of what is left, and that fixes how hard to burn.
-  const D = point.distanceTo(ship.pos);
-  const T = clamp(9 + 4.2 * Math.log10(Math.max(D / th.radius, 1.5)), 10, 40);
-  const t1 = (T - FLIP_SECS) / 2;
-  const a = D / (t1 * (t1 + FLIP_SECS));
+  // Plan the trip (src/course.ts): how hard to burn so that it takes a sensible time for its length.
+  const { a } = planTrip(point.distanceTo(ship.pos), th.radius, space.maxSpeed);
   auto = { thing: th, point, phase: 'cruise', a, dir: new V3(), t: 0, q0: new THREE.Quaternion() };
   ship.throttle = 0;
 }
@@ -1136,7 +1135,7 @@ addEventListener('mouseup', (e) => {
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('wheel', (e) => {
-  if ((e.target as HTMLElement).closest('#nav')) return;
+  if ((e.target as HTMLElement).closest('#nav') || (e.target as HTMLElement).closest('#map')) return;
   if (walk) return;
   if (inspect.on) { inspect.dist = clamp(inspect.dist * (e.deltaY > 0 ? 1.12 : 1 / 1.12), 1.25, 12); return; }
   auto = null;
@@ -1398,6 +1397,8 @@ function autopilot(dt: number, cap: number) {
     const k = smoother(clamp(ap.t / FLIP_SECS, 0, 1));
     ship.q.copy(ap.q0).multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), Math.PI * k));
     engine = 0;
+    // (Small corrections by the thrusters keep the line of travel on the target.)
+    ap.dir.lerp(ap.point.clone().sub(ship.pos).normalize(), 1 - Math.exp(-1.2 * dt)).normalize();
     ship.pos.addScaledVector(ap.dir, ship.speed * dt);
     if (ap.t >= FLIP_SECS) { ap.phase = 'burn'; ap.t = 0; }
     return;
@@ -1405,11 +1406,14 @@ function autopilot(dt: number, cap: number) {
   if (ap.phase === 'burn') {
     // The drive now points the way we are going. Brake along the same line, at the rate that stops us
     // exactly at the viewpoint: the speed from which a steady burn of `a` just runs out there.
-    const left = _a.copy(ap.point).sub(ship.pos).dot(ap.dir);
-    if (left <= 0.02 * R || ship.speed <= 0) { ship.speed = 0; engine = 0; ap.phase = 'face'; return; }
-    const want = Math.sqrt(2 * ap.a * left);
+    const toPoint = ap.point.clone().sub(ship.pos), left = toPoint.length();
+    if (left > 0) ap.dir.lerp(toPoint.divideScalar(left), 1 - Math.exp(-1.2 * dt)).normalize();
+    if (left <= 0.05 * R || ship.speed <= 0) { ship.speed = 0; engine = 0; ap.phase = 'face'; return; }
+    // (In the last stretch the burn's curve asks for less speed than one frame's step can follow, so it also
+    // never asks for more than three times the distance left a second: an easy final approach, no overshoot.)
+    const want = Math.min(Math.sqrt(2 * ap.a * left), 3 * left);
     if (ship.speed > want) { ship.speed = Math.max(want, ship.speed - 1.5 * ap.a * dt); engine = 1; } else engine = 0;
-    ship.pos.addScaledVector(ap.dir, ship.speed * dt);
+    ship.pos.addScaledVector(ap.dir, Math.min(ship.speed * dt, left));
     return;
   }
   const to = _a.copy(ap.point).sub(ship.pos);
@@ -1440,7 +1444,8 @@ function autopilot(dt: number, cap: number) {
   const align = fwd.dot(want);
   // Time to turn round? The burn needs v²/2a to stop and the flip itself coasts for FLIP_SECS.
   const need = (ship.speed * ship.speed) / (2 * ap.a) + ship.speed * FLIP_SECS * 1.08 + 0.02 * R;
-  if (ship.speed * FLIP_SECS > 0.12 * R && dist <= need && align > 0.97) {
+  // (Only with a clear line: the flip holds the heading fixed, so it must be the heading to the target.)
+  if (!aim && ship.speed * FLIP_SECS > 0.12 * R && dist <= need && align > 0.99) {
     ap.phase = 'flip';
     ap.t = 0;
     ap.dir.copy(fwd);
@@ -1906,6 +1911,20 @@ function updateHud(dt: number) {
 const _off = new V3(), _lookQ = new THREE.Quaternion();
 let last = performance.now();
 let clock = 0;
+
+// The star map (M): where everything is, and a plotter that hands a course to the autopilot.
+const starMap = createMap({
+  space: () => space,
+  ship: () => ({ pos: ship.pos, fwd: new V3(0, 0, -1).applyQuaternion(ship.q), speed: ship.speed }),
+  viewpoint: (t) => viewpoint(t as Thing),
+  plot: (t) => engage(t as Thing),
+  target: () => (auto?.thing ?? null) as never,
+  status: () => $('mode').textContent ?? '',
+  dist: (d) => fmtDist(d),
+  speed: (v) => fmtSpeed(v),
+  canOpen: () => started && !busy && !walk && !!space,
+});
+if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __map: typeof starMap }).__map = starMap;
 
 // With ?debug in the address, keep the last few thousand frame times for tests (hitch hunting).
 const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
