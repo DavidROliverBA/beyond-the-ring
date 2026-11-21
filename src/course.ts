@@ -27,5 +27,7 @@ export function planTrip(D: number, R: number, vmax: number): Trip {
   const dBurn = (vPeak * vPeak) / (2 * a);
   const flipAt = Math.max(0, D - dBurn - vPeak * FLIP_SECS * 1.08);
   const cruise = Math.max(0, flipAt - dBurn) / Math.max(vPeak, 1e-30);
-  return { a, vPeak, flipAt, eta: (2 * vPeak) / a + cruise + FLIP_SECS };
+  return { a, vPeak, flipAt, // (Measured over four flights: the burns, coast and flip come to the figure above, and turning to face the
+    // target at the start and settling at the end add about eight seconds.)
+    eta: (2 * vPeak) / a + cruise + FLIP_SECS + 8 };
 }

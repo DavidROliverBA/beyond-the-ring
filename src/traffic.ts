@@ -110,7 +110,11 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
     c.port = next;
     pointAt(f.ports[next], c.to);
     const D = c.from.distanceTo(c.to);
-    c.dur = Math.min(140, Math.max(20, D / (vLocal * unit)));
+    // A real hop: no faster than a drive that keeps pushing at a few m/s² can get up to over that distance
+    // (so a hop across the system takes days and the ship is, to us, nearly still), and at least the local
+    // pace between nearby points. Never past 1,000 km/s.
+    const Dm = D / unit, v = Math.min(1e6, Math.max(vLocal, Math.sqrt(3 * Dm)));
+    c.dur = Math.max(20, Dm / v);
     c.t0 = now;
     c.hold = 4 + r() * 30;
     _d.copy(c.to).sub(c.from);
