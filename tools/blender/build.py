@@ -1,7 +1,8 @@
 import bpy, sys, os, math, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import importlib, kit
+import importlib, kit, fit
 importlib.reload(kit)
+importlib.reload(fit)
 import bmesh
 from kit import Ship, reset, bake_ao, weather, export, preview, section_at
 from mathutils import Matrix, Vector
@@ -143,6 +144,10 @@ def corvette():
     clear = lambda c, n: not (abs(n.x) > 0.7 and -0.07 < c.y < 0.11 and c.z > -0.035)
     s.greeble(hp, 0.16, keep=lambda c, n: n.z < 0.5 and c.y < 0.44 and clear(c, n))
     s.greeble(ep, 0.16, m=('hull2', 'lgrey', 'dark'), keep=lambda c, n: n.z < 0.5 and not (abs(n.x) > 0.7 and abs(c.z) < 0.045))
+    # Landing legs folded flat against the belly: a pair forward, a pair under the engineering section.
+    for sx in (1, -1):
+        fit.leg(s, (sx * 0.09, 0.16, -0.0645), L=0.11, r=0.0045, pad=0.03)
+        fit.leg(s, (sx * 0.095, -0.22, -0.0865), L=0.12, r=0.0045, pad=0.03)
     return s
 
 
@@ -426,14 +431,13 @@ def dreadnought():
     band(sides, 'pale', -0.02, 0.0, lambda c: c.z > 0)
     band(sides, 'navy2', 0.44, 0.5)
     s.paint(caps, 'dark')
-    s.plate(sides, accents=[('navy2', 0.25)])
+    s.plate(sides, merge=0.5, inset=0.0034, depth=0.0024, accents=[('navy2', 0.25)])
     # Citadel: armoured decks amidships with the flag bridge on top.
     for (y0, y1, w, h, z, m) in [(0.22, -0.30, 0.058, 0.014, 0.076, 'navy'), (0.10, -0.24, 0.04, 0.014, 0.103, 'navy2'), (0.0, -0.14, 0.024, 0.012, 0.128, 'navy'), (-0.04, -0.09, 0.012, 0.012, 0.15, 'navy2')]:
         tier, _ = s.loft([(y0, w, h, 0.004, 0, z), (y1, w, h, 0.004, 0, z)], m, cell=0.019)
         s.plate(tier, merge=0.5, inset=0.0022, depth=0.001)
         for sx in (1, -1):
             s.windows((sx * (w + 0.0005), y0 - 0.02, z + 0.003), (sx * (w + 0.0005), y1 + 0.02, z + 0.003), int((y0 - y1) / 0.012), (sx, 0, 0), s=0.0026, m='blue')
-    s.mast((0, -0.07, 0.16), 0.07)
     s.dish((0.02, -0.2, 0.118), 0.016, aim=(0.3, -0.3, 1))
     kl, _ = s.loft([(0.3, 0.04, 0.012, 0.004, 0.008, -0.07), (-0.34, 0.05, 0.018, 0.004, 0.01, -0.078)], 'navy2', cell=0.021)
     s.plate(kl, merge=0.5)
@@ -446,8 +450,8 @@ def dreadnought():
             s.pdc((sx * 0.106, 0.08 - i * 0.085, -0.056), -1, s=0.009)
         for i in range(4):
             s.pdc((sx * 0.05, 0.44 - i * 0.06, at(0.44 - i * 0.06)[2]), 1, s=0.008)
-        s.windows((sx * 0.1385, 0.08, 0.0), (sx * 0.1385, -0.34, 0.0), 34, (sx, 0, 0), s=0.0026, m='blue')
-        s.windows((sx * 0.1385, 0.08, -0.02), (sx * 0.1385, -0.34, -0.02), 34, (sx, 0, 0), s=0.0026, m='blue', skip=0.5)
+        s.windows((sx * 0.1385, 0.08, 0.0), (sx * 0.1385, -0.25, 0.0), 26, (sx, 0, 0), s=0.0026, m='blue')
+        s.windows((sx * 0.1385, 0.08, -0.02), (sx * 0.1385, -0.25, -0.02), 26, (sx, 0, 0), s=0.0026, m='blue', skip=0.5)
         s.rcs((sx * at(0.4)[1], 0.4, 0), (sx, 0, 0), s=0.007)
         s.rcs((sx * 0.139, -0.38, 0.02), (sx, 0, 0), s=0.007)
         s.lamp((sx * 0.14, -0.05, 0.03), 'green' if sx > 0 else 'red', 0.0035)
@@ -463,6 +467,43 @@ def dreadnought():
     s.plate(en, merge=0.3)
     for x in (-0.078, 0, 0.078):
         s.bell(0.04, (x, -0.468, 0), name=f'drive_{x}', length=0.046)
+    # --- detail pass
+    # Lattice comms mast on the flag bridge with yards, a dish and a beacon.
+    fit.girder(s, (0, -0.07, 0.15), (0, -0.07, 0.232), 0.005, 6)
+    for z, hw in ((0.19, 0.026), (0.214, 0.016)):
+        s.box(hw * 2, 0.003, 0.003, (0, -0.07, z), 'dark')
+        s.lamp((hw, -0.07, z), 'window', 0.002)
+        s.lamp((-hw, -0.07, z), 'window', 0.002)
+    s.lamp((0, -0.07, 0.236), 'red', 0.003)
+    s.dish((0, -0.07, 0.17), 0.014, aim=(0.5, 0.6, 0.6))
+    # Sensor blisters on the bridge tiers and the bow cheeks.
+    for sx in (1, -1):
+        fit.blister(s, (sx * 0.02, 0.08, 0.1165), (0, 0, 1), 0.007)
+        fit.blister(s, (sx * 0.015, -0.01, 0.1395), (sx * 0.3, 0, 1), 0.005)
+        fit.blister(s, (sx * (at(0.47)[1] - 0.003), 0.47, 0.01), (sx, 0, 0.2), 0.008)
+        fit.blister(s, (sx * (at(-0.2)[1] - 0.0), -0.2, at(-0.2)[2] - 0.004), (0, 0, -1), 0.007)
+    # Torpedo tubes in the bow cap, and heavy turrets on the afterdeck facing astern.
+    fit.launchers(s, (0, 0.4955, 0), (0, 1, 0), (1, 0, 0), 3, 2, pitch=0.021, size=0.014, rim='navy2')
+    for sx in (1, -1):
+        fit.turret(s, (sx * 0.05, -0.345, at(-0.345)[2] - 0.001), (0, 0, 1), (0, -1, 0), r=0.013, L=0.032)
+        # A bank of radiator louvres on each flank aft, a nav light on the boom.
+        fit.radiator(s, (sx * 0.136, -0.35, -0.012), (sx, 0, 0), (0, 1, 0), n=3, w=0.13, L=0.115, pitch=0.026, tip_lamp='green' if sx > 0 else 'red')
+        # Bay mouths on the flank, lit inside.
+        for y in (-0.047, 0.03):
+            fit.hangar(s, (sx * 0.1385, y, -0.04), (sx, 0, 0), (0, 0, 1), 0.044, 0.014)
+        # Armour belts, raised plates in rows along the bow flanks.
+        for z in (-0.026, 0.0, 0.026):
+            for k in range(3):
+                y = 0.405 - k * 0.075
+                s.box(0.003, 0.068, 0.012, (sx * (at(y)[1] + 0.0008), y, z), 'navy2')
+        s.rcs((sx * 0.04, 0.47, at(0.47)[2]), (sx * 0.3, 0.2, 1), s=0.006)
+        s.rcs((sx * 0.13, 0.16, 0.052), (sx * 0.4, 0, 1), s=0.006)
+        s.rcs((sx * 0.139, -0.2, 0.03), (sx, 0, 0), s=0.007)
+    # Heat fins on the engine block, top and bottom.
+    for i in range(11):
+        x = (i - 5) * 0.0225
+        for sz in (1, -1):
+            s.box(0.002, 0.05, 0.018, (x, -0.452, sz * 0.073), 'navy2')
     return s
 
 
@@ -488,6 +529,46 @@ def racer():
     s.cyl(0.05, 0.045, 0.03, (0, -0.35, 0), 'dark', segs=20)
     s.bell(0.092, (0, -0.36, 0), name='drive_main', length=0.11)
     s.mast((0, 0.5, 0), 0.04, r=0.001, axis=(0, 1, 0))
+    # --- detail pass
+    at = lambda y: section_at(body, y)
+    # Canopy frame, a dorsal scoop and a dish.
+    for y in (0.17, 0.115, 0.065):
+        s.box(0.034, 0.004, 0.0022, (0, y, 0.0415), 'hull2')
+    s.box(0.004, 0.14, 0.0022, (0, 0.12, 0.042), 'hull2')
+    s.box(0.034, 0.045, 0.01, (0, -0.07, 0.044), 'dark')
+    s.box(0.04, 0.006, 0.014, (0, -0.045, 0.046), 'orange')
+    s.dish((0, 0.02, 0.046), 0.014, aim=(0, 0.4, 1))
+    s.mast((0, -0.3, 0.17), 0.07, r=0.0012, axis=(0, 0.1, 1))
+    # Cooling fins round the drive collar.
+    for i in range(14):
+        a = i / 14 * math.tau
+        s.box(0.0025, 0.03, 0.016, (math.cos(a) * 0.058, -0.35, math.sin(a) * 0.058), 'hull2', rot=(0, -a + math.pi / 2, 0))
+    # Fin tips carry nav lights.
+    for i, lamp in enumerate(('window', 'red', 'green')):
+        a = i / 3 * math.tau + math.pi / 2
+        s.lamp((math.cos(a) * 0.168, -0.32, math.sin(a) * 0.168), lamp, 0.004)
+    # Drop tanks on pylons, one each side.
+    for sx in (1, -1):
+        c = Vector((sx * 0.083, -0.07, 0))
+        s.cyl(0.016, 0.016, 0.16, c, 'pale', segs=10, axis='Y')
+        s.cyl(0.002, 0.016, 0.04, c + Vector((0, 0.1, 0)), 'pale', segs=10, axis='Y')
+        s.cyl(0.016, 0.006, 0.03, c + Vector((0, -0.095, 0)), 'dark', segs=10, axis='Y')
+        for dy in (-0.05, 0.04):
+            s.box(0.034, 0.018, 0.006, (sx * 0.0635, -0.07 + dy, 0), 'hull2')
+        for k in range(2):
+            s.box(0.003, 0.04, 0.012, c + Vector((0, -0.075, 0.016 * (1 if k else -1))), 'orange')
+        s.cyl(0.0165, 0.0165, 0.012, c + Vector((0, 0.03, 0)), 'orange', segs=10, axis='Y')
+        s.lamp(c + Vector((sx * 0.0, 0.07, 0.017)), 'green' if sx > 0 else 'red', 0.0028)
+    # Manoeuvring quads round the nose and aft.
+    thr = fit.thrusters
+    thr(s, (0, 0.28, at(0.28)[2]), (0, 0.1, 1), 0.0045, n=2, along=(1, 0, 0))
+    thr(s, (0, 0.28, -at(0.28)[2]), (0, 0.1, -1), 0.0045, n=2, along=(1, 0, 0))
+    for sx in (1, -1):
+        thr(s, (sx * 0.0555, -0.2, 0.0), (sx, 0, 0.2), 0.0055)
+    # Landing legs folded against the belly, either side of the centreline.
+    q = at(0.0)
+    for sx in (1, -1):
+        fit.leg(s, (sx * 0.02, 0.03, q[5] - q[2] - 0.001), fold=(0, -1, 0), normal=(0, 0, -1), L=0.13, r=0.0026, pad=0.013)
     return s
 
 
@@ -503,32 +584,62 @@ def freighter():
     s.box(0.09, 0.05, 0.02, (0, 0.44, 0.058), 'belt2')
     s.windows((-0.035, 0.466, 0.06), (0.035, 0.466, 0.06), 7, (0, 1, 0.2), s=0.004, m='blue', skip=0)
     s.dish((0.03, 0.4, 0.062), 0.016, aim=(0.3, 0.3, 1))
-    s.mast((-0.03, 0.41, 0.06), 0.06)
+    fit.girder(s, (-0.03, 0.41, 0.06), (-0.03, 0.41, 0.115), 0.004, 5)
+    s.box(0.036, 0.003, 0.003, (-0.03, 0.41, 0.1), 'dark')
+    s.box(0.024, 0.003, 0.003, (-0.03, 0.41, 0.112), 'dark')
+    s.lamp((-0.03, 0.41, 0.118), 'red', 0.003)
     s.truss((0, 0.36, 0), (0, -0.28, 0), 0.016, 16)
+    # The cage: rows of containers four across, in different sizes, with the odd tank pod and gaps where cargo has gone.
     for i in range(6):
         y = 0.3 - i * 0.097
         for (qx, qz) in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
-            if r.random() < 0.1:
+            u = r.random()
+            if u < 0.1:
                 continue
             m = r.choice(('rust', 'teal', 'belt', 'yellow', 'belt2', 'pale'))
             cx, cz = qx * 0.05, qz * 0.05
-            s.box(0.076, 0.086, 0.076, (cx, y, cz), m)
-            for k in (-0.03, 0, 0.03):
-                s.box(0.08, 0.004, 0.08, (cx, y + k, cz), 'belt2')
-            s.box(0.03, 0.002, 0.04, (cx + qx * 0.0385, y, cz), 'belt2', rot=(0, 0, math.pi / 2))
+            if u < 0.22:
+                # A tank pod: a strapped cylinder with domed ends.
+                s.cyl(0.034, 0.034, 0.08, (cx, y, cz), 'pale', segs=12)
+                s.cyl(0.026, 0.02, 0.01, (cx, y + 0.045, cz), 'belt2', segs=12)
+                s.cyl(0.02, 0.026, 0.01, (cx, y - 0.045, cz), 'belt2', segs=12)
+                for k in (-0.025, 0.0, 0.025):
+                    s.cyl(0.0356, 0.0356, 0.005, (cx, y + k, cz), 'belt2', segs=12)
+                s.lamp((cx + qx * 0.034, y + 0.03, cz), 'red', 0.0022)
+            elif u < 0.4:
+                # Two short containers end to end.
+                for hy in (-1, 1):
+                    fit.container(s, (cx, y + hy * 0.0225, cz), (0.076, 0.039, 0.076), r.choice(('rust', 'teal', 'belt', 'yellow', 'belt2', 'pale')), (qx, qz), ribs=2, door=hy)
+            else:
+                fit.container(s, (cx, y, cz), (0.076, 0.086, 0.076), m, (qx, qz), ribs=3, door=r.choice((-1, 1, 0)))
+        # Lashing frame in the gap behind each row.
+        gy = y - 0.0485
+        for sg in (-1, 1):
+            s.box(0.184, 0.005, 0.004, (0, gy, sg * 0.092), 'yellow')
+            s.box(0.004, 0.005, 0.184, (sg * 0.092, gy, 0), 'yellow')
     for y in (0.345, -0.27):
         s.box(0.22, 0.012, 0.012, (0, y, 0), 'yellow')
         s.box(0.012, 0.012, 0.22, (0, y, 0), 'yellow')
+    # Work lights on the tips of the cross frames.
+    for y in (0.345, -0.27):
+        for sg in (-1, 1):
+            s.lamp((sg * 0.117, y, 0), 'window', 0.003)
+            s.lamp((0, y, sg * 0.117), 'window', 0.003)
     en, _ = s.loft([(-0.28, 0.06, 0.05, 0.014, 0.014), (-0.3, 0.082, 0.07, 0.016, 0.016), (-0.38, 0.084, 0.072, 0.016, 0.016), (-0.405, 0.066, 0.056, 0.014, 0.014)], 'belt', cell=0.019)
     s.plate(en, accents=[('rust', 0.2), ('belt2', 0.25)])
     for sx in (1, -1):
-        s.box(0.14, 0.09, 0.003, (sx * 0.155, -0.34, 0), 'dark')
-        for k in range(5):
-            s.box(0.14, 0.002, 0.006, (sx * 0.155, -0.305 - k * 0.018, 0), 'belt2')
+        fit.radiator(s, (sx * 0.084, -0.345, 0), (sx, 0, 0), (0, 1, 0), n=2, w=0.1, L=0.14, pitch=0.024, normal=(0, 0, 1), tip_lamp='green' if sx > 0 else 'red', m='dark', rim='belt2')
+        fit.thrusters(s, (sx * 0.0845, -0.38, 0.045), (sx, 0, 0.6), 0.006)
+        fit.thrusters(s, (sx * 0.0445, 0.36, 0.05), (sx * 0.2, 0.7, 0.7), 0.0055)
+        fit.blister(s, (sx * 0.06, 0.435, 0.038), (sx * 0.6, 0.3, 0.7), 0.006)
         s.bell(0.046, (sx * 0.044, -0.405, 0), glow='window', name=f'drive_{sx}', length=0.055)
         s.lamp((sx * 0.074, 0.47, 0.03), 'window', 0.004)
-        s.lamp((sx * 0.226, -0.34, 0), 'green' if sx > 0 else 'red', 0.004)
         s.windows((sx * 0.0845, -0.31, 0.02), (sx * 0.0845, -0.37, 0.02), 6, (sx, 0, 0), s=0.003)
+    # Pipework and a cargo hatch on the engine housing, a docking ring let into the bridge nose.
+    for sg in (-1, 1):
+        s.pipe([(sg * 0.06, -0.3, 0.052), (sg * 0.06, -0.36, 0.052), (sg * 0.075, -0.385, 0.045)], r=0.0022)
+    s.hatch((0, -0.345, 0.0715), (0, 0, 1), 0.05, 0.04, m='belt2')
+    s.hatch((0, 0.48, -0.052), (0, 0, -1), 0.04, 0.05, m='belt2', lit=True)
     return s
 
 
@@ -544,6 +655,30 @@ def stealth():
         s.box(0.1, 0.16, 0.005, (sx * 0.17, -0.3, 0), 'black', rot=(0, 0, sx * -0.5))
     s.cyl(0.03, 0.026, 0.02, (0, -0.462, 0), 'black', segs=6)
     s.empty('drive_main', (0, -0.472, 0), 0.04)
+    # --- detail pass: nothing proud of the hull, but edges, hatches and panel lines that catch a glint.
+    at = lambda y: section_at(body, y, smooth=False)
+    ridge = lambda y, sx: (sx * (at(y)[1] - at(y)[3]), y, at(y)[2] + 0.0004)
+    ys = (0.48, 0.3, 0.18, 0.0, -0.18, -0.38)
+    for sx in (1, -1):
+        for y0, y1 in zip(ys, ys[1:]):
+            fit.seam(s, ridge(y0, sx), ridge(y1, sx), (0, 0, 1), w=0.003, m='hull2', t=0.001)
+        # Canted tail fins.
+        s.box(0.004, 0.13, 0.062, (sx * 0.075, -0.33, 0.07), 'black', rot=(0, sx * 0.42, 0))
+        s.box(0.0045, 0.13, 0.004, (sx * 0.0865, -0.33, 0.1), 'hull2', rot=(0, sx * 0.42, 0))
+        # Flush sensor windows along the nose cheeks, and stowed PDC covers.
+        for k, y in enumerate((0.36, 0.28, 0.2)):
+            s.box(0.02, 0.05, 0.001, (sx * (at(y)[1] - at(y)[3] - 0.03), y - 0.01, at(y)[2] + 0.0003), 'dark')
+        for y in (0.1, -0.1, -0.26):
+            x, z = sx * (at(y)[1] - at(y)[3] - 0.045), at(y)[2]
+            s.cyl(0.011, 0.011, 0.002, (x, y, z), 'hull2', axis='Z', segs=10)
+            s.cyl(0.008, 0.008, 0.0025, (x, y, z), 'dark', axis='Z', segs=10)
+            s.cyl(0.0012, 0.0012, 0.012, (x, y + 0.006, z + 0.001), 'dark', segs=4)
+        # Flush thruster grilles at the wing roots.
+        fit.thrusters(s, (sx * (at(-0.2)[1] - at(-0.2)[3] + 0.0), -0.2, at(-0.2)[2] - 0.003), (sx * 0.6, 0, 0.8), 0.0045, n=1)
+    # Hatches and intakes down the spine.
+    for y, z in ((0.04, 0.0585), (-0.1, 0.0665), (-0.25, 0.0595)):
+        s.box(0.022, 0.05, 0.001, (0, y, z), 'hull2')
+    s.box(0.07, 0.03, 0.001, (0, -0.35, 0.047), 'dark')
     return s
 
 
@@ -577,13 +712,54 @@ def survey():
     band(en, 'rce', -0.415, -0.4)
     s.plate(en, merge=0.4, accents=[('hull', 0.2)])
     for sx in (1, -1):
-        s.box(0.2, 0.12, 0.003, (sx * 0.19, -0.41, 0), 'dark')
-        for k in range(7):
-            s.box(0.2, 0.002, 0.006, (sx * 0.19, -0.36 - k * 0.017, 0), 'hull2')
-        s.lamp((sx * 0.291, -0.41, 0), 'green' if sx > 0 else 'red', 0.004)
+        fit.radiator(s, (sx * 0.09, -0.405, 0), (sx, 0, 0), (0, 1, 0), n=2, w=0.11, L=0.2, pitch=0.022, normal=(0, 0, 1), tip_lamp='green' if sx > 0 else 'red', m='dark', rim='pale')
         s.windows((sx * 0.0565, 0.16, 0.012), (sx * 0.064, -0.08, 0.012), 16, (sx, 0, 0), s=0.003)
         s.bell(0.04, (sx * 0.046, -0.46, 0), name=f'drive_{sx}', length=0.05)
         s.rcs((sx * 0.047, 0.4, 0), (sx, 0, 0), s=0.006)
+    # --- detail pass
+    # Four fuel spheres on struts, aft of the ring.
+    for sx in (1, -1):
+        for sz in (1, -1):
+            p = Vector((sx * 0.108, -0.2, sz * 0.05))
+            s.ball(0.027, p, 'pale', u=12, v=8)
+            fit.bar(s, (sx * 0.06, -0.2, sz * 0.03), p, 0.003, 'hull2')
+            fit.bar(s, (sx * 0.064, -0.17, sz * 0.02), p + Vector((0, 0.012, 0)), 0.002, 'hull2')
+            fit.bar(s, (sx * 0.064, -0.23, sz * 0.02), p + Vector((0, -0.012, 0)), 0.002, 'hull2')
+            s.cyl(0.0275, 0.0275, 0.004, p + Vector((0, 0, 0)), 'rce', segs=12, axis='Y')
+    # Sensor boom on the starboard side with an instrument pod at the tip.
+    fit.girder(s, (0.05, 0.27, 0.01), (0.23, 0.27, 0.01), 0.004, 9)
+    s.box(0.03, 0.03, 0.022, (0.24, 0.27, 0.01), 'hull2')
+    fit.blister(s, (0.24, 0.287, 0.01), (0, 1, 0.2), 0.008)
+    fit.blister(s, (0.255, 0.27, 0.01), (1, 0, 0), 0.007)
+    s.lamp((0.24, 0.27, 0.026), 'green', 0.003)
+    # Probe rack under the nose section: six survey probes in a cradle.
+    s.box(0.1, 0.14, 0.006, (0, 0.14, -0.064), 'hull2')
+    for i in range(6):
+        x = (i - 2.5) * 0.017
+        s.cyl(0.007, 0.007, 0.12, (x, 0.14, -0.073), 'pale', segs=8, axis='Y')
+        s.cyl(0.007, 0.002, 0.02, (x, 0.21, -0.073), 'orange', segs=8, axis='Y')
+    for y in (0.09, 0.19):
+        s.box(0.11, 0.006, 0.014, (0, y, -0.072), 'dark')
+    # Survey radar and a lattice mast; blisters and thruster quads on the bow.
+    fit.girder(s, (0, 0.4, 0.04), (0, 0.4, 0.1), 0.004, 6)
+    s.lamp((0, 0.4, 0.103), 'red', 0.003)
+    for sx in (1, -1):
+        fit.blister(s, (sx * 0.033, 0.46, 0.012), (sx, 0.3, 0.3), 0.007)
+        fit.thrusters(s, (sx * 0.036, 0.39, 0.0), (sx, 0, 0.5), 0.006)
+        fit.thrusters(s, (sx * 0.06, -0.3, 0.02), (sx, 0, 0.4), 0.006)
+        fit.hangar(s, (sx * 0.0495, -0.17, -0.083), (sx, 0, -0.1), (0, 0, 1), 0.07, 0.016)
+    fit.thrusters(s, (0, 0.38, 0.045), (0, 0.2, 1), 0.006, n=3, along=(1, 0, 0))
+    fit.thrusters(s, (0, 0.38, -0.045), (0, 0.2, -1), 0.006, n=3, along=(1, 0, 0))
+    fit.collar(s, -0.325, 0.07, lamp='window')
+    # The habitat ring: ribs round the rim, docking ports on its face, a hub where the spokes meet.
+    for i in range(24):
+        a = i / 24 * math.tau
+        s.box(0.004, 0.04, 0.011, (math.cos(a) * 0.1815, 0.02, math.sin(a) * 0.1815), 'hull2', rot=(0, -a, 0))
+    for i in range(4):
+        a = i / 4 * math.tau + 0.4 + math.pi / 4
+        s.hatch((math.cos(a) * 0.16, 0.0385, math.sin(a) * 0.16), (0, 1, 0), 0.034, 0.034, m='hull2', along=(math.cos(a), 0, math.sin(a)), lit=True)
+    s.cyl(0.07, 0.07, 0.034, (0, 0.02, 0), 'hull2', segs=20, axis='Y')
+    s.hoop(0.07, 0.002, 0.004, 0.02, 'steel', segs=20)
     return s
 
 
@@ -608,12 +784,25 @@ def medina():
         a, y = r.random() * math.tau, r.uniform(-0.26, 0.26)
         n = Vector((math.cos(a), 0, math.sin(a)))
         s.windows(n * (R + 0.0022) + Vector((0, y, 0)), n * (R + 0.0022) + Vector((0, y, 0)), 1, n, s=0.003, skip=0)
+    # Airlock hatches and panel seams on the drum's skin (they turn with it).
+    for i in range(10):
+        a = (i + 0.3 * (i % 2)) / 10 * math.tau
+        y = -0.2 + (i % 5) * 0.1
+        n = Vector((math.cos(a), 0, math.sin(a)))
+        s.hatch(n * (R + 0.0014) + Vector((0, y, 0)), n, 0.016, 0.022, m='hull2', along=(0, 1, 0), lit=True)
+    for i in range(30):
+        a = i / 30 * math.tau
+        fit.bar(s, (math.cos(a) * (R + 0.0012), -0.27, math.sin(a) * (R + 0.0012)), (math.cos(a) * (R + 0.0012), 0.27, math.sin(a) * (R + 0.0012)), 0.0008, 'dark')
     s.part('body')
     # Command bow.
     bow = s.lathe([(0.112, 0.282), (0.112, 0.3), (0.06, 0.38), (0.052, 0.4), (0.045, 0.425), (0.028, 0.445), (0.004, 0.452), (0.004, 0.282)], (0, 0, 0), 'pale', segs=32)
     s.plate([f for f in bow if 0.3 < f.calc_center_median().y < 0.38], merge=0.3, inset=0.0024, depth=0.0012, accents=[('hull', 0.25)])
     s.hoop(0.058, 0.005, 0.012, 0.39, 'gold', segs=32)
-    s.mast((0, 0.45, 0), 0.12, r=0.002, axis=(0, 1, 0))
+    fit.girder(s, (0, 0.45, 0), (0, 0.565, 0), 0.006, 9, r=0.0016)
+    for y in (0.5, 0.53):
+        s.box(0.05, 0.003, 0.003, (0, y, 0), 'dark')
+        s.box(0.003, 0.003, 0.05, (0, y, 0), 'dark')
+    s.lamp((0, 0.566, 0), 'red', 0.004)
     for i in range(24):
         a = i / 24 * math.tau
         s.box(0.003, 0.006, 0.003, (math.cos(a) * 0.0535, 0.412, math.sin(a) * 0.0535), 'window', rot=(0, -a, 0))
@@ -624,9 +813,30 @@ def medina():
     # Engineering and the drive.
     aft = s.lathe([(0.112, -0.282), (0.112, -0.3), (0.092, -0.36), (0.07, -0.375), (0.004, -0.375), (0.004, -0.282)], (0, 0, 0), 'hull2', segs=32)
     s.plate([f for f in aft if -0.36 < f.calc_center_median().y < -0.3], merge=0.3)
-    s.box(0.3, 0.05, 0.016, (0, -0.33, 0), 'dark')
-    s.box(0.016, 0.05, 0.3, (0, -0.33, 0), 'dark')
+    for ox, oz, nrm, lamp in ((1, 0, (0, 0, 1), 'green'), (-1, 0, (0, 0, 1), 'red'), (0, 1, (1, 0, 0), 'window'), (0, -1, (1, 0, 0), 'window')):
+        fit.radiator(s, (ox * 0.1, -0.33, oz * 0.1), (ox, 0, oz), (0, 1, 0), n=2, w=0.07, L=0.17, pitch=0.02, normal=nrm, tip_lamp=lamp, m='dark', rim='hull2')
     s.hoop(0.114, 0.004, 0.008, -0.292, 'gold', segs=32)
+    # Fuel spheres on the aft cone, docking arms and ports on the bow, thruster quads round both ends.
+    for sx in (1, -1):
+        for sz in (1, -1):
+            p = Vector((sx * 0.082, -0.335, sz * 0.082))
+            s.ball(0.021, p, 'pale', u=12, v=8)
+            fit.bar(s, p * 0.6 + Vector((0, 0.0, 0)), p, 0.003, 'hull2')
+            s.cyl(0.0215, 0.0215, 0.004, p, 'rce', segs=12, axis='Y')
+    for i in range(4):
+        a = i / 4 * math.tau + math.pi / 4
+        n = Vector((math.cos(a), 0, math.sin(a)))
+        fit.bar(s, n * 0.06 + Vector((0, 0.39, 0)), n * 0.11 + Vector((0, 0.39, 0)), 0.005, 'hull2')
+        s.box(0.02, 0.022, 0.014, n * 0.118 + Vector((0, 0.39, 0)), 'pale', rot=(0, -a, 0))
+        s.lamp(n * 0.13 + Vector((0, 0.39, 0)), 'window', 0.0025)
+        fit.blister(s, n * 0.05 + Vector((0, 0.425, 0)), (n.x, 0.4, n.z), 0.006)
+    for i in range(6):
+        a = i / 6 * math.tau
+        s.hatch(Vector((math.cos(a) * 0.087, 0.332, math.sin(a) * 0.087)), (math.cos(a) * 0.76, 0.65, math.sin(a) * 0.76), 0.02, 0.02, m='hull2', along=(0, 1, 0), lit=True)
+    for i in range(4):
+        a = i / 4 * math.tau
+        fit.thrusters(s, (math.cos(a) * 0.108, 0.292, math.sin(a) * 0.108), (math.cos(a), 0.2, math.sin(a)), 0.006, along=(0, 1, 0), n=2)
+        fit.thrusters(s, (math.cos(a) * 0.1, -0.32, math.sin(a) * 0.1), (math.cos(a), -0.1, math.sin(a)), 0.006, along=(0, 1, 0))
     s.bell(0.03, (0, -0.375, 0), glow='dark', name='idle_0')
     for sx in (1, -1):
         for sz in (1, -1):
@@ -716,6 +926,8 @@ for name in which:
     reset()
     ship = BUILD[name]()
     objs = ship.finish()
+    ys = [v.co.y for o in objs for v in o.data.vertices]
+    print(name, 'y range %.3f to %.3f' % (min(ys), max(ys)), 'width %.3f' % (2 * max(abs(v.co.x) for o in objs for v in o.data.vertices)))
     print(name, 'tris ~', sum(len(p.vertices) - 2 for o in objs for p in o.data.polygons))
     if '--noao' not in argv:
         bake_ao(objs)
@@ -725,4 +937,12 @@ for name in which:
         pack(os.path.join(ROOT, 'assets', 'models', name + '.glb'))
     if prev:
         far = ((1.6, -1.5, 0.9), (-1.5, 1.7, -0.6)) if name in ('tycho', 'player') else ((1.25, -1.15, 0.7), (-1.1, 1.3, -0.45))
-        preview(os.path.join(prev, name), views=far + ((CLOSE[name],) if name in CLOSE else ()))
+        if '--std' in argv:  # front three-quarter, side, rear three-quarter
+            far = ((1.0, 1.35, 0.55), (1.9, 0.0, 0.15), (1.0, -1.35, 0.55))
+        extra = ()
+        if '--cam' in argv:  # extra stills: x,y,z or x,y,z:tx,ty,tz, separated by ;
+            for v in argv[argv.index('--cam') + 1].split(';'):
+                at, _, to = v.partition(':')
+                at = tuple(float(k) for k in at.split(','))
+                extra += ((at, tuple(float(k) for k in to.split(','))),) if to else (at,)
+        preview(os.path.join(prev, name), views=far + ((CLOSE[name],) if name in CLOSE and '--cam' not in argv else ()) + extra)
