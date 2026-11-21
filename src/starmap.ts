@@ -240,7 +240,7 @@ export function createMap(host: MapHost): StarMap {
       if (!charted) ctx.globalAlpha = 0.4;
       drawMarker(t.kind, x, y, t.kind === 'gate' && t.nav ? 2.6 : k.r, t.kind === 'gate' && t.nav ? '#ffb25a' : k.c, t === selected || t === hovered);
       ctx.globalAlpha = 1;
-      if (local && t.vel && Math.hypot(t.vel.x, t.vel.z) > 1e-10) {
+      if (local && t.vel && t.kind === 'ship' && Math.hypot(t.vel.x, t.vel.z) > 1e-10) {
         // Which way she is going: a short tick from the marker.
         const a = Math.atan2(t.vel.z, t.vel.x);
         ctx.strokeStyle = k.c; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 16, y + Math.sin(a) * 16); ctx.stroke();
@@ -360,7 +360,7 @@ export function createMap(host: MapHost): StarMap {
     $('#mc-dist').textContent = host.dist(Math.max(0, D));
     $('#mc-trip').textContent = D < t.radius * 2 ? 'you are here' : `about ${Math.round(trip.eta)} s${t.vel ? ', then alongside' : ''}`;
     const mv = t.vel ? t.vel.length() : 0;
-    $('#mc-moving-row').style.display = t.vel ? 'flex' : 'none';
+    $('#mc-moving-row').style.display = t.vel && t.kind === 'ship' ? 'flex' : 'none';
     $('#mc-moving').textContent = mv * host.unitMetres < 2 ? 'holding station' : host.speed(mv);
   }
 

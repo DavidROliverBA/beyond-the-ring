@@ -80,5 +80,8 @@ export function makeComet(tail: number, coma: number, away: THREE.Vector3): THRE
     (haze.material as THREE.SpriteMaterial).opacity = base * THREE.MathUtils.clamp(d / (coma * 1.2), 0.04, 1);
   };
   g.add(haze);
+  // The tail follows the comet round: always straight away from the star (at the origin).
+  const z = new THREE.Vector3(0, 0, 1), tmp = new THREE.Vector3();
+  g.userData.away = (p: THREE.Vector3) => { if (p.lengthSq() > 0) holder.quaternion.setFromUnitVectors(z, tmp.copy(p).normalize()); };
   return g;
 }

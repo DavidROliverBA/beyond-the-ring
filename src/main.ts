@@ -286,6 +286,8 @@ interface Thing {
   parent?: string;
   /** A ship under way: its `pos` moves, and this is its velocity in scene units a second. */
   vel?: V3;
+  /** How far it moved this frame (a body on its orbit): whatever sits near it is carried along. */
+  step?: V3;
   label?: HTMLDivElement;
   normal?: V3;
   to?: { space: string; gate: string };
@@ -322,6 +324,17 @@ interface Space {
   lods: Lod[];
   tick: (t: number, dt: number) => void;
 }
+
+// ---------------------------------------------------------------- time
+// The planets and moons go round. `simRate` is days of that time per second of yours; `simStep` is what this
+// frame advances (days) and `simDt` the frame's seconds, both set in the frame loop before the space ticks.
+const RATES: [days: number, label: string][] = [[0, 'paused'], [1 / 1440, '1 min/s'], [1 / 24, '1 h/s'], [1, '1 day/s'], [10, '10 days/s'], [100, '100 days/s'], [365.25, '1 year/s']];
+let rateIdx = 2, simStep = 0, simDt = 0, simElapsed = 0;
+/** Days it takes a moon to go round, for a moon of each planet (to fix that planet's pull). */
+const MOON_REF: Record<string, [id: string, days: number]> = {
+  earth: ['luna', 27.32], mars: ['phobos', 0.3189], jupiter: ['io', 1.769], saturn: ['titan', 15.945],
+  uranus: ['titania', 8.706], neptune: ['triton', 5.877], pluto: ['charon', 6.387],
+};
 
 /** The map's view of ships under way: a Thing whose position is the craft's own, kept live. */
 function craftThings(info: { name: string; model: string; len: number; pos: V3; vel: V3 }[]): Thing[] {
@@ -414,6 +427,11 @@ const MODELS: Record<'platform' | 'diamond' | 'neutron', () => THREE.Group> = {
     return g;
   },
 };
+
+interface Mover {
+  th: Thing; holder: THREE.Group; pos: V3; w: number; ang: number; orbit: number; lift: number;
+  parentPos: V3 | null; off: V3; line?: THREE.LineLoop;
+}
 
 interface BuildCtx {
   spin: { o: THREE.Object3D; r: number }[];
@@ -526,7 +544,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   }
   const mesh = new THREE.Mesh(geo, lod.mat);
   tilt.add(mesh);
-  if (b.kind === 'comet' && b.tail) holder.add(makeComet(b.tail, b.coma ?? 0.4, pos.lengthSq() > 0 ? pos.clone().normalize() : new V3(1, 0, 0)));
+  if (b.kind === 'comet' && b.tail) { const cm = makeComet(b.tail, b.coma ?? 0.4, pos.lengthSq() > 0 ? pos.clone().normalize() : new V3(1, 0, 0)); holder.add(cm); ctx.anim.push(() => cm.userData.away(pos)); }
   ctx.spin.push({ o: mesh, r: b.spin ?? 0.02 });
   if (kinds.clouds) {
     lod.clouds = new THREE.MeshStandardMaterial({ transparent: true, roughness: 1, depthWrite: false, envMap: NO_ENV, envMapIntensity: 0 });
@@ -549,6 +567,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
     // Rayleigh ratios (red scatters least), a dusty tint gives Mars its butterscotch.
     const tint = new THREE.Color(b.atmo);
     const beta = new V3(tint.r, tint.g, tint.b).multiplyScalar(220 / Math.max(tint.r, tint.g, tint.b));
+    if (pos.lengthSq() > 0) ctx.anim.push(() => { sunDir.copy(pos).negate().normalize(); });
     const uniforms = { beta: { value: beta }, sunDir: { value: sunDir }, cam: { value: new V3() }, R: { value: R }, strength: { value: b.atmoK ?? 1 } };
     const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: ATMO_V, fragmentShader: ATMO_F, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     const shell = new THREE.Mesh(new THREE.SphereGeometry(R * ATMO_TOP, 96, 48), mat);
@@ -598,7 +617,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   }
 }
 
-function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>) {
+function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>, ctx: BuildCtx) {
   const r = rng(b.seed);
   const pos = new Float32Array(b.dust * 3);
   const v = new V3();
@@ -649,6 +668,7 @@ function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>) {
       put(rocks, i, v, 1e-6 + 2.5e-4 * r() ** 2);
     }
     rocks.position.copy(c);
+    ctx.anim.push(() => rocks.position.copy(c));       // (c is the body's own position, which moves)
     rocks.frustumCulled = false;
     group.add(rocks);
   }
@@ -694,6 +714,11 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   group.add(new THREE.PointLight(spec.light, 3.4, 0, 0));
   const posOf = new Map<string, V3>();
 
+  const movers: Mover[] = [];
+  const kOf = (parent: string): number | null => {
+    const ref = MOON_REF[parent], rs = ref && spec.bodies.find((x) => x.id === ref[0]);
+    return rs ? (ref[1] * ref[1]) / rs.orbit ** 3 : null;
+  };
   for (const b of spec.bodies) {
     const base = b.parent ? posOf.get(b.parent)! : ZERO;
     const pos = new V3(Math.cos(b.angle) * b.orbit, b.lift ?? 0, Math.sin(b.angle) * b.orbit).add(base);
@@ -703,17 +728,46 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
     holder.position.copy(pos);
     group.add(holder);
     await bodyVisual(b, holder, pos, ctx);
-    if (b.orbit > 0 && b.kind !== 'ship') group.add(orbitLine(base, b.orbit, b.lift ?? 0, b.parent ? 0.14 : 0.3));
+    let line: THREE.LineLoop | undefined;
+    if (b.orbit > 0 && b.kind !== 'ship') { line = orbitLine(base, b.orbit, b.lift ?? 0, b.parent ? 0.14 : 0.3); group.add(line); }
     const th: Thing = {
       id: b.id, name: b.name, sub: b.sub, desc: b.desc, kind: b.kind, pos, radius: b.radius,
       range: b.range ?? Infinity, solid: true, nav: true, indent: !!b.parent, parent: b.parent, dock: b.dock,
     };
     things.push(th);
     addLabel({ labels }, th, b.kind);
+    // Does it go round? Things that orbit the star by Kepler's third law (a year in days is 365.25 times the
+    // distance in AU to the 3/2), moons by their planet's pull; ships and stations beside a body ride along with it.
+    if (b.orbit > 0 && b.kind !== 'star') {
+      let w = 0;
+      const natural = b.kind === 'planet' || b.kind === 'dwarf' || b.kind === 'asteroid' || b.kind === 'comet';
+      if (!b.parent && natural) w = (TAU / (365.25 * (b.orbit / AU) ** 1.5));
+      else if (b.parent && b.kind === 'moon') { const k = kOf(b.parent); if (k) w = (TAU / Math.sqrt(k * b.orbit ** 3)) * (b.id === 'triton' ? -1 : 1); }
+      const parentPos = b.parent ? posOf.get(b.parent)! : null;
+      if (w || parentPos) {
+        th.vel = new V3(); th.step = new V3();
+        movers.push({ th, holder, pos, w, ang: b.angle, orbit: b.orbit, lift: b.lift ?? 0, parentPos, off: pos.clone().sub(parentPos ?? ZERO), line });
+      }
+    }
   }
+  ctx.anim.push(() => {
+    if (simStep === 0) { for (const m of movers) m.th.vel!.set(0, 0, 0); return; }
+    for (const m of movers) {
+      const prev = _c.copy(m.pos);
+      if (m.w) {
+        m.ang += m.w * simStep;
+        m.pos.set(Math.cos(m.ang) * m.orbit, m.lift, Math.sin(m.ang) * m.orbit);
+        if (m.parentPos) m.pos.add(m.parentPos);
+      } else if (m.parentPos) m.pos.copy(m.parentPos).add(m.off);
+      m.th.step!.copy(m.pos).sub(prev);
+      m.th.vel!.copy(m.th.step!).divideScalar(Math.max(simDt, 1e-6));
+      m.holder.position.copy(m.pos);
+      if (m.line && m.parentPos) m.line.position.copy(m.parentPos);
+    }
+  });
   progress('belts');
   await pause();
-  for (const belt of spec.belts) makeBelt(belt, group, posOf);
+  for (const belt of spec.belts) makeBelt(belt, group, posOf, ctx);
 
   const R = 0.00334;
   const gpos = new V3(Math.cos(spec.gate.angle) * spec.gate.orbit, 0, Math.sin(spec.gate.angle) * spec.gate.orbit);
@@ -1357,6 +1411,7 @@ addEventListener('keydown', (e) => {
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
     return;
   }
+  if (e.code === 'Comma' || e.code === 'Period') { rateIdx = clamp(rateIdx + (e.code === 'Period' ? 1 : -1), 0, RATES.length - 1); return; }
   if (e.code === 'KeyT') { if (tour.active || voyage) stopTour(); else voyageMenu.open(); return; }
   if (e.code === 'KeyI') { if (inspect.on) stopInspect(); else startInspect(); return; }
   if (inspect.on && (STEER.includes(e.code) || e.code === 'Escape')) stopInspect();
@@ -1980,6 +2035,11 @@ function updateHud(dt: number) {
     : escort ? `ALONGSIDE · ${escort.thing.name}`
     : ship.throttle < 0 ? 'REVERSE' : 'MANUAL';
   $('mode').classList.toggle('auto', !!auto || !!brake || !!escort);
+  {
+    const d = simElapsed, days = Math.floor(d), hrs = Math.floor((d - days) * 24), mins = Math.floor(((d - days) * 24 - hrs) * 60);
+    const el = days >= 365 ? `${Math.floor(days / 365.25)} y ${Math.floor(days % 365.25)} d` : days ? `${days} d ${hrs} h` : `${hrs} h ${mins} m`;
+    $('simclock').textContent = `TIME +${el} · ${RATES[rateIdx][1]}`;
+  }
 
   const near = nearest as Thing | null;
   // (The slack is for Sol's planets; in the ring space it would be the whole bubble.)
@@ -2126,6 +2186,9 @@ function frame(now: number) {
   dust.position.copy(cp);
   dustMat.opacity = 0.6 * clamp(1 - Math.abs(ship.speed) / (DUST_BOX * 6), 0, 1);
 
+  simDt = dt;
+  simStep = busy ? 0 : RATES[rateIdx][0] * dt;
+  simElapsed += simStep;
   space.tick(clock, dt);
   tickShipLights(clock);
   // The ships under way have just moved: carry ours along with the one we are chasing or flying beside, so
@@ -2134,6 +2197,15 @@ function frame(now: number) {
     _a.copy(escort.thing.pos).sub(escort.last);
     escort.last.copy(escort.thing.pos);
     ship.pos.add(_a); ship.prev.add(_a); shipModel.position.add(_a); camera.position.add(_a); sky.position.copy(camera.position);
+  } else if (simStep > 0) {
+    // Near a planet, moon or station that is going round, we go with it (a ship near Earth is in orbit, not left behind).
+    let near: Thing | null = null, nd = Infinity;
+    for (const th of space.things) {
+      if (!th.step) continue;
+      const d = _b.copy(th.pos).sub(th.step).distanceTo(camera.position) / Math.max(th.radius, 1e-9);   // (before it moved)
+      if (d < 40 && d < nd) { nd = d; near = th; }
+    }
+    if (near) { ship.pos.add(near.step!); ship.prev.add(near.step!); shipModel.position.add(near.step!); camera.position.add(near.step!); sky.position.copy(camera.position); }
   }
   updateLabels();
   updateHud(dt);
