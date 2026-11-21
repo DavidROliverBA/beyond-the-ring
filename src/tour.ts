@@ -17,7 +17,8 @@ export interface Shot {
 
 /** A shot that looks at its subject from the usual side, `dist` radii away: used by the voyages. */
 export const look = (id: string, secs = 8, travel = 7, caption?: string, side = 1): Shot =>
-  ({ id, from: [3.8, side * 0.9, 0.25], to: [2.6, side * 0.5, 0.1], secs, travel, caption });
+  // Round it: a sweep of about 150 degrees across its lit side, the way a camera crew would, and the next flight sets off from there.
+  ({ id, from: [3.8, side * -1.3, 0.28], to: [2.9, side * 1.3, 0.12], secs, travel, caption });
 
 /** A leg of a voyage: where it is, and what to look at there (or a few of the system's own bodies). */
 export interface Stage { space: string; shots: Shot[] | 'generic' }
@@ -76,12 +77,13 @@ export interface Tour {
 }
 
 const _cam = new THREE.PerspectiveCamera();
+const _p1 = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion();
 
 export function createTour(cut: (t: Target, caption: string) => void, dark: (on: boolean) => void): Tour {
   let shots: Shot[] = [], list: Target[] = [], sun: V3 | null = null, i = 0, t = 0, blacked = false;
   let once = false, end: (() => void) | undefined;
   // A flight between two shots: from where the camera was, along an arc, to the start of the next.
-  let leg: { t: number; dur: number; p0: V3; p1: V3; c: V3; q0: THREE.Quaternion; q1: THREE.Quaternion } | null = null;
+  let leg: { t: number; dur: number; d0: number; dir0: V3; q0: THREE.Quaternion; spin: THREE.Quaternion } | null = null;
   const dir = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), toSun = new THREE.Vector3(), right = new THREE.Vector3();
   const ease = (x: number) => x * x * (3 - 2 * x);
   const target = () => list.find((x) => x.id === shots[i]?.id);
@@ -106,14 +108,13 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
     leg = null;
     if (!tg) return;
     if (camera && shot.travel) {
-      // Fly there. The arc rises above the plane of the system, which keeps it clear of most of what is in the way.
+      // Fly there with the subject dead ahead the whole way, so it grows from a point into the shot. The camera
+      // first turns to face it, and the path swings round to the side the shot starts on while the distance
+      // closes smoothly (steady growth on screen).
       const p1 = shotPos(shot, tg, 0, new THREE.Vector3()), p0 = camera.position.clone();
-      _cam.position.copy(p1); _cam.up.set(0, 1, 0); _cam.lookAt(tg.pos); _cam.updateMatrixWorld();
-      const len = p0.distanceTo(p1);
-      leg = {
-        t: 0, dur: shot.travel, p0, p1, c: p0.clone().add(p1).multiplyScalar(0.5).addScaledVector(up, len * 0.22),
-        q0: camera.quaternion.clone(), q1: _cam.quaternion.clone(),
-      };
+      const dir0 = p0.clone().sub(tg.pos), d0 = Math.max(dir0.length(), 1e-30), dir1 = p1.clone().sub(tg.pos).normalize();
+      dir0.divideScalar(d0);
+      leg = { t: 0, dur: shot.travel, d0, dir0, q0: camera.quaternion.clone(), spin: new THREE.Quaternion().setFromUnitVectors(dir0, dir1) };
     }
     // (On a flight the caption waits until we arrive.)
     if (!leg) cut(tg, shot.caption ?? tg.desc ?? tg.sub ?? '');
@@ -147,9 +148,16 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
       if (leg) {
         leg.t += dt;
         const u = Math.min(1, leg.t / leg.dur), e = ease(u);
-        // Quadratic arc p0 -> c -> p1.
-        camera.position.copy(leg.p0).multiplyScalar((1 - e) * (1 - e)).addScaledVector(leg.c, 2 * (1 - e) * e).addScaledVector(leg.p1, e * e);
-        camera.quaternion.slerpQuaternions(leg.q0, leg.q1, ease(Math.min(1, u * 1.15)));
+        const p1 = shotPos(shot, tg, 0, _p1), d1 = Math.max(p1.distanceTo(tg.pos), 1e-30);
+        // Direction round the subject: turn from the way we came in to the way the shot starts.
+        _q.identity().slerp(leg.spin, e);
+        const dir = _d.copy(leg.dir0).applyQuaternion(_q);
+        const dist = Math.exp(Math.log(leg.d0) + (Math.log(d1) - Math.log(leg.d0)) * e);
+        camera.position.copy(tg.pos).addScaledVector(dir, dist);
+        _cam.position.copy(camera.position); _cam.up.set(0, 1, 0); _cam.lookAt(tg.pos); _cam.updateMatrixWorld();
+        // Turn to face it in the first third of the flight (that is the set-off), then hold it dead ahead.
+        const w = ease(Math.min(1, u / 0.3));
+        camera.quaternion.slerpQuaternions(leg.q0, _cam.quaternion, w);
         camera.updateMatrixWorld();
         if (u >= 1) { leg = null; cut(tg, shot.caption ?? tg.desc ?? tg.sub ?? ''); }
         return true;

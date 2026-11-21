@@ -56,6 +56,28 @@ export const VOYAGES: Voyage[] = [
     ] }],
   },
   {
+    id: 'ships', name: 'Ships and stations', from: SOL_ONLY,
+    blurb: 'A look round the fleet: freighters, warships, a racer, a hauler and a stealth ship, then Tycho Station, and Medina in the ring space.',
+    stages: [
+      { space: 'sol', shots: [
+        flight('molinari', 'Guy Molinari: a Belter freighter. Containers lashed in rows, radiators folded out to shed the heat.', 9),
+        flight('razorback', 'Razorback: a racer, built round one big drive and not much else.', 8, -1),
+        flight('canterbury', 'Canterbury: an ice hauler. Cheap to run, slow to turn, and the reason the outer planets can drink.', 9),
+        flight('anubis', 'Anubis, the stealth ship: no lights, a cold drive, and edges set to bounce a radar away.', 8, -1),
+        flight('donnager', 'Donnager: a Martian battleship, and a carrier for a brood of corvettes.', 10),
+        flight('agathaking', 'Agatha King: Earth\'s dreadnought. Radiator banks on both flanks, a comms mast, heavy guns aft.', 10, -1),
+        flight('thomasprince', 'Thomas Prince, sent to the Ring with a delegation aboard.', 9),
+        flight('tycho', 'Tycho Station: the yard, two habitat rings turning against each other.', 10, -1),
+      ] },
+      { space: 'sol', shots: [flight('ring', 'And now the way out.', 11)] },
+      { space: 'slow', shots: [
+        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 7, travel: 0 },
+        flight('medina', 'Medina: a slow drum, four docking arms, fuel spheres and a radiator cross.', 11),
+      ] },
+      { space: 'sol', shots: [flight('ring', 'Home again.', 8)] },
+    ],
+  },
+  {
     id: 'small', name: 'Rocks, comets and dwarfs', from: SOL_ONLY,
     blurb: 'The small worlds: Eros, Psyche, the Trojans, Halley, Hale-Bopp, an interloper from another star, and the dwarf planets at the edge.',
     stages: [{ space: 'sol', shots: [
@@ -143,7 +165,7 @@ export function createVoyageMenu(can: (v: Voyage) => boolean, go: (v: Voyage) =>
   document.head.append(style);
   const root = document.createElement('div');
   root.id = 'voyages';
-  root.innerHTML = '<div id="voyages-box"><h2>VOYAGES</h2><p class="sub">Choose one; any key hands the ship back.</p><div id="voy-list"></div><div class="foot">1–7 or click · Enter starts the highlighted one · T or Esc closes</div></div>';
+  root.innerHTML = '<div id="voyages-box"><h2>VOYAGES</h2><p class="sub">Choose one; any key hands the ship back.</p><div id="voy-list"></div><div class="foot">1–8 or click · Enter starts the highlighted one · T or Esc closes</div></div>';
   document.body.append(root);
   const listEl = root.querySelector('#voy-list') as HTMLElement;
   let isOpen = false, sel = 0;
