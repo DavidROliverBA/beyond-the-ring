@@ -70,7 +70,12 @@ interface Craft {
   tint: THREE.Color;
   model: ShipModel;
   name: string;
+  /** A sidestep, to keep clear of other ships and of anything solid; it eases back to nothing once the way is clear. */
+  off: V3;
 }
+
+/** Something solid that ships must not fly through: a station, or a ship parked at a port. `pos` may move. */
+export interface Obstacle { pos: V3; radius: number }
 
 /** What the map needs to know about a ship under way: `pos` and `vel` stay live. */
 export interface CraftInfo { name: string; model: ShipModel; len: number; pos: V3; vel: V3; fleet: number }
@@ -86,7 +91,7 @@ const _p = new THREE.Vector3();
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 
-export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLocal = 450) {
+export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLocal = 450, obstacles: Obstacle[] = []) {
   const r = rng(seed);
   const group = new THREE.Group();
   const crafts: Craft[] = [];
@@ -111,6 +116,16 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
     return pool[0];
   };
 
+  /** Not inside a station or on top of a parked ship: move a goal (offset `c.to` from `port`) out to clear air. */
+  const clearOf = (c: Craft, port: Port) => {
+    _a.copy(c.to).add(port.pos);
+    for (const ob of obstacles) {
+      _b.copy(_a).sub(ob.pos);
+      const need = ob.radius * 1.15 + c.len * 0.8, dd = _b.length();
+      if (dd < need) { if (dd < 1e-30) _b.set(need, 0, 0); else _b.multiplyScalar((need - dd) / dd); c.to.add(_b); _a.add(_b); }
+    }
+  };
+
   const plan = (c: Craft, now: number, f: Fleet) => {
     c.from.copy(c.to);
     c.fport = c.port;
@@ -118,6 +133,7 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
     if (f.ports.length > 1 && next === c.port && r() < 0.7) next = (next + 1) % f.ports.length;
     c.port = next;
     pointAt(f.ports[next], c.to);
+    clearOf(c, f.ports[next]);
     const D = _a.copy(c.from).add(f.ports[c.fport].pos).distanceTo(_b.copy(c.to).add(f.ports[c.port].pos));
     // A real hop: no faster than a drive that keeps pushing at a few m/s² can get up to over that distance
     // (so a hop across the system takes days and the ship is, to us, nearly still), and at least the local
@@ -147,11 +163,12 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
       group.add(g);
       const c: Craft = {
         g, fleet: fi, len, port: Math.floor(r() * f.ports.length), fport: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(),
-        t0: 0, dur: 1, hold: 0, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), pos: new THREE.Vector3(), vel: new THREE.Vector3(), model: kind.model,
+        t0: 0, dur: 1, hold: 0, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), pos: new THREE.Vector3(), vel: new THREE.Vector3(), off: new THREE.Vector3(), model: kind.model,
         name: `${NAMES[Math.floor(r() * NAMES.length)]}-${100 + Math.floor(r() * 900)}`,
         tint: new THREE.Color(r() < 0.25 ? 0xffd9a8 : r() < 0.5 ? 0xffffff : 0x9fd8ff),
       };
       pointAt(f.ports[c.port], c.to);
+      clearOf(c, f.ports[c.port]);
       plan(c, 0, f);
       // Scatter them through their flights so the sky is busy from the first frame.
       c.t0 = -r() * (c.dur + c.hold);
@@ -199,7 +216,7 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
         _p.copy(c.pos);
         c.a.copy(c.from).add(fleets[fi].ports[c.fport].pos);
         c.b.copy(c.to).add(fleets[fi].ports[c.port].pos);
-        c.pos.copy(c.a).lerp(c.b, s);
+        c.pos.copy(c.a).lerp(c.b, s).add(c.off);
         if (dt > 0) c.vel.copy(c.pos).sub(_p).divideScalar(dt);
         // Burn towards the goal, flip over about half-way, burn the other way to stop.
         const k = Math.min(1, Math.max(0, (tt - 0.4) / 0.2));
@@ -216,7 +233,50 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
         gl.pos[i * 3 + 2] = show ? 1e20 : c.pos.z - o.z;
       }
       gl.geo.attributes.position.needsUpdate = true;
+      separate(list, dt);
     }
+  };
+
+  /** Keep the ships that can be seen clear of one another and of anything solid. Each is nudged sideways (and
+   *  back off the line of the other) as it closes, hard enough that two ships meeting head on at the local pace
+   *  slide past with a gap; the sidestep fades away when the way is clear. */
+  const separate = (list: Craft[], dt: number) => {
+    if (dt <= 0) return;
+    const k = 1 - Math.exp(-9 * dt), relax = Math.exp(-0.6 * dt);
+    const vis = list.filter((c) => c.g.visible);
+    for (const c of list) if (!c.g.visible) c.off.multiplyScalar(0);
+    const near = new Set<Craft>();
+    const push = (c: Craft, dir: V3, pen: number, w: number) => {
+      c.off.addScaledVector(dir, pen * k * w);
+      near.add(c);
+    };
+    for (let i = 0; i < vis.length; i++) {
+      const a = vis[i];
+      for (let j = i + 1; j < vis.length; j++) {
+        const b = vis[j];
+        const zone = 1.3 * 0.5 * (a.len + b.len) + 0.5 * Math.max(a.len, b.len);        // well clear of touching, wider for the big ones
+        _d.copy(a.pos).sub(b.pos);
+        const dd = _d.length();
+        if (dd >= zone) continue;
+        if (dd < 1e-30) _d.set(1, 0, 0); else _d.divideScalar(dd);
+        // Part of the push goes sideways (to the left of a, right of b), so a head-on pair passes instead of stopping.
+        _p.copy(_d).cross(_up);
+        if (_p.lengthSq() < 1e-6) _p.set(1, 0, 0);
+        _p.normalize();
+        _d.multiplyScalar(0.7).addScaledVector(_p, 0.7).normalize();
+        const pen = zone - dd, wa = b.len / (a.len + b.len), wb = a.len / (a.len + b.len);   // the small one gives way
+        push(a, _d, pen, 2 * wa);
+        push(b, _d.negate(), pen, 2 * wb);
+      }
+      for (const ob of obstacles) {
+        _d.copy(a.pos).sub(ob.pos);
+        const dd = _d.length(), zone = ob.radius * 1.2 + a.len * 0.9;
+        if (dd >= zone) continue;
+        if (dd < 1e-30) _d.set(0, 1, 0); else _d.divideScalar(dd);
+        push(a, _d, zone - dd, 5);
+      }
+    }
+    for (const c of vis) if (!near.has(c)) c.off.multiplyScalar(relax);
   };
   const info: CraftInfo[] = crafts.map((c) => ({ name: `${LABEL[c.model] ?? 'Ship'} ${c.name}`, model: c.model, len: c.len, pos: c.pos, vel: c.vel, fleet: c.fleet }));
   return { group, tick, count: crafts.length, info };

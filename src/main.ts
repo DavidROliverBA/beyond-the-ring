@@ -801,8 +801,8 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
       { ports: [...port('mars', 0.03, 0.08), ...port('phobos', 0.002, 0.01)], n: 10 },
       { ports: [...port('earth', 0.06, 0.2), ...port('mars', 0.03, 0.12)], n: 30, only: ['freighter', 'hauler', 'battleship', 'survey'] },
       { ports: port('ceres', 0.004, 0.05), n: 60 },
-      { ports: [...port('ceres', 0.004, 0.02), ...port('tycho', 2e-6, 4e-5)], n: 25 },
-      { ports: port('tycho', 2e-6, 6e-5), n: 70 },
+      { ports: [...port('ceres', 0.004, 0.02), ...port('tycho', 8e-6, 4e-5)], n: 25 },
+      { ports: port('tycho', 8e-6, 6e-5), n: 70 },
       { ports: [...port('ceres', 0.01, 0.04), ...port('vesta', 0.002, 0.01), ...port('pallas', 0.002, 0.01)], n: 20, only: ['freighter', 'racer', 'survey'] },
       { ports: port('jupiter', 0.6, 2.2), n: 25 },
       { ports: port('ganymede', 0.03, 0.15), n: 30 },
@@ -816,7 +816,9 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
       ...spec.bodies.filter((b) => b.kind === 'planet' && b.radius >= 0.02).flatMap((b) => port(b.id, b.radius * 1.6, b.radius * 6).map((p) => ({ ports: [p], n: 6 }))),
       { ports: [{ pos: gpos.clone().addScaledVector(normal, 0.05), inner: 0.004, outer: 0.15 }], n: 22 },
     ];
-  const traffic = makeTraffic(fleets.filter((f) => f.ports.length), spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1));
+  // Stations and parked ships are solid: the traffic keeps out of them and sidesteps them.
+  const solids = spec.bodies.filter((b) => b.kind === 'station' || b.kind === 'ship').flatMap((b) => { const pp = posOf.get(b.id); return pp ? [{ pos: pp, radius: b.radius }] : []; });
+  const traffic = makeTraffic(fleets.filter((f) => f.ports.length), spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1), undefined, undefined, solids);
   group.add(traffic.group);
   ctx.anim.push((dt) => traffic.tick(dt, ship.pos, escort?.thing.pos));
   const idx = spec.id === 'sol' ? 0 : Number(spec.id.slice(4));
@@ -965,7 +967,7 @@ async function buildSlowZone(): Promise<Space> {
     { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 8.75 * KM }], n: 80, knot: 9 * KM },
     { ports: [{ pos: medinaPos, inner: 1.75 * KM, outer: 5 * KM }, { pos: new V3(), inner: 8.75 * KM, outer: 20 * KM }], n: 25, knot: 45 * KM },
     { ports: [{ pos: medinaPos, inner: 3 * KM, outer: 12 * KM }, ...charted], n: 36, only: ['freighter', 'hauler', 'survey', 'corvette'] },
-  ], 4242, SOL_UNIT, 80);
+  ], 4242, SOL_UNIT, 80, [{ pos: medinaPos, radius: 1 * KM }, { pos: new V3(), radius: HUB_R }]);
   group.add(crowd.group);
   ctx.anim.push((dt) => crowd.tick(dt, ship.pos, escort?.thing.pos));
 
