@@ -140,8 +140,16 @@ function canvasTex(c: HTMLCanvasElement): THREE.CanvasTexture {
 }
 
 const texLoader = new THREE.TextureLoader();
+const bitmapLoader = new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
 async function loadTex(url: string, srgb = true): Promise<THREE.Texture> {
-  const t = await texLoader.loadAsync(url);
+  // Decoded off the main thread as a bitmap, so the upload to the GPU is not also a decode (that was a stall of a tenth of a second or more).
+  let t: THREE.Texture;
+  try {
+    const bmp = await bitmapLoader.loadAsync(url);
+    t = new THREE.Texture(bmp as unknown as HTMLImageElement);
+    t.flipY = false;
+    t.needsUpdate = true;
+  } catch { t = await texLoader.loadAsync(url); }
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = THREE.RepeatWrapping;
   t.anisotropy = 8;
@@ -1900,9 +1908,11 @@ function roomToSharpen(l: Lod, app: number) {
 /** Repaint the surface of whatever you are closest to, one body at a time, in the background. */
 function lodTick() {
   if (lodBusy) return;
+  const tourSoon = tour.ahead(0);
   let best: Lod | null = null, score = 0, want = 0;
   for (const l of space.lods) {
-    const app = l.spec.radius / Math.max(1e-12, l.pos.distanceTo(ship.pos));
+    let app = l.spec.radius / Math.max(1e-12, l.pos.distanceTo(ship.pos));
+    if (tourSoon.includes(l.spec.id)) app = Math.max(app, 0.1);          // a tour is heading there: paint it on the way, not on arrival
     const target = app > 0.06 ? 2 : app > 0.004 ? 1 : 0;
     if (target <= l.level || app <= score) continue;
     // A photo body that only lacks its large maps waits until there is room for them.
@@ -2082,7 +2092,7 @@ function updateHud(dt: number) {
 // ------------------------------------------------------------------- loop
 
 const _off = new V3(), _lookQ = new THREE.Quaternion(), _qI = new THREE.Quaternion();
-let camHold = 0;
+let camHold = 0, tourDt = 1 / 60;
 let last = performance.now();
 let clock = 0;
 
@@ -2183,7 +2193,9 @@ function frame(now: number) {
   camera.quaternion.copy(_lookQ);
   camera.updateMatrixWorld();
   if (inspect.on && inspect.th) inspectCamera(realDt);
-  if (tour.active && tour.update(dt, camera, !started)) {
+  // A stalled frame must not make the film leap: the tour runs on a smoothed frame time.
+  tourDt += (Math.min(dt, 0.05) - tourDt) * 0.12;
+  if (tour.active && tour.update(photo ? 0 : tourDt, camera, !started)) {
     // The tour drives the camera; the ship rides along unseen, so maps sharpen where we're looking.
     shipModel.visible = false;
     ship.pos.copy(camera.position);

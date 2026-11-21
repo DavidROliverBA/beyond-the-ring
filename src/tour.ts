@@ -71,6 +71,8 @@ export interface Tour {
   /** True if there is something to show. */
   start(spaceId: string, things: Target[], sunPos: V3 | null, opt?: StartOptions): boolean;
   stop(): void;
+  /** The ids of the place being shown and the next `n` after it, so their surfaces can be ready before we get there. */
+  ahead(n: number): string[];
   /** Move the camera; returns false once there is nothing to show. */
   /** `aside` frames the subject off to the right, clear of the start screen's text. */
   update(dt: number, camera: THREE.PerspectiveCamera, aside?: boolean): boolean;
@@ -147,6 +149,7 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
       if (tour.active) { pending = !!opt.flyIn; begin(); }
       return tour.active;
     },
+    ahead(n) { return tour.active ? shots.slice(i, i + n + 1).map((x) => x.id) : []; },
     stop() {
       tour.active = false;
       leg = null;
