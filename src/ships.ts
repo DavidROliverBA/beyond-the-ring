@@ -8,6 +8,7 @@ import { DrivePlume } from './plume';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import corvetteGlb from '../assets/models/corvette.glb';
+import ringGlb from '../assets/models/ring.glb';
 import battleshipGlb from '../assets/models/battleship.glb';
 import haulerGlb from '../assets/models/hauler.glb';
 import tychoGlb from '../assets/models/tycho.glb';
@@ -623,9 +624,19 @@ function prepare(root: G): G {
   return root;
 }
 
+/** The Ring (tools/blender/ring.py): a hoop of major radius 1 in the XY plane, face towards +Z. Null if it did not load. */
+let ringFile: G | undefined;
+export function ringModel(): G | null {
+  return ringFile ? ringFile.clone(true) : null;
+}
+
 export async function loadModels() {
   // The files are packed with meshopt (tools/blender/build.py), which the loader unpacks as it reads.
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const ringLoad = loader.loadAsync(ringGlb).then((r) => { ringFile = prepare(r.scene);
+    // A megastructure left to weather for millennia: darker than a ship's paint, though the sun still picks out the plates.
+    ringFile.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.isMeshStandardMaterial && !(m as unknown as { _dim?: boolean })._dim) { m.color.multiplyScalar(0.5); (m as unknown as { _dim?: boolean })._dim = true; } });
+  }, (e) => console.warn('The Ring model did not load; using the simple hoop.', e));
   await Promise.all((Object.entries(GLB) as [ShipModel, string][]).map(async ([name, url]) => {
     try {
       loaded.set(name, prepare((await loader.loadAsync(url)).scene));
@@ -633,6 +644,7 @@ export async function loadModels() {
       console.warn(`Model "${name}" did not load; using the simple one.`, e);
     }
   }));
+  await ringLoad;
 }
 
 function fromFile(name: ShipModel, src: G): G {
