@@ -2,10 +2,19 @@
 // "Quick look" is the old tour of the system you are in. The others fly across Sol, and through the Ring
 // and the gates to other suns; each ends back where it began, and any key hands the ship back.
 
-import { look, type Shot, type Voyage } from './tour';
+import { look, gateShot, type Shot, type ShotStyle, type Voyage } from './tour';
 
 const SOL_ONLY = ['sol'];
-const flight = (id: string, caption: string, secs = 8, side = 1): Shot => look(id, secs, 8, caption, side);
+/** How each place is staged, for variety: reveals out of the star's glare for the big worlds, low skims over rocks and moons,
+ *  side-on tracking for ships, a pull back from a detail for small things. The rest sweep round the lit side. */
+const STYLE: Record<string, ShotStyle> = {
+  mercury: 'skim', venus: 'reveal', earth: 'reveal', luna: 'pull', phobos: 'skim', deimos: 'pull',
+  vesta: 'skim', pallas: 'pull', tycho: 'pull', jupiter: 'reveal', io: 'skim', europa: 'pull', callisto: 'skim',
+  saturn: 'reveal', enceladus: 'pull', titan: 'skim', neptune: 'reveal', triton: 'skim', pluto: 'pull',
+  molinari: 'track', razorback: 'track', canterbury: 'track', anubis: 'track', donnager: 'track', agathaking: 'track', thomasprince: 'track', medina: 'pull',
+  eros: 'pull', psyche: 'skim', ida: 'pull', haumea: 'skim', eris: 'pull',
+};
+const flight = (id: string, caption: string, secs = 8, side = 1): Shot => look(id, secs, 8, caption, side, STYLE[id] ?? 'sweep');
 
 export const VOYAGES: Voyage[] = [
   {
@@ -69,10 +78,11 @@ export const VOYAGES: Voyage[] = [
         flight('thomasprince', 'Thomas Prince, sent to the Ring with a delegation aboard.', 9),
         flight('tycho', 'Tycho Station: the yard, two habitat rings turning against each other.', 10, -1),
       ] },
-      { space: 'sol', shots: [flight('ring', 'And now the way out.', 11)] },
+      { space: 'sol', shots: [gateShot('ring', 'And now the way out.', 8)] },
       { space: 'slow', shots: [
-        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 7, travel: 0 },
+        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 7, travel: 7 },
         flight('medina', 'Medina: a slow drum, four docking arms, fuel spheres and a radiator cross.', 11),
+        gateShot('g0', 'And home through the Sol gate.', 6),
       ] },
       { space: 'sol', shots: [flight('ring', 'Home again.', 8)] },
     ],
@@ -100,17 +110,17 @@ export const VOYAGES: Voyage[] = [
     id: 'ring', name: 'Through the Ring', from: SOL_ONLY,
     blurb: 'Out to the Ring, through it into the ring space, past the station and Medina, and through the gate to Adro and its green diamond.',
     stages: [
-      { space: 'sol', shots: [flight('ring', 'Beyond Uranus, a hoop a thousand kilometres across. The way out.', 12)] },
+      { space: 'sol', shots: [gateShot('ring', 'Beyond Uranus, a hoop a thousand kilometres across. The way out.', 9)] },
       { space: 'slow', shots: [
-        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 9, travel: 0, caption: 'The Ring Station: where everything stops before it goes on.' },
+        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 9, travel: 7, caption: 'The Ring Station: where everything stops before it goes on.' },
         flight('medina', 'Medina Station: a slow drum at the hub of thirteen hundred doors.', 10),
         flight('g0', 'Behind it, the way home.', 8, -1),
-        flight('g412', 'Adro. One gate, one star, one object.', 10),
+        gateShot('g412', 'Adro. One gate, one star, one object.', 8),
       ] },
       { space: 'sys:412', shots: 'generic' },
       { space: 'slow', shots: [
-        { id: 'g412', from: [4, 0.8, 0.2], to: [3, 0.4, 0.1], secs: 7, travel: 0, caption: 'Back through the gate.' },
-        flight('g0', 'And home through the Sol gate.', 9),
+        gateShot('g412', 'Back through the gate.', 5, 6, false),
+        gateShot('g0', 'And home through the Sol gate.', 8),
       ] },
       { space: 'sol', shots: [flight('ring', 'Home again.', 8)] },
     ],
@@ -119,20 +129,20 @@ export const VOYAGES: Voyage[] = [
     id: 'worlds', name: 'The new worlds', from: SOL_ONLY,
     blurb: 'Through the Ring to Ilus, the first world settled past the gates, and Laconia, where something old keeps its platforms in orbit.',
     stages: [
-      { space: 'sol', shots: [flight('ring', 'Out to the Ring, and through.', 11)] },
+      { space: 'sol', shots: [gateShot('ring', 'Out to the Ring, and through.', 9)] },
       { space: 'slow', shots: [
-        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 7, travel: 0 },
-        flight('g77', 'Ilus. Also filed as New Terra: lithium in the ground and a sky full of small moons.', 10),
+        { id: 'station', from: [5.5, 0.9, 0.25], to: [3.6, 0.4, 0.1], secs: 7, travel: 7 },
+        gateShot('g77', 'Ilus. Also filed as New Terra: lithium in the ground and a sky full of small moons.', 8),
       ] },
       { space: 'sys:77', shots: 'generic' },
       { space: 'slow', shots: [
-        { id: 'g77', from: [4, 0.8, 0.2], to: [3, 0.4, 0.1], secs: 6, travel: 0 },
-        flight('g1100', 'Laconia: Earth-like and quiet, with strange platforms left in orbit.', 10),
+        gateShot('g77', undefined, 4, 6, false),
+        gateShot('g1100', 'Laconia: Earth-like and quiet, with strange platforms left in orbit.', 8),
       ] },
       { space: 'sys:1100', shots: 'generic' },
       { space: 'slow', shots: [
-        { id: 'g1100', from: [4, 0.8, 0.2], to: [3, 0.4, 0.1], secs: 6, travel: 0 },
-        flight('g0', 'Home through the Sol gate.', 9),
+        gateShot('g1100', undefined, 4, 6, false),
+        gateShot('g0', 'Home through the Sol gate.', 8),
       ] },
       { space: 'sol', shots: [flight('ring', 'Home again.', 8)] },
     ],

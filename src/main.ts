@@ -19,7 +19,7 @@ import { createLook } from './look';
 import { addLightning } from './lightning';
 import { makeComet } from './comet';
 import { createSound } from './sound';
-import { createTour, genericShots, type Voyage } from './tour';
+import { createTour, genericShots, gateShot, type Voyage } from './tour';
 import { VOYAGES, createVoyageMenu } from './voyages';
 import { FLIP_SECS, planTrip } from './course';
 import { createMap } from './starmap';
@@ -1265,7 +1265,8 @@ async function transit(g: Thing, quiet = false) {
   enter(next);
   await warm(scene, camera);
   const dest = next.things.find((t) => t.id === g.to!.gate)!;
-  ship.pos.copy(dest.pos).addScaledVector(dest.normal!, dest.radius * 2.5);
+  // (On a voyage we come out of the middle of the hoop, as if through it; otherwise we are placed in front of it.)
+  ship.pos.copy(dest.pos).addScaledVector(dest.normal!, dest.radius * (quiet ? 0.45 : 2.5));
   ship.prev.copy(ship.pos);
   faceShip(dest.normal!);
   camQ.copy(ship.q);
@@ -1313,6 +1314,7 @@ const STEER = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'KeyX', 'ArrowUp'
 const tour = createTour(
   (t, caption) => { if (started) banner(t.name, caption); },
   (on) => $('flash').classList.toggle('on', on),
+  { leg: () => sound.whoosh(0.8) },
 );
 let tourSave: { pos: V3; q: THREE.Quaternion; space: string } | null = null;
 /** The voyage being flown (T): which stage it is on. Set to null to call it off. */
@@ -1351,8 +1353,9 @@ async function voyageStage(run: NonNullable<typeof voyage>) {
     if (voyage !== run) return;
     if (++run.n >= run.v.stages.length) { banner(run.v.name, 'The voyage is over. Your ship is where you left her.'); stopTour(true); } else void voyageStage(run);
   };
-  const shots = st.shots === 'generic' ? genericShots(space.things, 7, 4) : st.shots;
-  if (!tour.start(space.id, space.things, tourSun(), { shots, once: true, flyIn: run.n === 0, end: next })) next();
+  // (A generic system ends at its gate, and dives through it to go on.)
+  const shots = st.shots === 'generic' ? [...genericShots(space.things, 8, 4), ...(space.things.some((t) => t.id === 'ring') ? [gateShot('ring', 'And back through the gate.', 6)] : [])] : st.shots;
+  if (!tour.start(space.id, space.things, tourSun(), { shots, once: true, flyIn: true, end: next })) next();
 }
 function stopTour(keepBanner = false) {
   if (!tour.active && !tourSave && !voyage) return;
@@ -2138,7 +2141,7 @@ function updateHud(dt: number) {
 // ------------------------------------------------------------------- loop
 
 const _off = new V3(), _lookQ = new THREE.Quaternion(), _qI = new THREE.Quaternion();
-let camHold = 0, tourDt = 1 / 60;
+let camHold = 0, tourDt = 1 / 60, cineState = false;
 let last = performance.now();
 let clock = 0;
 
@@ -2170,7 +2173,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
-if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip, dust, sky, auto, escort }) });
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip, dust, sky, auto, escort, camera }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
@@ -2247,6 +2250,9 @@ function frame(now: number) {
     ship.pos.copy(camera.position);
     ship.prev.copy(camera.position);
   }
+  // Tours get the film look: widescreen bars, a graded, grainy picture, anamorphic streaks.
+  const cineOn = (tour.active || !!voyage) && started;
+  if (cineOn !== cineState) { cineState = cineOn; document.body.classList.toggle('cine', cineOn); look.cine = cineOn ? 1 : 0; sound.score(cineOn); }
   sky.position.copy(camera.position);
   // The star's glint in the environment faces the star.
   if (space.star) {

@@ -76,10 +76,11 @@ const LENS = {
     starTurn: { value: 0 },
     aspect: { value: 1 },
     amount: { value: 0 },
+    streak: { value: 0 },
   },
   vertexShader: FULL_V,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse, tBright, tDirt, tStar, tRays; uniform float starTurn, aspect, amount, rays;
+    uniform sampler2D tDiffuse, tBright, tDirt, tStar, tRays; uniform float starTurn, aspect, amount, rays, streak;
     varying vec2 vUv;
     vec3 bright(vec2 uv) { return texture2D(tBright, uv).rgb; }
     // A touch of colour fringing on the halo, as real glass splits light.
@@ -90,6 +91,17 @@ const LENS = {
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
       c.rgb += texture2D(tRays, vUv).rgb * rays;
+      // Anamorphic streak: bright lights stretched sideways into a cool blue line, as through a cinema lens.
+      if (streak > 0.001) {
+        vec3 st = vec3(0.0);
+        for (int i = -14; i <= 14; i++) {
+          float fi = float(i);
+          vec3 b = bright(vUv + vec2(fi * 0.022 / aspect * 1.6, 0.0));
+          float l = max(max(b.r, b.g), b.b);
+          st += b * smoothstep(0.25, 1.2, l) * exp(-abs(fi) * 0.17);
+        }
+        c.rgb += st * vec3(0.30, 0.55, 1.0) * 0.07 * streak;
+      }
       if (amount <= 0.001) { gl_FragColor = c; return; }
       vec2 tc = vec2(1.0) - vUv;                 // ghosts appear mirrored through the centre
       vec2 gv = (vec2(0.5) - tc) * 0.37;
@@ -126,20 +138,28 @@ const FINISH = {
     grain: { value: 0.025 },
     time: { value: 0 },
     aspect: { value: 1 },
+    cine: { value: 0 },
   },
   vertexShader: FULL_V,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse; uniform vec3 gain, lift, gamma; uniform float vignette, grain, time, aspect;
+    uniform sampler2D tDiffuse; uniform vec3 gain, lift, gamma; uniform float vignette, grain, time, aspect, cine;
     varying vec2 vUv;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
+      // Colour fringing towards the corners, as real glass splits light (only in the film look).
+      vec2 ca = (vUv - 0.5) * 0.0042 * cine;
       vec4 c = texture2D(tDiffuse, vUv);
+      if (cine > 0.001) c.rgb = vec3(texture2D(tDiffuse, vUv - ca).r, c.g, texture2D(tDiffuse, vUv + ca).b);
       vec3 x = clamp(c.rgb, 0.0, 1.0);
       x = x * gain + lift * (1.0 - x);
+      // The film grade: cool teal in the shadows, warm in the highlights, a little more contrast.
+      float lum = dot(x, vec3(0.299, 0.587, 0.114));
+      x = mix(x, x * mix(vec3(0.90, 1.02, 1.10), vec3(1.08, 1.0, 0.92), smoothstep(0.15, 0.8, lum)), 0.55 * cine);
+      x = mix(x, x * x * (3.0 - 2.0 * x), 0.30 * cine);
       x = pow(max(x, vec3(0.0)), 1.0 / gamma);
       float r = length((vUv - 0.5) * vec2(aspect, 1.0));
-      x *= mix(1.0, smoothstep(1.05, 0.35, r), vignette);
-      x += (hash(vUv * 1024.0 + fract(time) * 97.0) - 0.5) * grain;
+      x *= mix(1.0, smoothstep(1.05, 0.35, r), vignette + 0.22 * cine);
+      x += (hash(vUv * 1024.0 + fract(time) * 97.0) - 0.5) * (grain + 0.02 * cine);
       gl_FragColor = vec4(x, c.a);
     }`,
 };
@@ -200,6 +220,8 @@ function starTexture() {
 export interface Look {
   /** Switch the whole look off (photo comparisons, slow machines). */
   enabled: boolean;
+  /** 1 for the film look (tours): streaks, split-tone grade, fringing, heavier vignette and grain; it eases in and out. */
+  cine: number;
   rays: Pass;
   lens: ShaderPass;
   finish: ShaderPass;
@@ -216,12 +238,15 @@ export function createLook(bloom: UnrealBloomPass): Look {
   lens.uniforms.tRays.value = rays.target.texture;
   const target: Record<'gain' | 'lift' | 'gamma', THREE.Vector3> = { gain: new THREE.Vector3(), lift: new THREE.Vector3(), gamma: new THREE.Vector3() };
   const p = new THREE.Vector3(), fwd = new THREE.Vector3(), toSun = new THREE.Vector3();
-  let t = 0, rayK = 0;
+  let t = 0, rayK = 0, cineK = 0;
 
   return {
-    rays, lens, finish, enabled: true,
+    rays, lens, finish, enabled: true, cine: 0,
     update(dt, place, camera, sun, aspect) {
       t += dt;
+      cineK += (this.cine - cineK) * (1 - Math.exp(-dt * 2.5));
+      finish.uniforms.cine.value = cineK;
+      lens.uniforms.streak.value = this.enabled ? cineK : 0;
       lens.enabled = finish.enabled = this.enabled;
       // Grade: ease towards the place's look over about a second, so docking doesn't snap.
       const [gain, lift, gamma] = GRADES[place] ?? GRADES.space;
@@ -255,7 +280,7 @@ export function createLook(bloom: UnrealBloomPass): Look {
       rays.enabled = this.enabled && rayK > 0.002;
       // Ghosts, halo and starburst come from whatever is brightest, so a bright planet raised them too. Only the star
       // should: they follow the star being in view (as the rays do), and stay faint otherwise.
-      lens.uniforms.amount.value = sun ? 0.03 + 0.27 * Math.min(1, rayK * 1.5) : 0.03;
+      lens.uniforms.amount.value = (sun ? 0.03 + 0.27 * Math.min(1, rayK * 1.5) : 0.03) * (1 + 0.35 * cineK);
     },
   };
 }

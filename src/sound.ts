@@ -23,6 +23,10 @@ export interface Sound {
   start(): void;
   update(s: SoundState, dt: number): void;
   ping(p: Ping): void;
+  /** A soft ambient score under a tour: it swells in and fades out. */
+  score(on: boolean): void;
+  /** The rush as the camera sets off on a flight; `strength` 0..1. */
+  whoosh(strength?: number): void;
   toggle(): boolean;
   readonly on: boolean;
   /** Loudness of what is playing now, 0..1 (for tests). */
@@ -138,7 +142,52 @@ export function createSound(): Sound {
     s.start(t, Math.random()); s.stop(t + 0.12);
   }
 
+  // The score: four slow chords of soft pads that overlap, through a long echo, as a film's strings would.
+  const CHORDS = [
+    [73.4, 220, 293.7, 349.2, 440], [58.3, 233.1, 293.7, 349.2, 466.2], [87.3, 220, 261.6, 349.2, 440], [65.4, 196, 261.6, 329.6, 392],
+  ];
+  let scoreOn = false, scoreBus: GainNode | null = null, scoreTimer = 0, chordN = 0;
+  function playChord() {
+    if (!ctx || !scoreBus) return;
+    const t = ctx.currentTime, dur = 13;
+    CHORDS[chordN++ % CHORDS.length].forEach((f, i) => {
+      for (const det of [-7, 6]) {
+        const o = ctx!.createOscillator(), g = ctx!.createGain();
+        o.type = i === 0 ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = det;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(i === 0 ? 0.16 : 0.05, t + 4.5);
+        g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(scoreBus!);
+        o.start(t); o.stop(t + dur + 0.2);
+      }
+    });
+  }
+  function buildScore(c: AudioContext) {
+    scoreBus = c.createGain(); scoreBus.gain.value = 0;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.4;
+    const dly = c.createDelay(2), fb = c.createGain(), wet = c.createGain();
+    dly.delayTime.value = 0.62; fb.gain.value = 0.42; wet.gain.value = 0.55;
+    scoreBus.connect(lp);
+    lp.connect(master);
+    lp.connect(dly); dly.connect(fb).connect(dly); dly.connect(wet).connect(master);
+  }
+
   const api: Sound = {
+    score(want) {
+      if (!ctx || want === scoreOn) return;
+      scoreOn = want;
+      if (!scoreBus) buildScore(ctx);
+      const t = ctx.currentTime;
+      scoreBus!.gain.cancelScheduledValues(t);
+      scoreBus!.gain.setTargetAtTime(want ? 0.9 : 0, t, want ? 2.5 : 1.8);
+      clearInterval(scoreTimer);
+      if (want) { playChord(); scoreTimer = window.setInterval(() => { if (scoreOn && on) playChord(); }, 9500); }
+    },
+    whoosh(strength = 0.7) {
+      if (!ctx || !on) return;
+      sweep(180, 2800, 2.0, 0.12 * strength);
+      tone([46], 1.5, 0.1 * strength, 'sine', 0);
+    },
     get on() { return on; },
     level() {
       if (!ctx) return 0;

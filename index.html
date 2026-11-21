@@ -88,6 +88,12 @@
 
   #banner { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); text-align: center; max-width: 560px; opacity: 0; transition: opacity 1.2s; }
   #banner.show { opacity: 1; }
+  /* The film look (tours): widescreen bars, and captions as a lower third. */
+  #cine-top, #cine-bot { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 6; pointer-events: none; transition: height 1.4s cubic-bezier(0.4, 0, 0.2, 1); }
+  #cine-top { top: 0; } #cine-bot { bottom: 0; }
+  body.cine #cine-top, body.cine #cine-bot { height: max(0px, calc((100vh - 100vw / 2.39) / 2)); }
+  body.cine #banner { top: auto; bottom: calc(max(0px, (100vh - 100vw / 2.39) / 2) + 28px); left: 6vw; transform: none; text-align: left; max-width: min(560px, 60vw); z-index: 7; }
+  body.cine #banner-title { font-size: 22px; letter-spacing: 0.26em; }
   #banner-title { font-size: 30px; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; text-shadow: 0 0 18px rgba(143, 220, 255, 0.7); }
   #banner-text { margin-top: 10px; color: #c3d3df; font: 14px/1.5 -apple-system, "Helvetica Neue", sans-serif; text-shadow: 0 0 6px #000; }
 
@@ -173,6 +179,7 @@
 
 <div id="photo-bar">PHOTO · mouse to look · [ ] exposure · Enter save · P back</div>
 <div id="flash"></div>
+<div id="cine-top"></div><div id="cine-bot"></div>
 <div id="loading"></div>
 
 <div id="start">
