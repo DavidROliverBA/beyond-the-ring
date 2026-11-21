@@ -62,8 +62,6 @@ function tube(g: G, m: Mat, rf: number, rb: number, len: number, z = 0, seg = 12
   return o;
 }
 
-const plumes = new WeakMap<G, THREE.Mesh[]>();
-
 /** A drive bell at `z` with its exhaust behind it. */
 function drive(g: G, m: Mat, r: number, z: number, x = 0, y = 0, color = 0x9fd8ff, burn = 1) {
   tube(g, m, r * 0.55, r, r * 1.1, z, 14, x, y);
@@ -73,19 +71,12 @@ function drive(g: G, m: Mat, r: number, z: number, x = 0, y = 0, color = 0x9fd8f
   if (burn) plumeAt(g, r, x, y, z + r * 0.56, color, burn);
 }
 
-/** Exhaust and glare behind a drive whose bell ends at `z`. */
+/** Exhaust behind a drive whose bell ends at `z`: the same beam as the Rocinante's, scaled to the
+ *  bell and tinted to the ship's drive colour. `burn` scales how long it is. */
 function plumeAt(g: G, r: number, x: number, y: number, z: number, color: number, burn: number) {
-  const p = new THREE.Mesh(
-    new THREE.ConeGeometry(r * 0.8, 1, 14, 1, true).translate(0, -0.5, 0).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
-  );
+  const p = new DrivePlume(r, r * 22 * burn, color, true);
   p.position.set(x, y, z);
-  p.scale.z = r * 5 * burn;
   g.add(p);
-  const s = glowSprite(color, r * 5, 0.7);
-  s.position.set(x, y, z + r * 0.14);
-  g.add(s);
-  plumes.set(g, [...(plumes.get(g) ?? []), p]);
 }
 
 /** Point-defence turret. */

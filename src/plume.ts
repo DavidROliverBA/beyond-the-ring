@@ -22,7 +22,7 @@ void main() {
 const BEAM_F = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform float time; uniform float power; uniform float phase;
+uniform float time; uniform float power; uniform float phase; uniform vec3 tint;
 varying vec2 vUv;
 void main() {
   #include <logdepthbuf_fragment>
@@ -35,7 +35,7 @@ void main() {
   float ripple = 0.88 + 0.07 * sin(along * 38.0 - time * 21.0 + phase) + 0.05 * sin(along * 91.0 - time * 47.0 + x * 4.0);
   float bright = g * ripple * exp(-along * 2.1) * (1.0 - smoothstep(0.78, 1.0, along));
   float core = pow(g, 4.0) * exp(-along * 5.5);                    // the hot centre line
-  vec3 outer = vec3(0.16, 0.38, 1.0), mid = vec3(0.55, 0.78, 1.0), hot = vec3(1.0, 0.96, 0.9);
+  vec3 outer = vec3(0.16, 0.38, 1.0) * tint, mid = mix(vec3(0.55, 0.78, 1.0) * tint, vec3(0.8, 0.9, 1.0), 0.35), hot = vec3(1.0, 0.96, 0.9);
   vec3 col = mix(outer, mid, smoothstep(0.0, 0.55, bright)) + hot * core * 1.6;
   gl_FragColor = vec4(col * bright * power * 2.4, 1.0);
 }`;
@@ -48,32 +48,35 @@ export class DrivePlume extends THREE.Group {
   private level = 0;
 
   /** `radius` is the nozzle radius, `reach` the length at full thrust, both in model units. */
-  constructor(private radius: number, private reach: number) {
+  constructor(private radius: number, private reach: number, tint: THREE.ColorRepresentation = 0xffffff, private fixed = false) {
     super();
     const geo = new THREE.PlaneGeometry(1, 1, 1, 1).translate(0, 0.5, 0).rotateX(Math.PI / 2);   // along +z, from 0 to 1
     for (let i = 0; i < 3; i++) {
       const mat = new THREE.ShaderMaterial({
-        uniforms: { time: { value: 0 }, power: { value: 0 }, phase: { value: i * 2.1 } },
+        uniforms: { time: { value: 0 }, power: { value: 0 }, phase: { value: i * 2.1 }, tint: { value: new THREE.Color(tint) } },
         vertexShader: BEAM_V, fragmentShader: BEAM_F,
         transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
       });
       const m = new THREE.Mesh(geo, mat);
       m.rotation.z = (i * Math.PI) / 3;
       m.frustumCulled = false;
+      if (fixed) m.onBeforeRender = () => { mat.uniforms.time.value = performance.now() / 1000; };
       this.add(m);
       this.beams.push(m);
       this.mats.push(mat);
     }
-    this.glow = glowSprite(0x7fb8ff, 1, 0.9);
+    this.glow = glowSprite(new THREE.Color(0x7fb8ff).multiply(new THREE.Color(tint)), 1, 0.9);
     this.core = glowSprite(0xffffff, 1, 1);
     this.add(this.glow, this.core);
     this.visible = false;
+    // A fixed plume (other ships, always burning at one level) is set once and runs on its own.
+    if (fixed) this.update(1, 0, true);
   }
 
   /** `thrust` 0..1 is what the drive is doing; `t` is the clock in seconds. */
-  update(thrust: number, t: number) {
+  update(thrust: number, t: number, snap = false) {
     // Light and dim over about a third of a second, never instantly.
-    this.level += (thrust - this.level) * (1 - Math.exp(-9 * 0.016));
+    this.level = snap ? thrust : this.level + (thrust - this.level) * (1 - Math.exp(-9 * 0.016));
     const k = this.level;
     this.visible = k > 0.01;
     if (!this.visible) return;
