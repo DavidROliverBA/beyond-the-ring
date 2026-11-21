@@ -18,6 +18,7 @@ import { SPIN_ON, feel } from './spin';
 import { createLook } from './look';
 import { addLightning } from './lightning';
 import { makeComet } from './comet';
+import { createSound } from './sound';
 import { createTour, genericShots, type Voyage } from './tour';
 import { VOYAGES, createVoyageMenu } from './voyages';
 import { FLIP_SECS, planTrip } from './course';
@@ -28,6 +29,7 @@ import { PHOTOS, STARS, type PhotoSet } from './photos';
 type V3 = THREE.Vector3;
 const V3 = THREE.Vector3;
 const ZERO = new V3();
+const sound = createSound();
 const _Z = new V3(0, 0, 1);
 const TAU = Math.PI * 2;
 const $ = (id: string) => document.getElementById(id)!;
@@ -1167,6 +1169,7 @@ function viewpoint(th: Thing): V3 {
 
 function engage(th: Thing) {
   if (busy) return;
+  sound.ping('engage');
   const point = viewpoint(th);
   brake = null;
   // Plan the trip (src/course.ts): how hard to burn so that it takes a sensible time for its length.
@@ -1200,6 +1203,7 @@ async function transit(g: Thing, quiet = false) {
   if (!quiet) stopTour();
   busy = true;
   auto = null;
+  sound.ping('gate');
   const flash = $('flash');
   flash.classList.add('on');
   await pause(450);
@@ -1407,10 +1411,12 @@ addEventListener('keydown', (e) => {
       document.body.classList.toggle('nav-open');
       if (document.body.classList.contains('nav-open')) document.exitPointerLock();
     } else if (e.code === 'KeyE' && nearPoint?.kind === 'exit') void undock();
+    else if (e.code === 'KeyK') sound.toggle();
     else if (e.code === 'KeyH') document.body.classList.toggle('help-open');
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
     return;
   }
+  if (e.code === 'KeyK') { const on = sound.toggle(); $('hint').textContent = on ? 'Sound on' : 'Sound off'; return; }
   if (e.code === 'Comma' || e.code === 'Period') { rateIdx = clamp(rateIdx + (e.code === 'Period' ? 1 : -1), 0, RATES.length - 1); return; }
   if (e.code === 'KeyT') { if (tour.active || voyage) stopTour(); else voyageMenu.open(); return; }
   if (e.code === 'KeyI') { if (inspect.on) stopInspect(); else startInspect(); return; }
@@ -1537,6 +1543,7 @@ function autopilot(dt: number, cap: number) {
     const dir = ap.thing.pos.clone().sub(ship.pos).normalize();
     faceShip(dir, 2.6 * dt);
     if (fwd.dot(dir) > 0.9997) {
+      sound.ping('arrive');
       if (ap.thing.vel) ship.speed = 0;
       auto = null;
     }
@@ -1753,6 +1760,7 @@ async function fade(work: () => Promise<void> | void) {
 
 async function dock(th: Thing) {
   if (busy || walk || !th.dock) return;
+  sound.ping('dock');
   auto = null;
   brake = null;
   ship.throttle = ship.speed = 0;
@@ -1785,6 +1793,7 @@ async function dock(th: Thing) {
 
 async function undock() {
   if (busy || !walk) return;
+  sound.ping('undock');
   await fade(() => {
     walk = null;
     nearPoint = null;
@@ -2094,8 +2103,10 @@ const starMap = createMap({
   speed: (v) => fmtSpeed(v),
   unitMetres: 1 / SOL_UNIT,
   canOpen: () => started && !busy && !walk && !!space,
+  ping: (k) => sound.ping(k),
 });
-if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __map: typeof starMap }).__map = starMap;
+if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __map: typeof starMap; __sound: typeof sound }).__map = starMap;
+if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __sound: typeof sound }).__sound = sound;
 
 // With ?debug in the address, keep the last few thousand frame times for tests (hitch hunting).
 const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
@@ -2127,6 +2138,7 @@ function frame(now: number) {
   if (!space) return;
   if (walk) {
     walkStep(dt);
+    sound.update({ engine: 0, turning: false, walking: true, pace: Math.hypot(walker.vx, walker.vz), ring: false, place: walk.id }, dt);
     updateHud(dt);
     look.update(dt, walk.id, walkCam, null, walkCam.aspect);
     draw(walk.scene, walkCam);
@@ -2191,6 +2203,10 @@ function frame(now: number) {
   simElapsed += simStep;
   space.tick(clock, dt);
   tickShipLights(clock);
+  sound.update({
+    engine: tour.active || inspect.on ? 0 : engine, walking: false, pace: 0, ring: space.id === 'slow',
+    turning: !tour.active && (!!brake || (!!auto && (auto.phase === 'flip' || auto.phase === 'burn')) || ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyQ', 'KeyE'].some((k) => keys.has(k))),
+  }, dt);
   // The ships under way have just moved: carry ours along with the one we are chasing or flying beside, so
   // that what is on screen has her exactly where we left her.
   if (escort) {
@@ -2240,6 +2256,7 @@ async function boot() {
 }
 
 $('launch').addEventListener('click', () => {
+  sound.start();
   stopTour();
   started = true;
   document.body.classList.add('started');

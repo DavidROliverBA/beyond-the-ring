@@ -29,6 +29,7 @@ export interface MapHost {
   dist(units: number): string;
   speed(v: number): string;
   canOpen(): boolean;
+  ping?(kind: 'open' | 'close' | 'select' | 'plot'): void;
 }
 /** SYSTEM is the whole chart on a log scale; NEARBY is a live plan view centred on you, to scale, with the ships under way. */
 type Mode = 'system' | 'local';
@@ -340,6 +341,7 @@ export function createMap(host: MapHost): StarMap {
 
   function select(t: MapThing | null, focus = false) {
     selected = t;
+    if (t) host.ping?.('select');
     if (t && focus) {
       if (mode === 'system') zoom = Math.max(zoom, t.parent ? 4 : 2.5);
       const p = t.parent && mode === 'system' ? screen(chart(byId.get(t.parent)!.pos)) : screen(chart(t.pos));
@@ -365,6 +367,7 @@ export function createMap(host: MapHost): StarMap {
   }
 
   function plotTo(t: MapThing) {
+    host.ping?.('plot');
     host.plot(t);
     close();
   }
@@ -451,6 +454,7 @@ export function createMap(host: MapHost): StarMap {
     if (isOpen || !host.canOpen()) return;
     document.exitPointerLock();
     isOpen = true;
+    host.ping?.('open');
     document.body.classList.add('map-open');
     resize();
     layout(); home();
@@ -462,6 +466,7 @@ export function createMap(host: MapHost): StarMap {
   function close() {
     if (!isOpen) return;
     isOpen = false;
+    host.ping?.('close');
     cancelAnimationFrame(raf);
     document.body.classList.remove('map-open');
     filter.blur();
