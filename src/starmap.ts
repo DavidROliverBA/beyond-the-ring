@@ -13,10 +13,14 @@ import { planTrip } from './course';
 export interface MapThing {
   id: string; name: string; sub: string; desc: string; kind: string;
   pos: THREE.Vector3; radius: number; indent: boolean; parent?: string; nav: boolean;
+  /** A ship under way: `pos` moves, and this is its velocity in scene units a second. */
+  vel?: THREE.Vector3;
   to?: { space: string; gate: string };
 }
 export interface MapHost {
-  space(): { id: string; name: string; things: MapThing[]; maxSpeed: number };
+  space(): { id: string; name: string; things: MapThing[]; craft: MapThing[]; maxSpeed: number };
+  /** Metres in one scene unit. */
+  unitMetres: number;
   ship(): { pos: THREE.Vector3; fwd: THREE.Vector3; speed: number };
   viewpoint(th: MapThing): THREE.Vector3;
   plot(th: MapThing): void;
@@ -26,6 +30,8 @@ export interface MapHost {
   speed(v: number): string;
   canOpen(): boolean;
 }
+/** SYSTEM is the whole chart on a log scale; NEARBY is a live plan view centred on you, to scale, with the ships under way. */
+type Mode = 'system' | 'local';
 export interface StarMap { open(): void; close(): void; toggle(): void; isOpen(): boolean }
 
 const CSS = `
@@ -35,6 +41,9 @@ body.map-open #hud, body.map-open #labels { visibility: hidden; }
 #map-side { width: 280px; flex: none; display: flex; flex-direction: column; padding: 14px 12px; border-right: 1px solid rgba(143,220,255,0.18); background: rgba(3,8,16,0.7); }
 #map-title { font-size: 11px; letter-spacing: 0.22em; color: #8fdcff; margin: 0 4px 2px; }
 #map-sub { font-size: 10px; color: #6f8aa0; margin: 0 4px 10px; letter-spacing: 0.06em; }
+#map-modes { display: flex; gap: 6px; margin: 0 2px 10px; }
+#map-modes button { flex: 1; background: rgba(143,220,255,0.06); border: 1px solid rgba(143,220,255,0.25); color: #8fdcff; font: inherit; font-size: 10px; letter-spacing: 0.16em; padding: 5px 0; border-radius: 3px; cursor: pointer; }
+#map-modes button.on { background: rgba(143,220,255,0.26); color: #fff; border-color: #8fdcff; }
 #map-filter { background: rgba(0,0,0,0.4); border: 1px solid rgba(143,220,255,0.25); border-radius: 3px; color: #fff; font: inherit; padding: 5px 8px; margin: 0 2px 8px; outline: none; }
 #map-filter:focus { border-color: #8fdcff; }
 #map-list { overflow-y: auto; flex: 1; }
@@ -79,6 +88,7 @@ export function createMap(host: MapHost): StarMap {
   root.id = 'map';
   root.innerHTML = `
     <div id="map-side"><div id="map-title">STAR MAP</div><div id="map-sub"></div>
+      <div id="map-modes"><button data-m="system">SYSTEM</button><button data-m="local">NEARBY · V</button></div>
       <input id="map-filter" type="text" placeholder="Find a place…" autocomplete="off" spellcheck="false">
       <div id="map-list"></div></div>
     <div id="map-stage"><canvas id="map-canvas"></canvas><div id="map-status"></div>
@@ -86,8 +96,9 @@ export function createMap(host: MapHost): StarMap {
       <div id="map-card"><div class="k"></div><h3></h3><p></p>
         <div class="row"><span>Distance</span><b id="mc-dist"></b></div>
         <div class="row"><span>Trip</span><b id="mc-trip"></b></div>
+        <div class="row" id="mc-moving-row"><span>She is doing</span><b id="mc-moving"></b></div>
         <button id="map-plot">PLOT COURSE</button></div>
-      <div id="map-hint">drag to move · wheel to zoom · click a place · double-click or Enter plots the course · F finds your ship · M or Esc closes</div></div>`;
+      <div id="map-hint">drag to move · wheel to zoom · click a place · double-click or Enter plots the course · V switches between the system and what is nearby · F finds your ship · M or Esc closes</div></div>`;
   document.body.append(root);
   const btn = document.createElement('button');
   btn.id = 'map-btn';
@@ -105,11 +116,16 @@ export function createMap(host: MapHost): StarMap {
   let selected: MapThing | null = null, hovered: MapThing | null = null;
   let things: MapThing[] = [], listed: MapThing[] = [], byId = new Map<string, MapThing>(), kids = new Map<string, MapThing[]>();
   let r0 = 1, rmax = 1, Rpx = 300;
+  let mode: Mode = 'system', lbase = 1;
+  const sPos = new THREE.Vector3(), sFwd = new THREE.Vector3(0, 0, -1);
+  let sysThings: MapThing[] = [], craft: MapThing[] = [];
+  const refreshShip = () => { const s = host.ship(); sPos.copy(s.pos); sFwd.copy(s.fwd); };
   const markers: { t: MapThing; x: number; y: number }[] = [];
 
   const rho = (p: THREE.Vector3) => Math.hypot(p.x, p.z);
   /** Chart position (before pan and zoom) of a place in space. */
   const chart = (p: THREE.Vector3): [number, number] => {
+    if (mode === 'local') return [(p.x - sPos.x) * lbase, (p.z - sPos.z) * lbase];
     const r = (Rpx * Math.log(1 + rho(p) / r0)) / Math.log(1 + rmax / r0), a = Math.atan2(p.z, p.x);
     return [Math.cos(a) * r, Math.sin(a) * r];
   };
@@ -118,7 +134,9 @@ export function createMap(host: MapHost): StarMap {
   function layout() {
     const sp = host.space();
     // Everything is drawn; the list holds the places you can name (the other gates turn up when you search).
-    things = sp.things;
+    sysThings = sp.things; craft = sp.craft;
+    things = mode === 'local' ? [...sysThings, ...craft] : sysThings;
+    refreshShip();
     listed = things.filter((t) => t.nav);
     byId = new Map(things.map((t) => [t.id, t]));
     kids = new Map();
@@ -129,13 +147,17 @@ export function createMap(host: MapHost): StarMap {
     // The ring space is a million kilometres across with Medina a few kilometres from its centre: a far smaller
     // inner scale there, or they would sit on top of each other.
     r0 = sp.id === 'slow' ? rmax * 3e-5 : (top[Math.floor(top.length * 0.1)] ?? rmax * 0.01);
-    $('#map-sub').textContent = `${sp.name} · ${listed.length.toLocaleString()} places${things.length > listed.length ? ` · ${(things.length - listed.length).toLocaleString()} uncharted gates` : ''}`;
+    const uncharted = sysThings.length - sysThings.filter((t) => t.nav).length;
+    $('#map-sub').textContent = mode === 'local'
+      ? `${sp.name} · around you · ${craft.length.toLocaleString()} ships under way`
+      : `${sp.name} · ${listed.length.toLocaleString()} places${uncharted ? ` · ${uncharted.toLocaleString()} uncharted gates` : ''}`;
+    root.querySelectorAll('#map-modes button').forEach((b) => b.classList.toggle('on', (b as HTMLElement).dataset.m === mode));
     if (selected && !byId.has(selected.id)) selected = null;
   }
 
   /** Where a place is drawn, with moons and the like gathered round their planet. */
   function place(t: MapThing): [number, number] | null {
-    const par = t.parent ? byId.get(t.parent) : null;
+    const par = t.parent && mode === 'system' ? byId.get(t.parent) : null;
     if (!par) return screen(chart(t.pos));
     const open = zoom >= 2.2 || selected === t || selected === par || hovered === par || hovered === t || (selected?.parent === par.id);
     if (!open) return null;
@@ -154,20 +176,37 @@ export function createMap(host: MapHost): StarMap {
     return out;
   }
 
+  /** Rings of 1, 2, 5 × 10ⁿ metres round you, for the nearby view. */
+  function localRings(): number[] {
+    const out: number[] = [], px = lbase * zoom, M = host.unitMetres;
+    for (let k = -1; k <= 18; k++) for (const m of NICE) { const v = (m * 10 ** k) / M; const r = v * px; if (r > 45 && r < Math.max(W, H) * 1.1) out.push(v); }
+    while (out.length > 8) out.splice(out.length % 2 ? 1 : 2, 1);
+    return out;
+  }
+
   function draw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
+    refreshShip();
     const [ox, oy] = screen([0, 0]);
+    const local = mode === 'local';
     // Distance rings.
     ctx.font = '10px ui-monospace, Menlo, monospace';
-    for (const v of ringValues()) {
+    if (local) {
+      for (const v of localRings()) {
+        const r = v * lbase * zoom;
+        ctx.strokeStyle = 'rgba(143,220,255,0.12)'; ctx.setLineDash([2, 5]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(ox, oy, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(143,220,255,0.4)'; ctx.fillText(host.dist(v), ox + r * 0.7071 + 4, oy + r * 0.7071 - 3);
+      }
+    } else for (const v of ringValues()) {
       const r = (Rpx * Math.log(1 + v / r0)) / Math.log(1 + rmax / r0) * zoom;
       ctx.strokeStyle = 'rgba(143,220,255,0.10)'; ctx.setLineDash([2, 5]); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(ox, oy, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       if (r > 40 && r < Math.max(W, H) * 2) { ctx.fillStyle = 'rgba(143,220,255,0.35)'; ctx.fillText(host.dist(v), ox + r * 0.7071 + 4, oy + r * 0.7071 - 3); }
     }
     // Planet orbits as faint circles.
-    for (const t of things) {
+    if (!local) for (const t of things) {
       if (t.parent || t.kind === 'gate' || t.kind === 'star' || t.kind === 'ship') continue;
       const r = (Rpx * Math.log(1 + rho(t.pos) / r0)) / Math.log(1 + rmax / r0) * zoom;
       if (r < 4) continue;
@@ -191,13 +230,24 @@ export function createMap(host: MapHost): StarMap {
       if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
       markers.push({ t, x, y });
       const k = KIND[t.kind] ?? KIND.planet;
+      if (local && t.kind !== 'ship' && t.kind !== 'gate') {
+        // At true size when that is big enough to see.
+        const pr = t.radius * lbase * zoom;
+        if (pr > 5) { ctx.fillStyle = 'rgba(143,200,235,0.10)'; ctx.strokeStyle = 'rgba(143,200,235,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, pr, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      }
       // A gate nobody has charted is a faint spark; a charted one is amber and a little larger.
       const charted = t.kind !== 'gate' || t.nav;
       if (!charted) ctx.globalAlpha = 0.4;
       drawMarker(t.kind, x, y, t.kind === 'gate' && t.nav ? 2.6 : k.r, t.kind === 'gate' && t.nav ? '#ffb25a' : k.c, t === selected || t === hovered);
       ctx.globalAlpha = 1;
+      if (local && t.vel && Math.hypot(t.vel.x, t.vel.z) > 1e-10) {
+        // Which way she is going: a short tick from the marker.
+        const a = Math.atan2(t.vel.z, t.vel.x);
+        ctx.strokeStyle = k.c; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 16, y + Math.sin(a) * 16); ctx.stroke();
+      }
       if (t === selected || t === hovered) label.push({ t, x, y, pri: 0 });
-      else if (LABELLED.has(t.kind) || (t.kind === 'gate' && t.nav && zoom > 1.4) || (t.parent && zoom >= 2.2)) label.push({ t, x, y, pri: t.kind === 'star' ? 1 : t.parent ? 4 : 2 });
+      else if (local && t.kind === 'ship' && Math.hypot(x - ox, y - oy) < 0.3 * Math.min(W, H)) label.push({ t, x, y, pri: 3 });
+      else if (LABELLED.has(t.kind) || (local && t.kind === 'gate' && t.nav) || (t.kind === 'gate' && t.nav && zoom > 1.4) || (t.parent && zoom >= 2.2)) label.push({ t, x, y, pri: t.kind === 'star' ? 1 : t.parent ? 4 : 2 });
     }
     label.sort((a, b) => a.pri - b.pri);
     ctx.font = '11px ui-monospace, Menlo, monospace';
@@ -211,7 +261,7 @@ export function createMap(host: MapHost): StarMap {
 
     // The ship.
     const [sx, sy] = screen(chart(sh.pos));
-    const ahead = sh.pos.clone().addScaledVector(sh.fwd, Math.max(rho(sh.pos) * 0.01, 1e-6));
+    const ahead = local ? sh.pos.clone().addScaledVector(sh.fwd, 30 / (lbase * zoom)) : sh.pos.clone().addScaledVector(sh.fwd, Math.max(rho(sh.pos) * 0.01, 1e-6));
     const [ax, ay] = screen(chart(ahead));
     const ang = Math.atan2(ay - sy, ax - sx);
     ctx.save(); ctx.translate(sx, sy); ctx.rotate(ang);
@@ -259,10 +309,19 @@ export function createMap(host: MapHost): StarMap {
   }
 
   // ------------------------------------------------------------------ list and card
+  const away = (t: MapThing) => Math.max(0, t.pos.distanceTo(sPos) - (t.kind === 'gate' ? 0 : t.radius));
+  /** The places the list shows: named places in the system view; in the nearby view, everything nearest first. */
+  function listRows(): MapThing[] {
+    const q = filter.value.trim().toLowerCase();
+    const hit = (t: MapThing) => t.name.toLowerCase().includes(q) || t.sub.toLowerCase().includes(q);
+    if (mode === 'system') return q ? things.filter(hit) : listed;
+    return (q ? things.filter(hit) : things.filter((t) => t.nav || t.kind !== 'gate')).map((t) => [away(t), t] as const).sort((a, b) => a[0] - b[0]).slice(0, 90).map((x) => x[1]);
+  }
   function fillList() {
+    const top = listEl.scrollTop;
     const q = filter.value.trim().toLowerCase();
     const sh = host.ship();
-    const rows: MapThing[] = q ? things.filter((t) => t.name.toLowerCase().includes(q) || t.sub.toLowerCase().includes(q)) : listed;
+    const rows = listRows();
     const cap = 90;
     listEl.innerHTML = '';
     for (const t of rows.slice(0, cap)) {
@@ -276,13 +335,14 @@ export function createMap(host: MapHost): StarMap {
       listEl.append(row);
     }
     if (rows.length > cap) { const m = document.createElement('div'); m.className = 'map-more'; m.textContent = `${(rows.length - cap).toLocaleString()} more — type to search`; listEl.append(m); }
+    listEl.scrollTop = top;
   }
 
   function select(t: MapThing | null, focus = false) {
     selected = t;
     if (t && focus) {
-      zoom = Math.max(zoom, t.parent ? 4 : 2.5);
-      const p = t.parent ? screen(chart(byId.get(t.parent)!.pos)) : screen(chart(t.pos));
+      if (mode === 'system') zoom = Math.max(zoom, t.parent ? 4 : 2.5);
+      const p = t.parent && mode === 'system' ? screen(chart(byId.get(t.parent)!.pos)) : screen(chart(t.pos));
       panX += W / 2 - p[0]; panY += H / 2 - p[1];
     }
     updateCard();
@@ -298,7 +358,10 @@ export function createMap(host: MapHost): StarMap {
     card.querySelector('h3')!.textContent = t.name;
     card.querySelector('p')!.textContent = t.desc;
     $('#mc-dist').textContent = host.dist(Math.max(0, D));
-    $('#mc-trip').textContent = D < t.radius * 2 ? 'you are here' : `about ${Math.round(trip.eta)} s · top ${host.speed(trip.vPeak)}`;
+    $('#mc-trip').textContent = D < t.radius * 2 ? 'you are here' : `about ${Math.round(trip.eta)} s${t.vel ? ', then alongside' : ''}`;
+    const mv = t.vel ? t.vel.length() : 0;
+    $('#mc-moving-row').style.display = t.vel ? 'flex' : 'none';
+    $('#mc-moving').textContent = mv * host.unitMetres < 2 ? 'holding station' : host.speed(mv);
   }
 
   function plotTo(t: MapThing) {
@@ -313,8 +376,24 @@ export function createMap(host: MapHost): StarMap {
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     Rpx = 0.46 * Math.min(W, H);
   }
-  function home() { zoom = 1; panX = panY = 0; }
+  function fitLocal() {
+    // Frame the eight nearest things, so there is always something to see and something to click.
+    const ds = things.filter((t) => t.kind !== 'gate').map(away).sort((a, b) => a - b);
+    const d = Math.max(ds[Math.min(ds.length - 1, 7)] ?? 1e-6, 3e-8);
+    lbase = (0.42 * Math.min(W, H)) / d;
+  }
+  function home() { zoom = 1; panX = panY = 0; if (mode === 'local') fitLocal(); }
+  function setMode(m: Mode) {
+    if (m === mode) return;
+    mode = m;
+    layout();
+    home();
+    filter.value = '';
+    fillList();
+    updateCard();
+  }
   function findShip() {
+    if (mode === 'local') { panX = panY = 0; return; }
     const [x, y] = chart(host.ship().pos);
     zoom = Math.max(zoom, 3); panX = -x * zoom; panY = -y * zoom;
   }
@@ -342,7 +421,7 @@ export function createMap(host: MapHost): StarMap {
   canvas.addEventListener('dblclick', (e) => { const t = pick(e.offsetX, e.offsetY); if (t) plotTo(t); });
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const z2 = Math.min(800, Math.max(0.55, zoom * Math.exp(-e.deltaY * 0.0016)));
+    const z2 = (mode === 'local' ? Math.min(2e5, Math.max(0.01, zoom * Math.exp(-e.deltaY * 0.0016))) : Math.min(800, Math.max(0.55, zoom * Math.exp(-e.deltaY * 0.0016))));
     const mx = e.offsetX - W / 2, my = e.offsetY - H / 2;
     panX = mx - ((mx - panX) / zoom) * z2; panY = my - ((my - panY) / zoom) * z2;
     zoom = z2;
@@ -351,6 +430,7 @@ export function createMap(host: MapHost): StarMap {
   $('#map-close').addEventListener('click', () => close());
   $('#map-plot').addEventListener('click', () => { if (selected) plotTo(selected); });
   btn.addEventListener('click', () => toggle());
+  root.querySelectorAll('#map-modes button').forEach((b) => b.addEventListener('click', () => setMode((b as HTMLElement).dataset.m as Mode)));
   addEventListener('resize', () => { if (isOpen) resize(); });
 
   function frame() {
@@ -358,23 +438,22 @@ export function createMap(host: MapHost): StarMap {
     raf = requestAnimationFrame(frame);
     draw();
     $('#map-status').textContent = host.status();
-    if ((listClock += 1) % 40 === 0) { updateCard(); fillListDistances(); }
+    if ((listClock += 1) % (mode === 'local' ? 12 : 40) === 0) { updateCard(); if (mode === 'local' && !filter.value) fillList(); else fillListDistances(); }
   }
   function fillListDistances() {
     const sh = host.ship();
     const rows = listEl.querySelectorAll('.map-row');
-    const q = filter.value.trim().toLowerCase();
-    const shown = (q ? things.filter((t) => t.name.toLowerCase().includes(q) || t.sub.toLowerCase().includes(q)) : listed).slice(0, rows.length);
+    const shown = listRows().slice(0, rows.length);
     rows.forEach((row, i) => { const t = shown[i]; if (t) (row.lastChild as HTMLElement).textContent = host.dist(Math.max(0, t.pos.distanceTo(sh.pos) - (t.kind === 'gate' ? 0 : t.radius))); });
   }
 
   function open() {
     if (isOpen || !host.canOpen()) return;
     document.exitPointerLock();
-    layout();
     isOpen = true;
     document.body.classList.add('map-open');
-    resize(); home();
+    resize();
+    layout(); home();
     select(host.target());
     fillList();
     filter.value = '';
@@ -401,6 +480,7 @@ export function createMap(host: MapHost): StarMap {
     if (!typing) {
       if (e.code === 'KeyF') findShip();
       else if (e.code === 'Home') home();
+      else if (e.code === 'KeyV') setMode(mode === 'local' ? 'system' : 'local');
       else if (e.code === 'Slash') { e.preventDefault(); filter.focus(); }
       e.stopImmediatePropagation();
     } else e.stopImmediatePropagation();

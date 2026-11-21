@@ -59,13 +59,24 @@ interface Craft {
   qa: THREE.Quaternion;
   qb: THREE.Quaternion;
   pos: V3;
+  /** Scene units a second, worked out each tick. */
+  vel: V3;
   tint: THREE.Color;
+  model: ShipModel;
+  name: string;
 }
+
+/** What the map needs to know about a ship under way: `pos` and `vel` stay live. */
+export interface CraftInfo { name: string; model: ShipModel; len: number; pos: V3; vel: V3; fleet: number }
+
+const NAMES = ['Cassiopeia', 'Anubis', 'Rosalind', 'Kestrel', 'Meridian', 'Ananke', 'Tamsin', 'Orpheus', 'Halcyon', 'Valkyrie', 'Marduk', 'Pelican', 'Sojourner', 'Calypso', 'Borealis', 'Wayfarer', 'Lodestar', 'Ceto', 'Amity', 'Gannet', 'Ixion', 'Perdita', 'Vesper', 'Skylark', 'Narwhal', 'Zephyr', 'Corsair', 'Tern', 'Argo', 'Mistral', 'Thessaly', 'Ondine'];
+const LABEL: Record<string, string> = { racer: 'Racer', corvette: 'Corvette', freighter: 'Freighter', survey: 'Survey ship', stealth: 'Stealth ship', hauler: 'Ice hauler', battleship: 'Warship', dreadnought: 'Capital ship' };
 
 const _up = new THREE.Vector3(0, 1, 0);
 const _m = new THREE.Matrix4();
 const _flip = new THREE.Quaternion().setFromAxisAngle(_up, Math.PI);
 const _d = new THREE.Vector3();
+const _p = new THREE.Vector3();
 
 export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLocal = 450) {
   const r = rng(seed);
@@ -123,7 +134,8 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
       group.add(g);
       const c: Craft = {
         g, fleet: fi, len, port: Math.floor(r() * f.ports.length), from: new THREE.Vector3(), to: new THREE.Vector3(),
-        t0: 0, dur: 1, hold: 0, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), pos: new THREE.Vector3(),
+        t0: 0, dur: 1, hold: 0, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), pos: new THREE.Vector3(), vel: new THREE.Vector3(), model: kind.model,
+        name: `${NAMES[Math.floor(r() * NAMES.length)]}-${100 + Math.floor(r() * 900)}`,
         tint: new THREE.Color(r() < 0.25 ? 0xffd9a8 : r() < 0.5 ? 0xffffff : 0x9fd8ff),
       };
       pointAt(f.ports[c.port], c.to);
@@ -155,7 +167,8 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
 
   let clock = 0;
   const q = new THREE.Quaternion();
-  const tick = (dt: number, viewer: V3) => {
+  /** `focus` is the position of a craft we are flying beside: it is always drawn in full. */
+  const tick = (dt: number, viewer: V3, focus?: V3) => {
     clock += dt;
     for (let fi = 0; fi < fleets.length; fi++) {
       const list = byFleet[fi], gl = glints[fi];
@@ -167,14 +180,16 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
         if (u >= 1 && clock - c.t0 >= c.dur + c.hold) { plan(c, clock, fleets[fi]); u = 0; }
         const tt = Math.min(1, Math.max(0, u));
         const s = tt < 0.5 ? 2 * tt * tt : 1 - 2 * (1 - tt) * (1 - tt);
+        _p.copy(c.pos);
         c.pos.copy(c.from).lerp(c.to, s);
+        if (dt > 0) c.vel.copy(c.pos).sub(_p).divideScalar(dt);
         // Burn towards the goal, flip over about half-way, burn the other way to stop.
         const k = Math.min(1, Math.max(0, (tt - 0.4) / 0.2));
         q.copy(c.qa).slerp(c.qb, k * k * (3 - 2 * k));
         c.g.position.copy(c.pos);
         c.g.quaternion.copy(q);
         const d = viewer.distanceTo(c.pos);
-        const show = c.len / Math.max(d, 1e-30) > 0.0018;
+        const show = c.pos === focus || c.len / Math.max(d, 1e-30) > 0.0018;
         c.g.visible = show;
         // The glint sits at the stern and goes out when the ship itself can be seen.
         const o = glintOrigin[fi];
@@ -185,5 +200,6 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
       gl.geo.attributes.position.needsUpdate = true;
     }
   };
-  return { group, tick, count: crafts.length };
+  const info: CraftInfo[] = crafts.map((c) => ({ name: `${LABEL[c.model] ?? 'Ship'} ${c.name}`, model: c.model, len: c.len, pos: c.pos, vel: c.vel, fleet: c.fleet }));
+  return { group, tick, count: crafts.length, info };
 }

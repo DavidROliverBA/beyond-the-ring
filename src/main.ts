@@ -266,6 +266,8 @@ interface Thing {
   indent: boolean;
   /** The body this one orbits, for the map. */
   parent?: string;
+  /** A ship under way: its `pos` moves, and this is its velocity in scene units a second. */
+  vel?: V3;
   label?: HTMLDivElement;
   normal?: V3;
   to?: { space: string; gate: string };
@@ -292,6 +294,8 @@ interface Space {
   group: THREE.Group;
   labels: HTMLDivElement;
   things: Thing[];
+  /** Ships under way: not in `things`, but the map can show and chase them. */
+  craft: Thing[];
   gates: Thing[];
   star?: V3;
   maxSpeed: number;
@@ -299,6 +303,15 @@ interface Space {
   bound?: number;
   lods: Lod[];
   tick: (t: number, dt: number) => void;
+}
+
+/** The map's view of ships under way: a Thing whose position is the craft's own, kept live. */
+function craftThings(info: { name: string; model: string; len: number; pos: V3; vel: V3 }[]): Thing[] {
+  return info.map((c, i) => ({
+    id: `craft${i}`, name: c.name, sub: `${c.model[0].toUpperCase()}${c.model.slice(1)} · ${Math.round(c.len / SOL_UNIT)} m`,
+    desc: 'A ship under way: it burns, turns end over end, and burns to a stop, then waits a while before its next run. Plot a course and you will come alongside and fly with her.',
+    kind: 'ship' as Kind, pos: c.pos, vel: c.vel, radius: c.len * 0.5, range: 0, solid: false, nav: false, indent: false,
+  }));
 }
 
 const labelRoot = $('labels');
@@ -706,7 +719,7 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
     ];
   const traffic = makeTraffic(fleets.filter((f) => f.ports.length), spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1));
   group.add(traffic.group);
-  ctx.anim.push((dt) => traffic.tick(dt, ship.pos));
+  ctx.anim.push((dt) => traffic.tick(dt, ship.pos, escort?.thing.pos));
   const idx = spec.id === 'sol' ? 0 : Number(spec.id.slice(4));
   const gth: Thing = {
     id: 'ring', name: spec.id === 'sol' ? 'The Ring' : 'Ring gate', sub: 'Gate to the ring space',
@@ -720,7 +733,7 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   addLabel({ labels }, gth, 'gate');
 
   return {
-    id: spec.id, name: spec.name, subtitle: spec.subtitle, blurb: spec.blurb, group, labels, things, gates: [gth],
+    id: spec.id, name: spec.name, subtitle: spec.subtitle, blurb: spec.blurb, group, labels, things, craft: craftThings(traffic.info), gates: [gth],
     star: new V3(), maxSpeed: 5000, sky: true, lods: ctx.lods,
     tick: (t, dt) => {
       for (const s of ctx.spin) s.o.rotation.y += s.r * dt;
@@ -855,7 +868,7 @@ async function buildSlowZone(): Promise<Space> {
     { ports: [{ pos: medinaPos, inner: 3 * KM, outer: 12 * KM }, ...charted], n: 36, only: ['freighter', 'hauler', 'survey', 'corvette'] },
   ], 4242, SOL_UNIT, 80);
   group.add(crowd.group);
-  ctx.anim.push((dt) => crowd.tick(dt, ship.pos));
+  ctx.anim.push((dt) => crowd.tick(dt, ship.pos, escort?.thing.pos));
 
   torus.frustumCulled = film.frustumCulled = false;
   group.add(torus, film);
@@ -912,7 +925,7 @@ async function buildSlowZone(): Promise<Space> {
   return {
     id: 'slow', name: 'The Ring Space', subtitle: `${GATE_COUNT} gates · no stars`,
     blurb: 'A starless bubble a million kilometres across. Every light on the wall is a door to another sun.',
-    group, labels, things, gates, maxSpeed: SLOW_LIMIT, sky: false, bound: SLOW_RADIUS + R * 5, lods: [],
+    group, labels, things, craft: craftThings(crowd.info), gates, maxSpeed: SLOW_LIMIT, sky: false, bound: SLOW_RADIUS + R * 5, lods: [],
     tick: (t, dt) => {
       for (const s of ctx.spin) s.o.rotation.y += s.r * dt;
       for (const a of ctx.anim) a(dt);
@@ -953,6 +966,9 @@ const cache = new Map<string, Space>();
  *  end over end, then burn the other way to arrive at rest. The way the ship is going stays fixed
  *  through the flip (`dir`); only the way it points changes. */
 interface Auto { thing: Thing; point: V3; phase: 'cruise' | 'flip' | 'burn' | 'face'; a: number; dir: V3; t: number; q0: THREE.Quaternion }
+/** Flying alongside a ship under way: whatever it does, we keep our place beside it. */
+let escort: { thing: Thing; last: V3 } | null = null;
+
 let auto: Auto | null = null;
 /** Flip and burn by hand (X): the same manoeuvre to stop, then the ship turns back to the way it was pointing. */
 interface Brake { phase: 'flip' | 'burn' | 'back'; t: number; dir: V3; q0: THREE.Quaternion; qFrom: THREE.Quaternion; a: number }
@@ -1006,6 +1022,7 @@ function disposeSpace(s: Space) {
 }
 
 function enter(s: Space) {
+  escort = null;
   if (space) {
     scene.remove(space.group);
     space.labels.remove();
@@ -1065,6 +1082,7 @@ function engage(th: Thing) {
   brake = null;
   // Plan the trip (src/course.ts): how hard to burn so that it takes a sensible time for its length.
   const { a } = planTrip(point.distanceTo(ship.pos), th.radius, space.maxSpeed);
+  escort = th.vel ? { thing: th, last: th.pos.clone() } : null;
   auto = { thing: th, point, phase: 'cruise', a, dir: new V3(), t: 0, q0: new THREE.Quaternion() };
   ship.throttle = 0;
 }
@@ -1381,6 +1399,7 @@ function speedCap(): number {
 
 function autopilot(dt: number, cap: number) {
   const ap = auto!;
+  if (ap.thing.vel) ap.point.copy(viewpoint(ap.thing));      // a moving target: aim at where it is now
   const fwd = _b.set(0, 0, -1).applyQuaternion(ship.q);
   const R = ap.thing.radius;
   if (ap.phase === 'face') {
@@ -1388,7 +1407,10 @@ function autopilot(dt: number, cap: number) {
     ship.speed *= Math.exp(-8 * dt);
     const dir = ap.thing.pos.clone().sub(ship.pos).normalize();
     faceShip(dir, 2.6 * dt);
-    if (fwd.dot(dir) > 0.9997) auto = null;
+    if (fwd.dot(dir) > 0.9997) {
+      if (ap.thing.vel) ship.speed = 0;
+      auto = null;
+    }
     return;
   }
   if (ap.phase === 'flip') {
@@ -1408,11 +1430,13 @@ function autopilot(dt: number, cap: number) {
     // exactly at the viewpoint: the speed from which a steady burn of `a` just runs out there.
     const toPoint = ap.point.clone().sub(ship.pos), left = toPoint.length();
     if (left > 0) ap.dir.lerp(toPoint.divideScalar(left), 1 - Math.exp(-1.2 * dt)).normalize();
-    if (left <= 0.05 * R || ship.speed <= 0) { ship.speed = 0; engine = 0; ap.phase = 'face'; return; }
+    if (left <= (ap.thing.vel ? 0.3 : 0.05) * R || ship.speed <= 0) { ship.speed = 0; engine = 0; ap.phase = 'face'; return; }
     // (In the last stretch the burn's curve asks for less speed than one frame's step can follow, so it also
     // never asks for more than three times the distance left a second: an easy final approach, no overshoot.)
     const want = Math.min(Math.sqrt(2 * ap.a * left), 3 * left);
-    if (ship.speed > want) { ship.speed = Math.max(want, ship.speed - 1.5 * ap.a * dt); engine = 1; } else engine = 0;
+    if (ship.speed > want) { ship.speed = Math.max(want, ship.speed - 1.5 * ap.a * dt); engine = 1; }
+    else if (ap.thing.vel && ship.speed < want) { ship.speed = Math.min(want, ship.speed + ap.a * dt); engine = 1; }   // she moved: pick the pace back up
+    else engine = 0;
     ship.pos.addScaledVector(ap.dir, Math.min(ship.speed * dt, left));
     return;
   }
@@ -1503,6 +1527,11 @@ function abortManoeuvre() {
 }
 
 function step(dt: number) {
+  if (escort) {
+    // On the way to her the autopilot works in her frame, as if she stood still, so the chase always ends alongside.
+    const chasing = auto?.thing === escort.thing;
+    if (!chasing && (auto || brake || ship.throttle > 0 || ship.speed > 1e-9 || escort.thing.pos.distanceTo(ship.pos) > escort.thing.radius * 40)) escort = null;
+  }
   ship.prev.copy(ship.pos);
   const cap = speedCap();
 
@@ -1874,8 +1903,9 @@ function updateHud(dt: number) {
   $('mode').textContent = auto
     ? auto.phase === 'flip' ? `FLIPPING · ${auto.thing.name}` : auto.phase === 'burn' ? `BURNING TO ARRIVE · ${auto.thing.name}` : `AUTOPILOT → ${auto.thing.name}`
     : brake ? (brake.phase === 'flip' ? 'FLIPPING' : brake.phase === 'burn' ? 'BURNING TO A STOP' : 'TURNING BACK')
+    : escort ? `ALONGSIDE · ${escort.thing.name}`
     : ship.throttle < 0 ? 'REVERSE' : 'MANUAL';
-  $('mode').classList.toggle('auto', !!auto || !!brake);
+  $('mode').classList.toggle('auto', !!auto || !!brake || !!escort);
 
   const near = nearest as Thing | null;
   // (The slack is for Sol's planets; in the ring space it would be the whole bubble.)
@@ -1922,6 +1952,7 @@ const starMap = createMap({
   status: () => $('mode').textContent ?? '',
   dist: (d) => fmtDist(d),
   speed: (v) => fmtSpeed(v),
+  unitMetres: 1 / SOL_UNIT,
   canOpen: () => started && !busy && !walk && !!space,
 });
 if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __map: typeof starMap }).__map = starMap;
@@ -1931,7 +1962,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
-if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip, dust, sky }) });
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip, dust, sky, auto, escort }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
@@ -2011,6 +2042,13 @@ function frame(now: number) {
   dustMat.opacity = 0.6 * clamp(1 - Math.abs(ship.speed) / (DUST_BOX * 6), 0, 1);
 
   space.tick(clock, dt);
+  // The ships under way have just moved: carry ours along with the one we are chasing or flying beside, so
+  // that what is on screen has her exactly where we left her.
+  if (escort) {
+    _a.copy(escort.thing.pos).sub(escort.last);
+    escort.last.copy(escort.thing.pos);
+    ship.pos.add(_a); ship.prev.add(_a); shipModel.position.add(_a); camera.position.add(_a); sky.position.copy(camera.position);
+  }
   updateLabels();
   updateHud(dt);
   look.update(dt, 'space', camera, space.things.find((t) => t.kind === 'star')?.pos ?? null, camera.aspect);
