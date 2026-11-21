@@ -557,6 +557,15 @@ function hullMaps() {
   return shared;
 }
 
+/** Navigation strobes: flash briefly once a period. Each kind of ship has its own rhythm. */
+const strobes: { m: THREE.MeshBasicMaterial; base: THREE.Color; period: number; phase: number }[] = [];
+export function tickShipLights(t: number) {
+  for (const s of strobes) {
+    const u = (t / s.period + s.phase) % 1;
+    s.m.color.copy(s.base).multiplyScalar(u < 0.1 ? 2.2 : 0.1);
+  }
+}
+
 function prepare(root: G): G {
   const hull = hullMaps();
   const mats = new Map<string, Mat>();
@@ -569,6 +578,8 @@ function prepare(root: G): G {
       if (LAMPS.has(src.name)) {
         const b = new THREE.MeshBasicMaterial({ color: src.color, map: PANES.has(src.name) ? hull.rooms : null });
         b.color.multiplyScalar(1.6);
+        // The red and green lights are the navigation strobes: a short flash, then dim, as on any real craft.
+        if (src.name === 'red' || src.name === 'green') strobes.push({ m: b, base: b.color.clone(), period: 1.1 + Math.random() * 0.7, phase: Math.random() });
         m = b;
       } else {
         // The vertex colours hold the weathering (shadowed dirt, soot, scuffed edges) as a multiplier on the paint.

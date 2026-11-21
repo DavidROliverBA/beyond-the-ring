@@ -10,7 +10,7 @@ import {
   type BeltSpec, type BodySpec, type Kind, type SystemSpec,
 } from './data';
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
-import { buildModel, glowSprite, glowTex, loadModels, playerShip, ROCI_UNIT, type ShipModel } from './ships';
+import { buildModel, glowSprite, glowTex, loadModels, playerShip, ROCI_UNIT, tickShipLights, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
 import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
@@ -28,6 +28,7 @@ import { PHOTOS, STARS, type PhotoSet } from './photos';
 type V3 = THREE.Vector3;
 const V3 = THREE.Vector3;
 const ZERO = new V3();
+const _Z = new V3(0, 0, 1);
 const TAU = Math.PI * 2;
 const $ = (id: string) => document.getElementById(id)!;
 const pause = (ms = 0) => new Promise<void>((r) => setTimeout(r, ms));
@@ -96,8 +97,23 @@ async function warm(s: THREE.Scene, c: THREE.Camera) {
 
 // A dim studio stands in for all the light bouncing around, so metal has something to reflect.
 const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environment = envMap;
-scene.environmentIntensity = 0.3;
+// Out in space it is different: black sky with the star in it. Metal facing away from the star
+// reflects dark, and metal facing it picks up a broad glint, which is what gives hulls their contrast.
+// (The room above is kept for the interiors.) The star's patch is turned to face the star each frame.
+const spaceEnv = (() => {
+  const e = new THREE.Scene();
+  e.background = new THREE.Color(0x05070d);
+  const sunPatch = new THREE.Mesh(new THREE.SphereGeometry(4.2, 24, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.94, 0.82).multiplyScalar(16) }));
+  sunPatch.position.set(0, 0, 10);
+  e.add(sunPatch);
+  // A faint band of galaxy-light all round, so nothing is a perfect mirror of black.
+  const band = new THREE.Mesh(new THREE.TorusGeometry(10, 1.4, 8, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 0.62, 0.8).multiplyScalar(0.35) }));
+  band.rotation.x = Math.PI / 2.6;
+  e.add(band);
+  return new THREE.PMREMGenerator(renderer).fromScene(e, 0.05).texture;
+})();
+scene.environment = spaceEnv;
+scene.environmentIntensity = 1;
 // Planets, moons and rocks must not pick up that studio: it lit night sides like day. A material's
 // envMapIntensity doesn't scale scene.environment, so they get their own black environment instead.
 const NO_ENV = new THREE.PMREMGenerator(renderer).fromScene(new THREE.Scene(), 0).texture;
@@ -2091,6 +2107,11 @@ function frame(now: number) {
     ship.prev.copy(camera.position);
   }
   sky.position.copy(camera.position);
+  // The star's glint in the environment faces the star.
+  if (space.star) {
+    _a.copy(space.star).sub(camera.position);
+    if (_a.lengthSq() > 1e-12) scene.environmentRotation.setFromQuaternion(_q.setFromUnitVectors(_Z, _a.normalize()));
+  }
 
   const p = dustGeo.getAttribute('position') as THREE.BufferAttribute;
   const cp = camera.position, h = DUST_BOX / 2;
@@ -2106,6 +2127,7 @@ function frame(now: number) {
   dustMat.opacity = 0.6 * clamp(1 - Math.abs(ship.speed) / (DUST_BOX * 6), 0, 1);
 
   space.tick(clock, dt);
+  tickShipLights(clock);
   // The ships under way have just moved: carry ours along with the one we are chasing or flying beside, so
   // that what is on screen has her exactly where we left her.
   if (escort) {
