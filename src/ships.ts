@@ -74,7 +74,7 @@ function drive(g: G, m: Mat, r: number, z: number, x = 0, y = 0, color = 0x9fd8f
 /** Exhaust behind a drive whose bell ends at `z`: the same beam as the Rocinante's, scaled to the
  *  bell and tinted to the ship's drive colour. `burn` scales how long it is. */
 function plumeAt(g: G, r: number, x: number, y: number, z: number, color: number, burn: number) {
-  const p = new DrivePlume(r, r * 22 * burn, color, true);
+  const p = new DrivePlume(r, r * 11 * burn, color, true);
   p.position.set(x, y, z);
   g.add(p);
 }

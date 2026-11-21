@@ -48,7 +48,7 @@ export class DrivePlume extends THREE.Group {
   private level = 0;
 
   /** `radius` is the nozzle radius, `reach` the length at full thrust, both in model units. */
-  constructor(private radius: number, private reach: number, tint: THREE.ColorRepresentation = 0xffffff, private fixed = false) {
+  constructor(private radius: number, private reach: number, private tint: THREE.ColorRepresentation = 0xffffff, private fixed = false) {
     super();
     const geo = new THREE.PlaneGeometry(1, 1, 1, 1).translate(0, 0.5, 0).rotateX(Math.PI / 2);   // along +z, from 0 to 1
     for (let i = 0; i < 3; i++) {
@@ -73,6 +73,13 @@ export class DrivePlume extends THREE.Group {
     if (fixed) this.update(1, 0, true);
   }
 
+  /** A copy is built afresh: the stock clone would run the constructor with nothing and pile its own parts on the copied ones. */
+  override clone(): this {
+    const c = new DrivePlume(this.radius, this.reach, this.tint, this.fixed);
+    c.position.copy(this.position); c.quaternion.copy(this.quaternion); c.scale.copy(this.scale); c.name = this.name;
+    return c as this;
+  }
+
   /** `thrust` 0..1 is what the drive is doing; `t` is the clock in seconds. */
   update(thrust: number, t: number, snap = false) {
     // Light and dim over about a third of a second, never instantly.
@@ -85,11 +92,13 @@ export class DrivePlume extends THREE.Group {
     for (let i = 0; i < 3; i++) {
       this.beams[i].scale.set(wide, 1, len);
       this.mats[i].uniforms.time.value = t;
-      this.mats[i].uniforms.power.value = Math.min(1, k * 1.15);
+      this.mats[i].uniforms.power.value = Math.min(1, k * 1.15) * (this.fixed ? 0.45 : 1);
     }
-    this.glow.scale.setScalar(this.radius * (8 + 10 * k));
-    (this.glow.material as THREE.SpriteMaterial).opacity = 0.35 + 0.5 * k;
-    this.core.scale.setScalar(this.radius * (3.2 + 3.5 * k));
-    (this.core.material as THREE.SpriteMaterial).opacity = 0.5 + 0.5 * k;
+    // (A ship seen from far off has many of these on screen at once: keep the halo of a fixed one small.)
+    const halo = this.fixed ? 0.3 : 1;
+    this.glow.scale.setScalar(this.radius * (8 + 10 * k) * halo);
+    (this.glow.material as THREE.SpriteMaterial).opacity = (0.35 + 0.5 * k) * (this.fixed ? 0.6 : 1);
+    this.core.scale.setScalar(this.radius * (3.2 + 3.5 * k) * (this.fixed ? 0.5 : 1));
+    (this.core.material as THREE.SpriteMaterial).opacity = (0.5 + 0.5 * k) * (this.fixed ? 0.7 : 1);
   }
 }
