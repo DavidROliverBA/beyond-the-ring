@@ -10,7 +10,7 @@ import {
   type BeltSpec, type BodySpec, type Kind, type SystemSpec,
 } from './data';
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
-import { buildModel, glowSprite, glowTex, loadModels, playerShip, ROCI_UNIT, tickShipLights, type ShipModel } from './ships';
+import { buildModel, glowSprite, glowTex, loadModels, playerShip, ringModel, ROCI_UNIT, tickShipLights, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
 import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
@@ -249,9 +249,16 @@ const GATE_V = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>
 varying vec2 vUv;
+varying vec3 vObjView;   // from the surface to the eye, in the gate's own axes: for the layers' parallax
+varying vec3 vViewN;     // the film's normal and the way to the eye, in view space: for the edge glow
+varying vec3 vViewV;
 void main() {
   vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vViewN = normalMatrix * vec3(0.0, 0.0, 1.0);
+  vViewV = -mv.xyz;
+  vObjView = (inverse(modelViewMatrix) * vec4(0.0, 0.0, 0.0, 1.0)).xyz - position;
+  gl_Position = projectionMatrix * mv;
   #include <logdepthbuf_vertex>
 }`;
 const GATE_F = /* glsl */ `
@@ -259,16 +266,45 @@ const GATE_F = /* glsl */ `
 #include <logdepthbuf_pars_fragment>
 uniform float time;
 varying vec2 vUv;
+varying vec3 vObjView;
+varying vec3 vViewN;
+varying vec3 vViewV;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) { return 0.5 * vn(p) + 0.28 * vn(p * 2.03 + 5.2) + 0.14 * vn(p * 4.1 + 1.7) + 0.08 * vn(p * 8.3 + 9.1); }
+// One sheet of the film: filaments dragged round the middle in a slow spiral, brightest where the noise folds over.
+vec3 sheet(vec2 q, float t, float scale, float twist, float dir) {
+  float r = length(q);
+  float a = atan(q.y, q.x) + dir * (twist * (1.0 - r) * (1.0 - r) * 3.2 + t * 0.07 / (0.35 + r));
+  vec2 s = vec2(cos(a), sin(a)) * r * scale;
+  float n = fbm(s + vec2(t * 0.04 * dir, 0.0));
+  float ridge = pow(max(1.0 - abs(2.0 * n - 1.0), 0.0), 3.5);
+  float cloud = smoothstep(0.35, 0.8, n);
+  return vec3(0.03, 0.12, 0.34) * cloud + vec3(0.26, 0.62, 1.0) * ridge * 0.9 + vec3(0.7, 0.9, 1.0) * pow(ridge, 4.0) * 0.5;
+}
 void main() {
   #include <logdepthbuf_fragment>
-  vec2 p = vUv - 0.5;
-  float r = length(p) * 2.0;
-  float a = atan(p.y, p.x);
-  float swirl = sin(a * 5.0 + time * 0.9 + r * 9.0) * 0.5 + 0.5;
-  float ripple = sin(r * 26.0 - time * 2.2) * 0.5 + 0.5;
-  vec3 col = mix(vec3(0.01, 0.03, 0.09), vec3(0.16, 0.5, 1.0), swirl * ripple * 0.7 + 0.08);
-  float alpha = 0.75 * smoothstep(1.0, 0.86, r);
-  gl_FragColor = vec4(col, alpha);
+  vec2 p = (vUv - 0.5) * 2.0;
+  float r = length(p);
+  // Look through the film: deeper sheets slide against the near one as the eye moves, so it has thickness.
+  vec3 vd = normalize(vObjView);
+  vec2 tilt = vd.xy / (abs(vd.z) + 0.15);
+  tilt *= min(1.0, 1.1 / max(length(tilt), 1e-3));
+  vec3 col = sheet(p, time, 2.6, 1.0, 1.0)
+           + sheet(p - tilt * 0.09, time * 0.8 + 3.0, 3.7, 0.7, -1.0) * 0.65
+           + sheet(p - tilt * 0.22, time * 0.6 + 7.0, 5.2, 1.4, 1.0) * 0.4;
+  // A deep, dark heart that brightens towards the hoop, where the light piles up against the frame.
+  float rim = smoothstep(0.55, 1.0, r);
+  float fres = pow(max(1.0 - abs(dot(normalize(vViewN), normalize(vViewV))), 0.0), 2.0);
+  float pulse = 0.85 + 0.15 * sin(time * 1.3 + atan(p.y, p.x) * 3.0);
+  col *= 0.07 + 0.38 * smoothstep(0.0, 1.0, r);
+  col += vec3(0.30, 0.72, 1.0) * (rim * rim * 0.4 * pulse + pow(smoothstep(0.9, 1.0, r), 2.0) * 0.9);
+  col += vec3(0.2, 0.5, 0.9) * fres * (0.1 + 0.35 * rim);
+  float alpha = (0.86 + 0.14 * rim + 0.1 * fres) * smoothstep(1.0, 0.93, r);
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
   #include <colorspace_fragment>
 }`;
 
@@ -698,11 +734,18 @@ function orbitLine(center: V3, radius: number, y: number, opacity: number): THRE
 
 function makeGateObject(R: number, ctx: BuildCtx): THREE.Group {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(
-    new THREE.TorusGeometry(R, R * 0.06, 14, 120),
-    new THREE.MeshStandardMaterial({ color: 0x3a4654, emissive: 0x0c2c48, metalness: 0.8, roughness: 0.35 }),
-  ));
-  g.add(new THREE.Mesh(new THREE.TorusGeometry(R * 0.935, R * 0.012, 6, 120), lampMat(0x7fd6ff)));
+  // The Blender model (tools/blender/ring.py) is a hoop of radius 1; without it, the plain torus and lamp ring.
+  const ring = ringModel();
+  if (ring) {
+    ring.scale.setScalar(R);
+    g.add(ring);
+  } else {
+    g.add(new THREE.Mesh(
+      new THREE.TorusGeometry(R, R * 0.06, 14, 120),
+      new THREE.MeshStandardMaterial({ color: 0x3a4654, emissive: 0x0c2c48, metalness: 0.8, roughness: 0.35 }),
+    ));
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(R * 0.935, R * 0.012, 6, 120), lampMat(0x7fd6ff)));
+  }
   const mat = new THREE.ShaderMaterial({
     uniforms: { time: { value: 0 } }, vertexShader: GATE_V, fragmentShader: GATE_F,
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
