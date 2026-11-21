@@ -300,7 +300,7 @@ void main() {
   float rim = smoothstep(0.55, 1.0, r);
   float fres = pow(max(1.0 - abs(dot(normalize(vViewN), normalize(vViewV))), 0.0), 2.0);
   float pulse = 0.85 + 0.15 * sin(time * 1.3 + atan(p.y, p.x) * 3.0);
-  col *= 0.07 + 0.38 * smoothstep(0.0, 1.0, r);
+  col *= 0.05 + 0.26 * smoothstep(0.0, 1.0, r);
   col += vec3(0.30, 0.72, 1.0) * (rim * rim * 0.4 * pulse + pow(smoothstep(0.9, 1.0, r), 2.0) * 0.9);
   col += vec3(0.2, 0.5, 0.9) * fres * (0.1 + 0.35 * rim);
   float alpha = (0.86 + 0.14 * rim + 0.1 * fres) * smoothstep(1.0, 0.93, r);
@@ -2113,7 +2113,8 @@ function updateHud(dt: number) {
   if (focus) {
     card.style.display = 'block';
     $('card-name').textContent = focus.name;
-    $('card-sub').textContent = focus.sub;
+    // True size, so ships, stations and worlds can be compared by eye.
+    $('card-sub').textContent = focus.radius > 0 && !/ m$/.test(focus.sub) ? `${focus.sub} · ${fmtDist(focus.radius * 2)} across` : focus.sub;
     $('card-desc').textContent = focus.desc;
     $('card-dist').textContent = fmtDist(Math.max(0, focus.pos.distanceTo(ship.pos) - (focus.solid ? focus.radius : 0)));
     const here = dockable();

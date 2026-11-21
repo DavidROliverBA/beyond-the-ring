@@ -13,14 +13,15 @@ import { rng } from './textures';
 
 type V3 = THREE.Vector3;
 
-/** Lengths in metres. */
+/** Lengths in metres. A class is the same length wherever it turns up (the named ships in data.ts use these too:
+ *  Agatha King and Thomas Prince 800, Donnager 475, Canterbury 500, Molinari 100, Razorback 25, Anubis 150). */
 const KINDS: { model: ShipModel; m: number; w: number }[] = [
   { model: 'racer', m: 25, w: 6 },
   { model: 'corvette', m: 46, w: 4 },
   { model: 'freighter', m: 100, w: 6 },
   { model: 'survey', m: 120, w: 1.6 },
   { model: 'stealth', m: 150, w: 0.4 },
-  { model: 'hauler', m: 300, w: 2.5 },
+  { model: 'hauler', m: 500, w: 2.5 },
   { model: 'battleship', m: 475, w: 0.35 },
   { model: 'dreadnought', m: 800, w: 0.15 },
 ];

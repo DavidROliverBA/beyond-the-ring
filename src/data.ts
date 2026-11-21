@@ -161,7 +161,7 @@ export const SOL: SystemSpec = {
     },
     ship('agathaking', 'UNN Agatha King', 'dreadnought', 'Truman-class dreadnought · UN Navy',
       'Slab-sided and heavily armoured: Earth\'s answer to the Martian battleships, and flagship of the UN fleet sent out to Jupiter.',
-      'earth', 0.12, 3.4, 2.34e-6, 0.01, 1.2),
+      'earth', 0.12, 3.4, 2.674e-6, 0.01, 1.2),
     {
       id: 'mars', name: 'Mars', kind: 'planet', sub: 'Rocky planet · 1.52 AU', radius: 0.02266, orbit: 1.524 * AU, angle: 5.2,
       tilt: 0.44, spin: 0.03, res: 768,
@@ -184,7 +184,7 @@ export const SOL: SystemSpec = {
     {
       id: 'tycho', name: 'Tycho Station', kind: 'station', sub: 'Mobile construction yard · the Belt', radius: 3.34e-6,
       orbit: 2.95 * AU, angle: 0.25, lift: 30, model: 'tycho', spin: 0, range: 8000, dock: 'tycho',
-      desc: 'A shipyard that can move itself: a half-kilometre sphere, two counter-rotating habitat rings and a yard on top. Its engineers spun up Ceres and built the largest ship ever attempted.',
+      desc: 'A shipyard that can move itself: a sphere a kilometre across, two counter-rotating habitat rings and a yard on top. Its engineers spun up Ceres and built the largest ship ever attempted.',
     },
     ship('molinari', 'Guy Molinari', 'freighter', 'Belter freighter · OPA',
       'A battered cargo hauler. Before the Belt had a navy, ships like this carried its boarding parties, packed into the holds behind the containers.',
