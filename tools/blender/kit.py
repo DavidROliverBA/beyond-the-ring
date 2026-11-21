@@ -503,6 +503,14 @@ class Ship:
                 continue
             n = f.normal
             ax = max(range(3), key=lambda i: abs(n[i]))
+            if abs(n[ax]) < 0.92:
+                # A slanted facet (a chamfer, a swept flank): project onto its own plane, or the plates stretch.
+                t1 = Vector(tuple(1.0 if k == min(range(3), key=lambda i: abs(n[i])) else 0.0 for k in range(3)))
+                t2 = n.cross(t1).normalized()
+                t1 = t2.cross(n).normalized()
+                for l in f.loops:
+                    l[uv].uv = (l.vert.co.dot(t2) / uv_scale, l.vert.co.dot(t1) / uv_scale)
+                continue
             i, j = [(1, 2), (0, 2), (0, 1)][ax]
             for l in f.loops:
                 l[uv].uv = (l.vert.co[i] / uv_scale, l.vert.co[j] / uv_scale)
@@ -724,7 +732,7 @@ def preview(path, views=((1.25, -1.15, 0.7), (-1.1, 1.3, -0.45)), res=(1300, 760
     sc.world = world
     sun = bpy.data.objects.new('sun', bpy.data.lights.new('sun', 'SUN'))
     sun.data.energy = 4
-    sun.rotation_euler = (0.9, 0.2, 0.6)
+    sun.rotation_euler = (math.pi - 0.9, 0.2, 0.6) if os.environ.get('SUN_UP') else (0.9, 0.2, 0.6)  # SUN_UP: light the belly
     sc.collection.objects.link(sun)
     cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam'))
     cam.data.lens = 60
