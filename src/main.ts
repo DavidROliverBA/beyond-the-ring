@@ -18,6 +18,7 @@ import { SPIN_ON, feel } from './spin';
 import { createLook } from './look';
 import { addLightning } from './lightning';
 import { createTour } from './tour';
+import { makeSky } from './sky';
 import { PHOTOS, STARS, type PhotoSet } from './photos';
 
 type V3 = THREE.Vector3;
@@ -243,53 +244,8 @@ void main() {
 
 // ------------------------------------------------------------------- sky
 
-function makeSky(): THREE.Group {
-  const g = new THREE.Group();
-  const r = rng(4242);
-  const R = 1e6;
-  const tints = [[0.7, 0.8, 1], [1, 1, 1], [1, 0.95, 0.8], [1, 0.8, 0.6], [0.8, 0.88, 1]];
-  const layer = (n: number, size: number, band: boolean, gain: number) => {
-    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
-    const v = new V3(), tilt = new THREE.Euler(1.05, 0, 0.4);
-    for (let i = 0; i < n; i++) {
-      if (band) {
-        const a = r() * TAU;
-        const spread = (r() + r() + r() - 1.5) * 0.22;
-        v.set(Math.cos(a), spread, Math.sin(a)).normalize().applyEuler(tilt);
-      } else {
-        const y = r() * 2 - 1, a = r() * TAU, q = Math.sqrt(1 - y * y);
-        v.set(q * Math.cos(a), y, q * Math.sin(a));
-      }
-      pos.set([v.x * R, v.y * R, v.z * R], i * 3);
-      const t = tints[Math.floor(r() * tints.length)];
-      const b = (0.25 + 0.75 * r() ** 3) * gain;
-      col.set([t[0] * b, t[1] * b, t[2] * b], i * 3);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true }));
-    pts.frustumCulled = false;
-    g.add(pts);
-  };
-  layer(5000, 1.4, false, 0.9);
-  layer(500, 2.6, false, 1);
-  const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(R * 0.9, 48, 24),
-    new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide, depthWrite: false, fog: false }),
-  );
-  dome.rotation.set(1.05, 0, 0.4);
-  dome.frustumCulled = false;
-  dome.renderOrder = -10;
-  g.add(dome);
-  void loadTex(STARS).then((t) => {
-    dome.material.map = t;
-    dome.material.color.setScalar(0.75);
-    dome.material.needsUpdate = true;
-  });
-  return g;
-}
-const sky = makeSky();
+const skyCtl = makeSky(loadTex, STARS);
+const sky = skyCtl.group;
 scene.add(sky);
 
 // ----------------------------------------------------------------- world
@@ -1043,6 +999,7 @@ function enter(s: Space) {
   scene.add(s.group);
   labelRoot.append(s.labels);
   sky.visible = s.sky;
+  skyCtl.setSystem(s.id);
   auto = null;
   aimed = null;
   applyOrbits();
@@ -1843,7 +1800,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
-if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip }) });
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip, dust, sky }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });

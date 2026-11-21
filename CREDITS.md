@@ -34,6 +34,14 @@ All maps have been resized and recompressed for use in a browser. Further change
 
 The Ganymede and Callisto files here are adaptations (resized, converted to JPEG) and are therefore offered under the same CC BY-SA 3.0 licence as the originals. The Solar System Scope files remain under CC BY 4.0.
 
+## Stars (`assets/stars`)
+
+| File | Source | Author | Licence |
+|---|---|---|---|
+| `stars.bin` | [HYG star database v4.0](https://github.com/astronexus/HYG-Database) (merges the ESA Hipparcos, Yale Bright Star and Gliese catalogues) | David Nash (astronexus.com) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+
+`stars.bin` is an adaptation: the 23,354 stars brighter than magnitude 7.4, reduced to position, brightness and colour index and packed into 6 bytes a star by `tools/stars/build-catalogue.ts`. It is therefore offered under the same CC BY-SA 4.0 licence as the original. The Milky Way image behind the stars is `stars.jpg` (Solar System Scope, CC BY 4.0, above); its orientation was found by matching its bright points to this catalogue.
+
 NASA material is used in line with NASA's media guidelines. Its use here does not imply any endorsement by NASA.
 
 Every other body in the game (Io, Titan, Pluto, the small moons and all worlds beyond the Ring) is painted by the project's own code.
