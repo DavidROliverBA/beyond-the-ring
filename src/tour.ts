@@ -83,9 +83,12 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
   let shots: Shot[] = [], list: Target[] = [], sun: V3 | null = null, i = 0, t = 0, blacked = false;
   let once = false, end: (() => void) | undefined;
   // A flight between two shots: from where the camera was, along an arc, to the start of the next.
-  let leg: { t: number; dur: number; d0: number; dir0: V3; q0: THREE.Quaternion; spin: THREE.Quaternion } | null = null;
+  let leg: { t: number; dur: number; d0: number; dir0: V3; q0: THREE.Quaternion; spin: THREE.Quaternion; m: number } | null = null;
   const dir = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), toSun = new THREE.Vector3(), right = new THREE.Vector3();
   const ease = (x: number) => x * x * (3 - 2 * x);
+  // A sweep round a subject starts at speed (as the flight in arrives) and comes to rest at the end, so the
+  // camera never stops dead on arrival: slope 1 at the start, 0 at the end.
+  const sweep = (x: number) => x + x * x - x * x * x;
   const target = () => list.find((x) => x.id === shots[i]?.id);
 
   /** Where the camera stands `k` (0..1) of the way through a shot. */
@@ -114,7 +117,17 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
       const p1 = shotPos(shot, tg, 0, new THREE.Vector3()), p0 = camera.position.clone();
       const dir0 = p0.clone().sub(tg.pos), d0 = Math.max(dir0.length(), 1e-30), dir1 = p1.clone().sub(tg.pos).normalize();
       dir0.divideScalar(d0);
-      leg = { t: 0, dur: shot.travel, d0, dir0, q0: camera.quaternion.clone(), spin: new THREE.Quaternion().setFromUnitVectors(dir0, dir1) };
+      // The turn round the subject should end at the speed the sweep starts at. Work that out (in turn-fractions
+      // per leg) if the two go the same way, else let the turn end at rest.
+      const cosT = Math.min(1, dir0.dot(dir1)), theta = Math.acos(cosT);
+      let m = 0;
+      if (theta > 1e-3) {
+        const a = shotPos(shot, tg, 0, new THREE.Vector3()).sub(tg.pos).normalize(), b = shotPos(shot, tg, 0.02, new THREE.Vector3()).sub(tg.pos).normalize();
+        const rate = a.angleTo(b) / (0.02 * shot.secs);                       // radians a second as the sweep starts
+        const along = _d.copy(dir1).multiplyScalar(cosT).sub(dir0);            // the way the turn is going on arrival
+        if (along.dot(b.sub(a)) > 0) m = Math.min(2.5, (rate * shot.travel) / theta);
+      }
+      leg = { t: 0, dur: shot.travel, d0, dir0, q0: camera.quaternion.clone(), spin: new THREE.Quaternion().setFromUnitVectors(dir0, dir1), m };
     }
     // (On a flight the caption waits until we arrive.)
     if (!leg) cut(tg, shot.caption ?? tg.desc ?? tg.sub ?? '');
@@ -150,7 +163,8 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
         const u = Math.min(1, leg.t / leg.dur), e = ease(u);
         const p1 = shotPos(shot, tg, 0, _p1), d1 = Math.max(p1.distanceTo(tg.pos), 1e-30);
         // Direction round the subject: turn from the way we came in to the way the shot starts.
-        _q.identity().slerp(leg.spin, e);
+        const e2 = (3 * u * u - 2 * u * u * u) + leg.m * (u * u * u - u * u);   // turn: from rest, arriving at the sweep's speed
+        _q.identity().slerp(leg.spin, e2);
         const dir = _d.copy(leg.dir0).applyQuaternion(_q);
         const dist = Math.exp(Math.log(leg.d0) + (Math.log(d1) - Math.log(leg.d0)) * e);
         camera.position.copy(tg.pos).addScaledVector(dir, dist);
@@ -178,7 +192,7 @@ export function createTour(cut: (t: Target, caption: string) => void, dark: (on:
         begin(next?.travel ? camera : undefined);
         return tour.update(0, camera, aside);
       }
-      shotPos(shot, tg, ease(Math.min(1, t / shot.secs)), camera.position);
+      shotPos(shot, tg, sweep(Math.min(1, t / shot.secs)), camera.position);
       camera.up.set(0, 1, 0);
       camera.lookAt(tg.pos);
       if (aside) { camera.rotateY(0.34); camera.rotateX(0.08); }

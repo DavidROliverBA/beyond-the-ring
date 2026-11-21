@@ -82,3 +82,4 @@ Every station now has grime, clutter, railings and signs that tell you where thi
 - Browser and machine used.
 
 - [ ] **New ship models** (dreadnought, survey ship, freighter, racer, stealth ship, Medina, corvette legs): radiators, masts, turrets, container rows, drop tanks, folded legs. Look at them close (I to inspect) and from afar in traffic: any that look wrong or too busy? Weight check: any slower where there are many ships?
+- [ ] **Smoother tours and flips.** On a voyage the camera no longer stops dead on arriving at each place: the sweep round it picks up at the speed the flight in arrives with, then eases to rest before setting off. During a flip-and-burn (autopilot or X) the camera now holds the way you are travelling while the ship swings round in front of it, then settles back behind her afterwards. Does the flip read better? Any jolt as the camera settles?

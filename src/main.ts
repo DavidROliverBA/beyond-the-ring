@@ -2081,7 +2081,8 @@ function updateHud(dt: number) {
 
 // ------------------------------------------------------------------- loop
 
-const _off = new V3(), _lookQ = new THREE.Quaternion();
+const _off = new V3(), _lookQ = new THREE.Quaternion(), _qI = new THREE.Quaternion();
+let camHold = 0;
 let last = performance.now();
 let clock = 0;
 
@@ -2161,7 +2162,17 @@ function frame(now: number) {
 
   // While the ship turns end over end the camera follows slowly, so you watch her swing round.
   const turning = !!brake || (!!auto && (auto.phase === 'flip' || auto.phase === 'burn'));
-  camQ.slerp(ship.q, 1 - Math.exp(-(turning ? 1.1 : 9) * dt));
+  // The camera looks the way she is travelling, not the way she points: through the flip it holds that heading
+  // (she swings round in front of the lens) and only afterwards settles back behind her.
+  const going = brake && brake.phase !== 'back' ? brake.dir : auto && (auto.phase === 'flip' || auto.phase === 'burn') ? auto.dir : null;
+  if (going && ship.speed > 1e-9) {
+    _a.set(0, 0, -1).applyQuaternion(camQ);
+    camQ.premultiply(_q.setFromUnitVectors(_a, going).slerp(_qI, 1 - Math.min(1, 1.2 * dt)));   // swing only: roll is kept
+    camHold = 2.2;
+  } else {
+    camHold = Math.max(0, camHold - dt);
+    camQ.slerp(ship.q, 1 - Math.exp(-(turning ? 1.1 : camHold > 0 ? 1.6 : 9) * dt));
+  }
   _lookQ.copy(camQ)
     .multiply(_q.setFromAxisAngle(_a.set(0, 1, 0), lookYaw))
     .multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), lookPitch));
