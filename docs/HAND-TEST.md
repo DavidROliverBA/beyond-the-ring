@@ -14,6 +14,10 @@ Note what felt wrong and where. "Fine" is a useful answer too.
 - [ ] Pick a destination from the list (Tab). Does the autopilot arrive smoothly?
 - [ ] Fly towards the Sun: soft rays and a faint lens halo, not a washed-out screen.
 - [ ] Look at Earth's night side: dark, city lights, now and then a lightning flash in the clouds. Day side: a light blue haze, thin blue limb.
+- [ ] The ship is the Rocinante (name under the speed readout). Her drive plume is a long white-blue beam, brighter with a harder burn, off when you coast. Do you see it from the chase view (V toggles chase and cockpit)?
+- [ ] Pick a far destination (Tab, click Neptune). The autopilot burns, coasts, then **flips end over end** and burns the other way to arrive at rest; the readout says FLIPPING and BURNING TO ARRIVE. Does the flip look right, and does the camera follow slowly enough to watch it?
+- [ ] Build up speed with W, then press X: the ship flips, burns to a stop and turns back to the way she pointed (W cancels it). Any key during an autopilot flip hands the helm back.
+- [ ] Look up: the stars are the real sky (Orion with orange Betelgeuse, Sirius, the Southern Cross, the Milky Way as a band). Do the colours and groupings look right to you?
 - [ ] T plays the tour from where you are; any key hands control back where you were.
 - [ ] Near Tycho, aim at a ship or the station and press I: the camera glides in; move the mouse to circle it, wheel to zoom; I again to fly on. Do the new hull textures, grime and lit windows look right up close?
 - [ ] P (photo mode): HUD gone, time frozen, mouse looks, [ ] exposure, Enter saves a PNG, P again to fly on.

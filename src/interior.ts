@@ -1172,7 +1172,8 @@ class Kit implements Site {
 
   /** Your own ship on the pad, with the way back aboard. */
   parkShip(x: number, z: number, yaw: number) {
-    const S = 15;
+    // The Rocinante, at about 60% of her true 46 m so that she fits a bay built before she was your ship.
+    const S = 22;
     const { group, plume } = playerShip();
     plume.visible = false;
     group.scale.setScalar(S);
@@ -1184,8 +1185,8 @@ class Kit implements Site {
       this.cyl(0.16, 2.3, 0x2d3238, px, pz, { solid: false });
       this.cyl(0.5, 0.1, 0x2d3238, px, pz, { solid: false });
     }
-    this.block(x, z, 5, 22);
-    const [rx, rz] = at(0, 12.5);
+    this.block(x, z, 8, 28);
+    const [rx, rz] = at(0, 14.5);
     const ramp = this.box(2, 0.12, 5, 0x3a3f46, rx, rz, { y: 0.9, yaw, solid: false });
     ramp.rotation.x = this.curveR ? 0 : 0.36;
     const [ex, ez] = at(0, 15.5);
@@ -1420,8 +1421,8 @@ function tycho(): Interior {
   k.placard(6, 47, Math.PI, 'Tycho Station',
     'A sphere half a kilometre across with two habitat rings turning in opposite directions around it, and drives big enough to move the whole yard wherever the work is. Tycho is owned by an Earth corporation and run, in practice, for the Belt. You are standing in one of the bays let into the sphere.');
   k.placard(-6, 47, Math.PI, 'What you can see outside',
-    'Through the bay door: the Rocinante on a holding tether. She is a Martian Corvette-class frigate, about 46 metres from nose to drive cone. Tycho refitted her after her first battles and has been her home port ever since.');
-  const roci = buildModel('corvette');
+    'Through the bay door: the yard, with ships on holding tethers while the gangs work on them. Your own, the Rocinante, is the one on the pad behind you: a Martian Corvette-class frigate, about 46 metres from nose to drive cone, which Tycho refitted after her first battles and has been her home port ever since.');
+  const roci = buildModel('hauler');
   roci.scale.setScalar(46);
   roci.position.set(26, 14, -70);
   roci.rotation.set(0.1, 2.2, 0.2);

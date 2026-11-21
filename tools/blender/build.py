@@ -685,7 +685,7 @@ def player():
 
 
 BUILD = {'corvette': corvette, 'battleship': battleship, 'hauler': hauler, 'tycho': tycho, 'dreadnought': dreadnought, 'racer': racer,
-         'freighter': freighter, 'stealth': stealth, 'survey': survey, 'medina': medina, 'player': player}
+         'freighter': freighter, 'stealth': stealth, 'survey': survey, 'medina': medina}
 
 
 

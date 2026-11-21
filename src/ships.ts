@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { paintGlow, rng } from './textures';
 import { scan } from './materials';
+import { DrivePlume } from './plume';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import corvetteGlb from '../assets/models/corvette.glb';
@@ -16,7 +17,6 @@ import freighterGlb from '../assets/models/freighter.glb';
 import stealthGlb from '../assets/models/stealth.glb';
 import surveyGlb from '../assets/models/survey.glb';
 import medinaGlb from '../assets/models/medina.glb';
-import playerGlb from '../assets/models/player.glb';
 import hullColor from '../assets/pbr/hull_color.jpg';
 import hullNormal from '../assets/pbr/hull_normal.jpg';
 import hullRough from '../assets/pbr/hull_rough.jpg';
@@ -509,63 +509,18 @@ function mirrors(): G {
 }
 
 /** Your ship — an original design: a long-range survey skiff. Returns the model and its exhaust. */
-export function playerShip(): { group: G; plume: THREE.Mesh } {
-  const file = loaded.get('player');
-  if (file) {
-    const g = new THREE.Group();
-    g.add(file.clone(true));
-    const plume = new THREE.Mesh(
-      new THREE.ConeGeometry(0.15, 1, 14, 1, true).translate(0, -0.5, 0).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
-    );
-    plume.position.z = 0.66;
-    g.add(plume);
-    return { group: g, plume };
-  }
+/** The ship you fly is the Rocinante: the Blender corvette, 1.24 model units from nose to drive, which at
+ *  the 46 m the books give her makes a model unit about 37 m. Its drive nozzle is at the tail (+z). */
+export const ROCI = { length: 1.236, nozzleZ: 0.556, nozzleR: 0.09, metres: 46 };
+export const ROCI_UNIT = ROCI.metres / ROCI.length;   // metres in one model unit
+
+export function playerShip(): { group: G; plume: DrivePlume } {
   const g = new THREE.Group();
-  const hull = metal(0x8d98a3, { roughness: 0.42, emissive: 0x0b0e12 });
-  const trim = metal(0xc8662a, { roughness: 0.5, emissive: 0x2a1004 });
-  const dark = metal(0x23282e);
-  const body = tube(g, hull, 0.1, 0.16, 0.9, 0, 10);
-  body.scale.y = 0.85;
-  const nose = tube(g, hull, 0.02, 0.1, 0.34, -0.62, 10);
-  nose.scale.y = 0.85;
-  bx(g, dark, 0.09, 0.03, 0.2, 0, 0.085, -0.42);
-  bx(g, lit(0x9fd8ff), 0.07, 0.006, 0.12, 0, 0.101, -0.44);
-  tube(g, trim, 0.118, 0.128, 0.06, -0.22, 10).scale.y = 0.85;
-  tube(g, dark, 0.132, 0.14, 0.03, 0.05, 10).scale.y = 0.85;
-  bx(g, hull, 0.1, 0.05, 0.3, 0, 0.13, 0.15);
-  bx(g, dark, 0.012, 0.2, 0.22, 0, 0.26, 0.3);
-  bx(g, trim, 0.014, 0.04, 0.22, 0, 0.36, 0.32);
-  for (const s of [1, -1]) {
-    bx(g, hull, 0.08, 0.08, 0.5, s * 0.23, -0.01, 0.2);
-    tube(g, hull, 0.02, 0.045, 0.14, -0.12, 8, s * 0.23, -0.01);
-    bx(g, hull, 0.06, 0.02, 0.2, s * 0.15, 0, 0.2);
-    const fin = bx(g, trim, 0.34, 0.012, 0.26, s * 0.4, -0.01, 0.3);
-    fin.rotation.y = s * -0.35;
-    bx(g, dark, 0.3, 0.004, 0.14, s * 0.4, 0.06, 0.12).rotation.z = s * 0.5;
-    pdc(g, dark, s * 0.09, 0.085, -0.1, 0.016);
-    tube(g, dark, 0.03, 0.045, 0.08, 0.48, 10, s * 0.23, -0.01);
-    const d = new THREE.Mesh(new THREE.CircleGeometry(0.03, 10), lit(0x5f9fc4));
-    d.position.set(s * 0.23, -0.01, 0.522);
-    g.add(d);
-    lamp(g, s > 0 ? 0x4fff7a : 0xff4f4f, s * 0.57, -0.01, 0.36, 0.012);
-    windows(g, s * 0.125, 0.03, -0.3, 0.0, 5, 0xffe2a8, 0.008);
-  }
-  tube(g, dark, 0.006, 0.006, 0.3, -0.9, 5);
-  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 5, 0, Math.PI * 2, 0, 1.0), hull);
-  dish.rotation.x = Math.PI;
-  dish.position.set(0, 0.24, -0.05);
-  g.add(dish);
-  tube(g, dark, 0.13, 0.2, 0.2, 0.55, 14);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.12, 14), lit(0x5f9fc4));
-  disc.position.z = 0.652;
-  g.add(disc);
-  const plume = new THREE.Mesh(
-    new THREE.ConeGeometry(0.15, 1, 14, 1, true).translate(0, -0.5, 0).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
-  );
-  plume.position.z = 0.66;
+  const file = loaded.get('corvette');
+  g.add(file ? file.clone(true) : corvette());
+  // A tall drive plume, as long as four ship lengths at full burn.
+  const plume = new DrivePlume(ROCI.nozzleR, 4.2);
+  plume.position.z = ROCI.nozzleZ;
   g.add(plume);
   return { group: g, plume };
 }
@@ -579,7 +534,7 @@ const BUILDERS: Record<Exclude<ShipModel, 'player'>, () => G> = {
 
 const GLB: Partial<Record<ShipModel, string>> = {
   corvette: corvetteGlb, battleship: battleshipGlb, hauler: haulerGlb, tycho: tychoGlb, dreadnought: dreadnoughtGlb, racer: racerGlb,
-  freighter: freighterGlb, stealth: stealthGlb, survey: surveyGlb, medina: medinaGlb, player: playerGlb,
+  freighter: freighterGlb, stealth: stealthGlb, survey: surveyGlb, medina: medinaGlb,
 };
 const BURN: Partial<Record<ShipModel, [color: number, burn: number]>> = {
   corvette: [0x9fd8ff, 1], battleship: [0x9fd8ff, 0.6], hauler: [0xffd9a8, 0.3], dreadnought: [0xa8d0ff, 0.6], racer: [0x9fd8ff, 1],

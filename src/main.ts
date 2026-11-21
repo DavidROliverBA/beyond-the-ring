@@ -10,7 +10,7 @@ import {
   type BeltSpec, type BodySpec, type Kind, type SystemSpec,
 } from './data';
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
-import { buildModel, glowSprite, glowTex, loadModels, playerShip, type ShipModel } from './ships';
+import { buildModel, glowSprite, glowTex, loadModels, playerShip, ROCI_UNIT, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
 import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
@@ -920,7 +920,8 @@ async function buildSlowZone(): Promise<Space> {
 // ------------------------------------------------------------------ ship
 
 /** Your ship is about 30 m long, so the chase camera rides a few hundred metres behind it. */
-const SHIP_SCALE = 2e-7;
+// The Rocinante at her true 46 m: a model unit is about 37 m, and a scene unit is 1/1000 AU.
+const SHIP_SCALE = ROCI_UNIT * SOL_UNIT;
 const ship = { pos: new V3(), prev: new V3(), q: new THREE.Quaternion(), speed: 0, throttle: 0 };
 let { group: shipModel, plume } = playerShip();
 shipModel.scale.setScalar(SHIP_SCALE);
@@ -944,7 +945,19 @@ scene.add(dust);
 
 let space: Space;
 const cache = new Map<string, Space>();
-let auto: { thing: Thing; point: V3; phase: 'cruise' | 'face' } | null = null;
+/** The autopilot flies the way a torch ship does: burn towards the target, coast while the ship turns
+ *  end over end, then burn the other way to arrive at rest. The way the ship is going stays fixed
+ *  through the flip (`dir`); only the way it points changes. */
+interface Auto { thing: Thing; point: V3; phase: 'cruise' | 'flip' | 'burn' | 'face'; a: number; dir: V3; t: number; q0: THREE.Quaternion }
+let auto: Auto | null = null;
+/** Flip and burn by hand (X): the same manoeuvre to stop, then the ship turns back to the way it was pointing. */
+interface Brake { phase: 'flip' | 'burn' | 'back'; t: number; dir: V3; q0: THREE.Quaternion; qFrom: THREE.Quaternion; a: number }
+let brake: Brake | null = null;
+/** What the drive is doing this frame, 0 (off) to 1 (full burn); the plume follows it. */
+let engine = 0;
+const FLIP_SECS = 5.5;      // end over end, drive off
+const BRAKE_SECS = 7;       // a manual burn to a stop
+const smoother = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
 let aimed: Thing | null = null;
 let nearest: Thing | null = null;
 let busy = true;
@@ -1045,11 +1058,20 @@ function viewpoint(th: Thing): V3 {
 
 function engage(th: Thing) {
   if (busy) return;
-  auto = { thing: th, point: viewpoint(th), phase: 'cruise' };
+  const point = viewpoint(th);
+  brake = null;
+  // Plan the trip: a hop takes ten seconds or so, a crossing of the system about half a minute. With the
+  // flip taking its share, the burns each last half of what is left, and that fixes how hard to burn.
+  const D = point.distanceTo(ship.pos);
+  const T = clamp(9 + 4.2 * Math.log10(Math.max(D / th.radius, 1.5)), 10, 40);
+  const t1 = (T - FLIP_SECS) / 2;
+  const a = D / (t1 * (t1 + FLIP_SECS));
+  auto = { thing: th, point, phase: 'cruise', a, dir: new V3(), t: 0, q0: new THREE.Quaternion() };
   ship.throttle = 0;
 }
 
 function placeAt(th: Thing) {
+  brake = null;
   ship.pos.copy(viewpoint(th));
   ship.prev.copy(ship.pos);
   faceShip(th.pos.clone().sub(ship.pos).normalize());
@@ -1068,6 +1090,7 @@ function banner(title: string, text: string) {
 
 async function transit(g: Thing) {
   if (busy || !g.to) return;
+  brake = null;
   stopTour();
   busy = true;
   auto = null;
@@ -1246,7 +1269,9 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyT') { if (tour.active) stopTour(); else startTour(); return; }
   if (e.code === 'KeyI') { if (inspect.on) stopInspect(); else startInspect(); return; }
   if (inspect.on && (STEER.includes(e.code) || e.code === 'Escape')) stopInspect();
-  if (STEER.includes(e.code)) auto = null;
+  // X in the middle of the autopilot's own flip and burn changes nothing: it is already doing it.
+  if (e.code === 'KeyX' && auto && (auto.phase === 'flip' || auto.phase === 'burn')) return;
+  if (STEER.includes(e.code)) { if (auto && (auto.phase === 'flip' || auto.phase === 'burn')) abortManoeuvre(); else auto = null; }
   switch (e.code) {
     case 'Tab':
     case 'KeyN':
@@ -1254,7 +1279,7 @@ addEventListener('keydown', (e) => {
       document.body.classList.toggle('nav-open');
       if (document.body.classList.contains('nav-open')) document.exitPointerLock();
       break;
-    case 'KeyX': ship.throttle = 0; break;
+    case 'KeyX': ship.throttle = 0; startBrake(); break;
     case 'KeyV': chase = !chase; break;
     case 'KeyO': orbitsOn = !orbitsOn; applyOrbits(); break;
     case 'KeyH': document.body.classList.toggle('help-open'); break;
@@ -1358,16 +1383,38 @@ function speedCap(): number {
 function autopilot(dt: number, cap: number) {
   const ap = auto!;
   const fwd = _b.set(0, 0, -1).applyQuaternion(ship.q);
+  const R = ap.thing.radius;
   if (ap.phase === 'face') {
+    engine = 0;
     ship.speed *= Math.exp(-8 * dt);
     const dir = ap.thing.pos.clone().sub(ship.pos).normalize();
     faceShip(dir, 2.6 * dt);
     if (fwd.dot(dir) > 0.9997) auto = null;
     return;
   }
+  if (ap.phase === 'flip') {
+    // Coasting: the drive is off, the ship turns end over end and the way we are going does not change.
+    ap.t += dt;
+    const k = smoother(clamp(ap.t / FLIP_SECS, 0, 1));
+    ship.q.copy(ap.q0).multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), Math.PI * k));
+    engine = 0;
+    ship.pos.addScaledVector(ap.dir, ship.speed * dt);
+    if (ap.t >= FLIP_SECS) { ap.phase = 'burn'; ap.t = 0; }
+    return;
+  }
+  if (ap.phase === 'burn') {
+    // The drive now points the way we are going. Brake along the same line, at the rate that stops us
+    // exactly at the viewpoint: the speed from which a steady burn of `a` just runs out there.
+    const left = _a.copy(ap.point).sub(ship.pos).dot(ap.dir);
+    if (left <= 0.02 * R || ship.speed <= 0) { ship.speed = 0; engine = 0; ap.phase = 'face'; return; }
+    const want = Math.sqrt(2 * ap.a * left);
+    if (ship.speed > want) { ship.speed = Math.max(want, ship.speed - 1.5 * ap.a * dt); engine = 1; } else engine = 0;
+    ship.pos.addScaledVector(ap.dir, ship.speed * dt);
+    return;
+  }
   const to = _a.copy(ap.point).sub(ship.pos);
   const dist = to.length();
-  if (dist < 0.02 * ap.thing.radius) {
+  if (dist < 0.02 * R) {
     ap.phase = 'face';
     return;
   }
@@ -1391,10 +1438,63 @@ function autopilot(dt: number, cap: number) {
   const want = aim ? aim.sub(ship.pos).normalize() : dir;
   faceShip(want, 2.6 * dt);
   const align = fwd.dot(want);
-  const target = Math.min(cap, dist * 2.2) * (align > 0.9 ? 1 : align > 0.5 ? 0.2 : 0);
-  ship.speed += (target - ship.speed) * (1 - Math.exp(-4 * dt));
-  ship.speed = Math.min(ship.speed, cap, dist / dt);
+  // Time to turn round? The burn needs v²/2a to stop and the flip itself coasts for FLIP_SECS.
+  const need = (ship.speed * ship.speed) / (2 * ap.a) + ship.speed * FLIP_SECS * 1.08 + 0.02 * R;
+  if (ship.speed * FLIP_SECS > 0.12 * R && dist <= need && align > 0.97) {
+    ap.phase = 'flip';
+    ap.t = 0;
+    ap.dir.copy(fwd);
+    ap.q0.copy(ship.q);
+    engine = 0;
+    return;
+  }
+  // Burn (or coast at the limit) towards the target. Close in, the old rule still holds the speed down.
+  const vTarget = Math.min(cap, dist * 2.2) * (align > 0.9 ? 1 : align > 0.5 ? 0.2 : 0);
+  if (ship.speed < vTarget) { ship.speed = Math.min(vTarget, ship.speed + ap.a * dt); engine = 1; }
+  else { ship.speed += (vTarget - ship.speed) * (1 - Math.exp(-4 * dt)); engine = 0; }
+  ship.speed = Math.min(ship.speed, dist / dt);
   ship.pos.addScaledVector(fwd, ship.speed * dt);
+}
+
+/** Start a flip and burn to a stop (X). Does nothing if we are hardly moving. */
+function startBrake() {
+  if (auto || brake || busy || walk) return;
+  if (ship.speed <= 3e-7) { ship.speed = 0; return; }       // under about 45 m/s: just stop
+  const fwd = new V3(0, 0, -1).applyQuaternion(ship.q);
+  brake = { phase: 'flip', t: 0, dir: fwd, q0: ship.q.clone(), qFrom: ship.q.clone(), a: ship.speed / BRAKE_SECS };
+  ship.throttle = 0;
+}
+
+function braking(dt: number) {
+  const b = brake!;
+  b.t += dt;
+  if (b.phase === 'flip') {
+    ship.q.copy(b.q0).multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), Math.PI * smoother(clamp(b.t / FLIP_SECS, 0, 1))));
+    engine = 0;
+    ship.pos.addScaledVector(b.dir, ship.speed * dt);
+    if (b.t >= FLIP_SECS) { b.phase = 'burn'; b.t = 0; }
+  } else if (b.phase === 'burn') {
+    ship.speed = Math.max(0, ship.speed - b.a * dt);
+    engine = 1;
+    ship.pos.addScaledVector(b.dir, ship.speed * dt);
+    if (ship.speed <= 0) { b.phase = 'back'; b.t = 0; b.qFrom.copy(ship.q); engine = 0; }
+  } else {
+    // Turn back the way we were pointing (still carrying whatever speed is left).
+    ship.q.slerpQuaternions(b.qFrom, b.q0, smoother(clamp(b.t / (FLIP_SECS * 0.8), 0, 1)));
+    engine = 0;
+    ship.pos.addScaledVector(b.dir, ship.speed * dt);
+    if (b.t >= FLIP_SECS * 0.8) { ship.q.copy(b.q0); brake = null; }
+  }
+}
+
+/** Take the helm back mid-manoeuvre: finish turning to the original heading, keeping the way we were going. */
+function abortManoeuvre() {
+  if (auto && (auto.phase === 'flip' || auto.phase === 'burn')) {
+    brake = { phase: 'back', t: 0, dir: auto.dir.clone(), q0: auto.q0.clone(), qFrom: ship.q.clone(), a: 0 };
+    auto = null;
+  } else if (brake && brake.phase !== 'back') {
+    brake.phase = 'back'; brake.t = 0; brake.qFrom.copy(ship.q);
+  }
 }
 
 function step(dt: number) {
@@ -1422,7 +1522,12 @@ function step(dt: number) {
 
   if (auto) {
     autopilot(dt, cap);
+  } else if (brake) {
+    // Flipping and burning by hand: the helm is the ship's own until it has turned back.
+    if (keys.has('KeyW') || keys.has('Escape')) abortManoeuvre();
+    if (brake) braking(dt);
   } else {
+    engine = 0;
     if (yaw) ship.q.multiply(_q.setFromAxisAngle(_a.set(0, 1, 0), yaw));
     if (pitch) ship.q.multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), pitch));
     if (roll) ship.q.multiply(_q.setFromAxisAngle(_a.set(0, 0, 1), roll));
@@ -1430,8 +1535,11 @@ function step(dt: number) {
     if (keys.has('KeyW')) ship.throttle = clamp(ship.throttle + 0.4 * dt, -0.3, 1);
     if (keys.has('KeyS')) ship.throttle = clamp(ship.throttle - 0.4 * dt, -0.3, 1);
     const target = clamp(speedFor(ship.throttle), -cap, cap);
+    const before = ship.speed;
     ship.speed += (target - ship.speed) * (1 - Math.exp(-3.5 * dt));
     ship.speed = clamp(ship.speed, -cap, cap);
+    // The drive burns while we speed up, and idles low while a throttle is set; it is off when we cut it.
+    engine = ship.speed > before + Math.abs(target) * 0.002 * dt * 60 ? 1 : ship.throttle > 0.02 ? 0.22 : 0;
     ship.pos.addScaledVector(_b.set(0, 0, -1).applyQuaternion(ship.q), ship.speed * dt);
   }
 
@@ -1483,6 +1591,7 @@ async function fade(work: () => Promise<void> | void) {
 async function dock(th: Thing) {
   if (busy || walk || !th.dock) return;
   auto = null;
+  brake = null;
   ship.throttle = ship.speed = 0;
   await fade(async () => {
     loadingEl.textContent = 'Docking…';
@@ -1757,8 +1866,11 @@ function updateHud(dt: number) {
   $('speed').textContent = fmtSpeed(ship.speed);
   ($('throttle-fill') as HTMLElement).style.width = `${Math.abs(ship.throttle) * 100}%`;
   $('throttle-fill').classList.toggle('reverse', ship.throttle < 0);
-  $('mode').textContent = auto ? `AUTOPILOT → ${auto.thing.name}` : ship.throttle < 0 ? 'REVERSE' : 'MANUAL';
-  $('mode').classList.toggle('auto', !!auto);
+  $('mode').textContent = auto
+    ? auto.phase === 'flip' ? `FLIPPING · ${auto.thing.name}` : auto.phase === 'burn' ? `BURNING TO ARRIVE · ${auto.thing.name}` : `AUTOPILOT → ${auto.thing.name}`
+    : brake ? (brake.phase === 'flip' ? 'FLIPPING' : brake.phase === 'burn' ? 'BURNING TO A STOP' : 'TURNING BACK')
+    : ship.throttle < 0 ? 'REVERSE' : 'MANUAL';
+  $('mode').classList.toggle('auto', !!auto || !!brake);
 
   const near = nearest as Thing | null;
   // (The slack is for Sol's planets; in the ring space it would be the whole bubble.)
@@ -1843,16 +1955,17 @@ function frame(now: number) {
   shipModel.position.copy(ship.pos);
   shipModel.quaternion.copy(ship.q);
   shipModel.visible = chase;
-  const thrust = clamp(Math.abs(ship.speed) / space.maxSpeed * 6 + Math.abs(ship.throttle), 0, 1);
-  plume.scale.set(1, 1, 0.15 + thrust * 1.6 + Math.sin(clock * 40) * 0.04);
-  (plume.material as THREE.MeshBasicMaterial).opacity = 0.12 + thrust * 0.45;
+  plume.update(walk || tour.active || inspect.on ? 0 : engine, clock);
 
-  camQ.slerp(ship.q, 1 - Math.exp(-9 * dt));
+  // While the ship turns end over end the camera follows slowly, so you watch her swing round.
+  const turning = !!brake || (!!auto && (auto.phase === 'flip' || auto.phase === 'burn'));
+  camQ.slerp(ship.q, 1 - Math.exp(-(turning ? 1.1 : 9) * dt));
   _lookQ.copy(camQ)
     .multiply(_q.setFromAxisAngle(_a.set(0, 1, 0), lookYaw))
     .multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), lookPitch));
-  if (chase) _off.set(0, 1.5, 6.4).multiplyScalar(SHIP_SCALE);
-  else _off.set(0, 0.06, -0.9).multiplyScalar(SHIP_SCALE);
+  // A little off to the side, so the plume shows as a beam and not as a glow straight at the lens.
+  if (chase) _off.set(1.7, 1.4, 6.4).multiplyScalar(SHIP_SCALE);
+  else _off.set(0, 0.1, -0.45).multiplyScalar(SHIP_SCALE);
   camera.position.copy(ship.pos).add(_off.applyQuaternion(_lookQ));
   camera.quaternion.copy(_lookQ);
   camera.updateMatrixWorld();
