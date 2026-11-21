@@ -566,8 +566,30 @@ export function tickShipLights(t: number) {
   }
 }
 
+/** The shared hull texture repeats every few metres, which shows on a big ship. This breaks it up with slow
+ *  streaks and blotches of tint and gloss that follow the ship (not the texture), so no two stretches of hull match. */
+function macro(mat: THREE.MeshStandardMaterial, size: number) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.macroK = { value: 5 / size };
+    sh.vertexShader = 'varying vec3 vMP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vMP = position;');
+    sh.fragmentShader = `varying vec3 vMP; uniform float macroK;
+      float mh(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float mn(vec3 p) {
+        vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(mh(i), mh(i + vec3(1,0,0)), f.x), mix(mh(i + vec3(0,1,0)), mh(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(mh(i + vec3(0,0,1)), mh(i + vec3(1,0,1)), f.x), mix(mh(i + vec3(0,1,1)), mh(i + vec3(1,1,1)), f.x), f.y), f.z);
+      }
+      float macroN(vec3 q) { vec3 p = q * macroK; return 0.55 * mn(p * vec3(2.0, 2.0, 0.6)) + 0.3 * mn(p * vec3(5.0, 5.0, 1.6) + 7.0) + 0.15 * mn(p * 13.0 + 3.0); }\n` +
+      sh.fragmentShader
+        .replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= 0.72 + 0.56 * macroN(vMP);')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * (0.8 + 0.5 * macroN(vMP + 11.0)), 0.04, 1.0);');
+  };
+  mat.customProgramCacheKey = () => 'hull-macro';
+}
+
 function prepare(root: G): G {
   const hull = hullMaps();
+  const box = new THREE.Box3().setFromObject(root), extent = Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z) || 1;
   const mats = new Map<string, Mat>();
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -584,6 +606,7 @@ function prepare(root: G): G {
       } else {
         // The vertex colours hold the weathering (shadowed dirt, soot, scuffed edges) as a multiplier on the paint.
         src.color.multiplyScalar(1 / CLEAN);
+        if (src.name !== 'ice') macro(src, extent);
         if (src.name !== 'ice') {
           src.map = hull.color;
           src.normalMap = hull.normal;
