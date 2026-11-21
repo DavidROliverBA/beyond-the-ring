@@ -17,7 +17,9 @@ import { loadPeople } from './skinned';
 import { SPIN_ON, feel } from './spin';
 import { createLook } from './look';
 import { addLightning } from './lightning';
-import { createTour } from './tour';
+import { makeComet } from './comet';
+import { createTour, genericShots, type Voyage } from './tour';
+import { VOYAGES, createVoyageMenu } from './voyages';
 import { FLIP_SECS, planTrip } from './course';
 import { createMap } from './starmap';
 import { makeSky } from './sky';
@@ -340,6 +342,21 @@ const rockGeo = (() => {
   return g;
 })();
 
+/** Turn a sphere into a lumpy, stretched small body. Never bigger than the sphere, so the body's size holds. */
+function lump(geo: THREE.SphereGeometry, shape: NonNullable<BodySpec['shape']>) {
+  const N = new Noise(shape.seed), p = geo.getAttribute('position'), v = new V3();
+  const big = Math.max(...shape.stretch), R = geo.parameters.radius;
+  const [sx, sy, sz] = shape.stretch.map((x) => x / big);
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    const n = N.n3(v.x * 1.7 + 9, v.y * 1.7 + 9, v.z * 1.7 + 9) * 0.65 + N.n3(v.x * 4.1 + 3, v.y * 4.1 + 3, v.z * 4.1 + 3) * 0.35;
+    const k = 1 - shape.lump * (1 - n);
+    p.setXYZ(i, v.x * sx * k * R, v.y * sy * k * R, v.z * sz * k * R);
+  }
+  p.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
 const lampMat = (c: number) => { const m = new THREE.MeshBasicMaterial({ color: c }); m.color.multiplyScalar(2); return m; };
 
 const MODELS: Record<'platform' | 'diamond' | 'neutron', () => THREE.Group> = {
@@ -474,6 +491,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   const maps = !photo || (painted.lights && !photo.night) ? (await paintBody(tex, 256, 128))! : null;
   const big = R >= 0.2;
   const geo = new THREE.SphereGeometry(R, big ? 128 : 64, big ? 64 : 32);
+  if (b.shape) lump(geo, b.shape);
   const lod: Lod = { spec: b, pos, mat: new THREE.MeshBasicMaterial(), level: 0, photo };
   if (b.kind === 'star') {
     lod.mat.color.setScalar(1.7);
@@ -492,6 +510,7 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   }
   const mesh = new THREE.Mesh(geo, lod.mat);
   tilt.add(mesh);
+  if (b.kind === 'comet' && b.tail) holder.add(makeComet(b.tail, b.coma ?? 0.4, pos.lengthSq() > 0 ? pos.clone().normalize() : new V3(1, 0, 0)));
   ctx.spin.push({ o: mesh, r: b.spin ?? 0.02 });
   if (kinds.clouds) {
     lod.clouds = new THREE.MeshStandardMaterial({ transparent: true, roughness: 1, depthWrite: false, envMap: NO_ENV, envMapIntensity: 0 });
@@ -572,7 +591,7 @@ function makeBelt(b: BeltSpec, group: THREE.Group, posOf: Map<string, V3>) {
       const y = r() * 2 - 1, a = r() * TAU, q = Math.sqrt(1 - y * y);
       v.set(q * Math.cos(a), y, q * Math.sin(a)).multiplyScalar(b.inner + (b.outer - b.inner) * r());
     } else {
-      const a = r() * TAU, d = b.inner + (b.outer - b.inner) * (r() + r()) / 2;
+      const a = b.arc ? b.arc[0] + (b.arc[1] - b.arc[0]) * r() : r() * TAU, d = b.inner + (b.outer - b.inner) * (r() + r()) / 2;
       v.set(Math.cos(a) * d, (r() + r() + r() - 1.5) * b.height, Math.sin(a) * d);
     }
     return v;
@@ -1105,10 +1124,10 @@ function banner(title: string, text: string) {
   bannerTimer = window.setTimeout(() => $('banner').classList.remove('show'), 7000);
 }
 
-async function transit(g: Thing) {
+async function transit(g: Thing, quiet = false) {
   if (busy || !g.to) return;
   brake = null;
-  stopTour();
+  if (!quiet) stopTour();
   busy = true;
   auto = null;
   const flash = $('flash');
@@ -1128,7 +1147,7 @@ async function transit(g: Thing) {
   loadingEl.textContent = '';
   await pause(200);
   flash.classList.remove('on');
-  banner(next.id === 'slow' ? next.name : `${next.name} system`, next.blurb);
+  if (!quiet) banner(next.id === 'slow' ? next.name : `${next.name} system`, next.blurb);
   busy = false;
 }
 
@@ -1168,24 +1187,63 @@ const tour = createTour(
   (t, caption) => { if (started) banner(t.name, caption); },
   (on) => $('flash').classList.toggle('on', on),
 );
-let tourSave: { pos: V3; q: THREE.Quaternion } | null = null;
+let tourSave: { pos: V3; q: THREE.Quaternion; space: string } | null = null;
+/** The voyage being flown (T): which stage it is on. Set to null to call it off. */
+let voyage: { v: Voyage; n: number } | null = null;
+const tourSun = () => space.things.find((t) => t.kind === 'star')?.pos ?? (space.id === 'slow' ? ZERO : null);
 function startTour() {
   if (busy || walk || tour.active) return;
-  tourSave = { pos: ship.pos.clone(), q: ship.q.clone() };
-  auto = null;
+  tourSave = { pos: ship.pos.clone(), q: ship.q.clone(), space: space.id };
+  auto = null; brake = null; escort = null;
   ship.speed = ship.throttle = 0;
   // (The ring space has no star; its station is the lamp, so shots there are framed round it.)
-  tour.start(space.id, space.things, space.things.find((t) => t.kind === 'star')?.pos ?? (space.id === 'slow' ? ZERO : null));
+  tour.start(space.id, space.things, tourSun());
 }
-function stopTour() {
-  if (!tour.active && !tourSave) return;
+
+/** A voyage: stages in one place after another, carried between them through the gates. */
+function startVoyage(v: Voyage) {
+  if (busy || walk || tour.active) return;
+  if (!v.stages.length) { startTour(); return; }
+  tourSave = { pos: ship.pos.clone(), q: ship.q.clone(), space: space.id };
+  auto = null; brake = null; escort = null;
+  ship.speed = ship.throttle = 0;
+  voyage = { v, n: 0 };
+  document.body.classList.add('voyage');
+  banner(v.name, v.blurb);
+  void voyageStage(voyage);
+}
+async function voyageStage(run: NonNullable<typeof voyage>) {
+  const st = run.v.stages[run.n];
+  if (space.id !== st.space) {
+    const gate = space.things.find((t) => t.to?.space === st.space);
+    if (!gate) { stopTour(); return; }
+    await transit(gate, true);
+    if (voyage !== run) return;
+  }
+  const next = () => {
+    if (voyage !== run) return;
+    if (++run.n >= run.v.stages.length) { banner(run.v.name, 'The voyage is over. Your ship is where you left her.'); stopTour(true); } else void voyageStage(run);
+  };
+  const shots = st.shots === 'generic' ? genericShots(space.things, 7, 4) : st.shots;
+  if (!tour.start(space.id, space.things, tourSun(), { shots, once: true, flyIn: run.n === 0, end: next })) next();
+}
+function stopTour(keepBanner = false) {
+  if (!tour.active && !tourSave && !voyage) return;
+  voyage = null;
+  document.body.classList.remove('voyage');
   tour.stop();
-  $('banner').classList.remove('show');
+  if (!keepBanner) $('banner').classList.remove('show');
   if (tourSave) {
-    ship.pos.copy(tourSave.pos);
-    ship.prev.copy(tourSave.pos);
-    ship.q.copy(tourSave.q);
-    camQ.copy(tourSave.q);
+    if (tourSave.space === space.id) {
+      ship.pos.copy(tourSave.pos);
+      ship.prev.copy(tourSave.pos);
+      ship.q.copy(tourSave.q);
+      camQ.copy(tourSave.q);
+    } else {
+      // Stopped in some other place than we started: stay where we are, facing as the camera is.
+      ship.q.copy(camera.quaternion);
+      camQ.copy(ship.q);
+    }
     tourSave = null;
   }
   shipModel.visible = chase;
@@ -1263,7 +1321,7 @@ addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey) return;
   if (started && !busy && e.code === 'KeyP') { setPhoto(!photo); return; }
   // Any key but T (and the panels) ends a tour and only does that, so the ship doesn't lurch off.
-  if (started && tour.active && !['KeyT', 'Tab', 'KeyN', 'KeyH'].includes(e.code)) { stopTour(); return; }
+  if (started && (tour.active || voyage) && !['KeyT', 'Tab', 'KeyN', 'KeyH'].includes(e.code)) { stopTour(); return; }
   if (photo) {
     if (e.code === 'BracketRight') renderer.toneMappingExposure = Math.min(4, renderer.toneMappingExposure * 1.15);
     else if (e.code === 'BracketLeft') renderer.toneMappingExposure = Math.max(0.25, renderer.toneMappingExposure / 1.15);
@@ -1283,7 +1341,7 @@ addEventListener('keydown', (e) => {
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
     return;
   }
-  if (e.code === 'KeyT') { if (tour.active) stopTour(); else startTour(); return; }
+  if (e.code === 'KeyT') { if (tour.active || voyage) stopTour(); else voyageMenu.open(); return; }
   if (e.code === 'KeyI') { if (inspect.on) stopInspect(); else startInspect(); return; }
   if (inspect.on && (STEER.includes(e.code) || e.code === 'Escape')) stopInspect();
   // X in the middle of the autopilot's own flip and burn changes nothing: it is already doing it.
@@ -1943,6 +2001,12 @@ let last = performance.now();
 let clock = 0;
 
 // The star map (M): where everything is, and a plotter that hands a course to the autopilot.
+const voyageMenu = createVoyageMenu(
+  (v) => v.from.length === 0 || v.from.includes(space.id),
+  startVoyage,
+  () => started && !busy && !walk && !!space && !tour.active,
+);
+
 const starMap = createMap({
   space: () => space,
   ship: () => ({ pos: ship.pos, fwd: new V3(0, 0, -1).applyQuaternion(ship.q), speed: ship.speed }),

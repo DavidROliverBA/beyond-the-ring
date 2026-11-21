@@ -11,7 +11,7 @@ export const GATE_COUNT = 1373;
  *  true-scale units as everything else: half a million kilometres from the station to the gates. */
 export const SLOW_RADIUS = (500000 / 149597870.7) * AU;
 
-export type Kind = 'star' | 'planet' | 'moon' | 'dwarf' | 'asteroid' | 'station' | 'ship' | 'artifact' | 'gate';
+export type Kind = 'star' | 'planet' | 'moon' | 'dwarf' | 'asteroid' | 'comet' | 'station' | 'ship' | 'artifact' | 'gate';
 export type Model = 'platform' | 'diamond' | 'neutron' | ShipModel;
 
 export interface RingSpec {
@@ -47,6 +47,11 @@ export interface BodySpec {
   /** Id of the interior you can dock at and walk around. */
   dock?: string;
   res?: number;
+  /** A lumpy small body: stretched along its axes, with lumps of this size (0..0.5) from this seed. */
+  shape?: { stretch: [number, number, number]; lump: number; seed: number };
+  /** A comet: how long its tail is, and how wide its coma, in scene units. */
+  tail?: number;
+  coma?: number;
 }
 
 export interface BeltSpec {
@@ -61,6 +66,8 @@ export interface BeltSpec {
   dustSize: number;
   size: [number, number];
   shell?: boolean;
+  /** Only this stretch of the orbit, in radians: Jupiter's Trojans sit sixty degrees ahead of and behind it. */
+  arc?: [number, number];
   /** Ids of bodies that get a dense knot of rocks around them. */
   clusters?: string[];
 }
@@ -94,6 +101,11 @@ const P: Record<string, Stop[]> = {
   titan: [[0, '#b0701f'], [1, '#e3a84a']],
   ice: [[0, '#8fa3b5'], [0.5, '#cfdbe6'], [1, '#ffffff']],
   pluto: [[0, '#6b4a38'], [0.5, '#c9a98a'], [1, '#f3e9dc']],
+  metal: [[0, '#34373c'], [0.5, '#7a7f87'], [1, '#c3c7ce']],
+  comet: [[0, '#0e0d0c'], [0.5, '#2a2623'], [1, '#5a524a']],
+  haumea: [[0, '#9aa6b3'], [0.5, '#dfe6ee'], [1, '#ffffff']],
+  makemake: [[0, '#6e3a24'], [0.5, '#b86a44'], [1, '#e2b08a']],
+  sedna: [[0, '#4a1608'], [0.5, '#8a2c14'], [1, '#c8683e']],
   rock: [[0, '#2c2722'], [0.5, '#6b6157'], [1, '#a89c8c']],
   ringCream: [[0, '#8a765a'], [0.5, '#d9c7a0'], [1, '#f6edd6']],
   ringGrey: [[0, '#55606a'], [1, '#aab6c0']],
@@ -296,13 +308,230 @@ export const SOL: SystemSpec = {
       lift: 6000, tex: { style: 'ice', palette: P.ice, seed: 37, scale: 2.5, accent: '#4f6f8a' }, range: FAR,
       desc: 'A vast shell of dormant comets, the last thing tied to the Sun. In truth it lies thousands of AU out; it has been drawn in close so you can reach it.',
     },
+    {
+      id: 'hygiea', name: 'Hygiea', kind: 'asteroid', sub: 'Asteroid · the Belt · 3.14 AU', radius: 0.001437186, orbit: 3.14 * AU, angle: 0.4,
+      lift: 0, spin: 0.1, shape: { stretch: [1, 0.9, 0.85], lump: 0.06, seed: 60 },
+      tex: moonTex(60, P.dark, 2.4), range: 6000,
+      desc: 'Nearly round, dark and fourth in size: a dwarf planet in all but name.',
+    },
+    {
+      id: 'interamnia', name: 'Interamnia', kind: 'asteroid', sub: 'Asteroid · the Belt · 3.06 AU', radius: 0.001089588, orbit: 3.06 * AU, angle: 5.2,
+      lift: -200, spin: 0.1, shape: { stretch: [1, 0.9, 0.85], lump: 0.12, seed: 61 },
+      tex: moonTex(61, P.dark, 2.4), range: 6000,
+      desc: 'A dark, heavy lump on a tilted orbit; ice miners prospect its shadows.',
+    },
+    {
+      id: 'eunomia', name: 'Eunomia', kind: 'asteroid', sub: 'Asteroid · the Belt · 2.64 AU', radius: 0.000895735, orbit: 2.64 * AU, angle: 2.2,
+      lift: 60, spin: 0.1, shape: { stretch: [1.15, 0.8, 0.8], lump: 0.16, seed: 62 },
+      tex: moonTex(62, P.rock, 2.4), range: 6000,
+      desc: 'Long and bright, the biggest of the stony rocks.',
+    },
+    {
+      id: 'juno', name: 'Juno', kind: 'asteroid', sub: 'Asteroid · the Belt · 2.67 AU', radius: 0.000848943, orbit: 2.67 * AU, angle: 5.7,
+      lift: -90, spin: 0.1, shape: { stretch: [1.05, 0.9, 0.85], lump: 0.2, seed: 63 },
+      tex: moonTex(63, P.rock, 2.4), range: 6000,
+      desc: 'Bright and irregular, one of the first rocks anyone found between Mars and Jupiter.',
+    },
+    {
+      id: 'psyche', name: 'Psyche', kind: 'asteroid', sub: 'Metal asteroid · the Belt · 2.92 AU', radius: 0.000741989, orbit: 2.92 * AU, angle: 3.8,
+      lift: 140, spin: 0.1, shape: { stretch: [1.1, 0.9, 0.7], lump: 0.17, seed: 64 },
+      tex: moonTex(64, P.metal, 2.4), range: 6000,
+      desc: 'Nearly all metal: iron and nickel from the heart of a world that never finished forming. Worth more than anything on Earth.',
+    },
+    {
+      id: 'eros', name: 'Eros', kind: 'asteroid', sub: 'Near-Earth asteroid · 1.46 AU', radius: 0.000113638, orbit: 1.458 * AU, angle: 1.1,
+      lift: 0, spin: 0.3, shape: { stretch: [1, 0.46, 0.42], lump: 0.12, seed: 65 },
+      tex: moonTex(65, P.rock, 2.4), range: 6000,
+      desc: 'Shaped like a peanut, thirty-four kilometres long, and one of the few rocks that crosses the orbit of Mars.',
+    },
+    {
+      id: 'ida', name: 'Ida', kind: 'asteroid', sub: 'Asteroid · the Belt · 2.86 AU', radius: 0.000180484, orbit: 2.86 * AU, angle: 0.9,
+      lift: -30, spin: 0.25, shape: { stretch: [1, 0.46, 0.4], lump: 0.18, seed: 66 },
+      tex: moonTex(66, P.rock, 2.4), range: 6000,
+      desc: 'Fifty kilometres long and pitted with craters. It has a tiny moon of its own.',
+    },
+    {
+      id: 'apophis', name: 'Apophis', kind: 'asteroid', sub: 'Near-Earth asteroid · 0.92 AU', radius: 1.136e-06, orbit: 0.92 * AU, angle: 4.0,
+      lift: 0, spin: 0.4, shape: { stretch: [1, 0.7, 0.6], lump: 0.2, seed: 67 },
+      tex: moonTex(67, P.rock, 2.4), range: 6000,
+      desc: 'A rock the size of a stadium that once looked likely to hit Earth. It will not, for a good while.',
+    },
+    {
+      id: 'bennu', name: 'Bennu', kind: 'asteroid', sub: 'Near-Earth asteroid · 1.13 AU', radius: 1.638e-06, orbit: 1.126 * AU, angle: 5.0,
+      lift: 0, spin: 0.4, shape: { stretch: [1, 1, 0.9], lump: 0.1, seed: 68 },
+      tex: moonTex(68, P.dark, 2.4), range: 6000,
+      desc: 'A spinning-top heap of rubble that a probe once touched down on and sampled.',
+    },
+    {
+      id: 'ryugu', name: 'Ryugu', kind: 'asteroid', sub: 'Near-Earth asteroid · 1.19 AU', radius: 3.008e-06, orbit: 1.19 * AU, angle: 3.3,
+      lift: 0, spin: 0.4, shape: { stretch: [1, 1, 0.9], lump: 0.1, seed: 69 },
+      tex: moonTex(69, P.dark, 2.4), range: 6000,
+      desc: 'A black diamond of loose boulders, hardly held together.',
+    },
+    {
+      id: 'hektor', name: 'Hektor', kind: 'asteroid', sub: 'Jupiter Trojan · 5.2 AU', radius: 0.001002688, orbit: 5.2 * AU, angle: 2.9472,
+      lift: 0, spin: 0.1, shape: { stretch: [1, 0.5, 0.5], lump: 0.14, seed: 70 },
+      tex: moonTex(70, P.dark, 2.4), range: 6000,
+      desc: 'A Trojan: it keeps pace with Jupiter, sixty degrees ahead, with thousands of its kind. Dumbbell-shaped, and thought to be two rocks stuck together.',
+    },
+    {
+      id: 'chiron', name: 'Chiron', kind: 'asteroid', sub: 'Centaur · 13.7 AU', radius: 0.000668459, orbit: 13.7 * AU, angle: 4.4,
+      lift: 300, spin: 0.1, shape: { stretch: [1, 0.9, 0.85], lump: 0.15, seed: 71 },
+      tex: moonTex(71, P.dark, 2.4), range: 6000,
+      desc: 'Half asteroid and half comet, wandering between Saturn and Uranus on an orbit that cannot last.',
+    },
+    {
+      id: 'oumuamua', name: 'ʻOumuamua', kind: 'asteroid', sub: 'Interstellar object', radius: 1.337e-06, orbit: 8.5 * AU, angle: 2.0,
+      lift: 900, spin: 0.5, shape: { stretch: [1, 0.12, 0.12], lump: 0.08, seed: 72 },
+      tex: moonTex(72, P.rock, 2.4), range: 6000,
+      desc: 'Four hundred metres long and thin as a pencil: the first thing seen to arrive from another star. It is leaving, and nobody caught it.',
+    },
+    {
+      id: 'haumea', name: 'Haumea', kind: 'dwarf', sub: 'Dwarf planet · 43.1 AU', radius: 0.005454623, orbit: 43.1 * AU, angle: 0.7,
+      lift: 600, spin: 0.05, shape: { stretch: [1, 0.8, 0.5], lump: 0.04, seed: 80 },
+      tex: { style: 'ice', palette: P.haumea, seed: 80, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'Spun into an egg by a day of under four hours, and ringed, with two moons: the fastest-turning big body in Sol.',
+    },
+    {
+      id: 'makemake', name: 'Makemake', kind: 'dwarf', sub: 'Dwarf planet · 45.4 AU', radius: 0.00477948, orbit: 45.4 * AU, angle: 2.0,
+      lift: -500, spin: 0.05, shape: { stretch: [1, 1, 1], lump: 0.04, seed: 81 },
+      tex: { style: 'ice', palette: P.makemake, seed: 81, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'Rust-red and nearly airless: a Kuiper belt world that has never been visited.',
+    },
+    {
+      id: 'eris', name: 'Eris', kind: 'dwarf', sub: 'Dwarf planet · 67.8 AU', radius: 0.007774175, orbit: 67.8 * AU, angle: 5.9,
+      lift: 1800, spin: 0.05, shape: { stretch: [1, 1, 1], lump: 0.04, seed: 82 },
+      tex: { style: 'ice', palette: P.haumea, seed: 82, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'Heavier than Pluto, and the reason Pluto stopped being a planet. Seen from here the Sun is only the brightest star.',
+    },
+    {
+      id: 'orcus', name: 'Orcus', kind: 'dwarf', sub: 'Dwarf planet · 39.2 AU', radius: 0.00307491, orbit: 39.2 * AU, angle: 3.9,
+      lift: -300, spin: 0.05, shape: { stretch: [1, 1, 1], lump: 0.04, seed: 83 },
+      tex: { style: 'ice', palette: P.pluto, seed: 83, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'Pluto\'s mirror: the same orbit, half a turn behind, and a moon that hangs over it.',
+    },
+    {
+      id: 'quaoar', name: 'Quaoar', kind: 'dwarf', sub: 'Dwarf planet · 43.7 AU', radius: 0.003709946, orbit: 43.7 * AU, angle: 1.5,
+      lift: 200, spin: 0.05, shape: { stretch: [1, 1, 1], lump: 0.04, seed: 84 },
+      tex: { style: 'ice', palette: P.makemake, seed: 84, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'A dark world with a ring where no ring should be.',
+    },
+    {
+      id: 'sedna', name: 'Sedna', kind: 'dwarf', sub: 'Dwarf planet · 83 AU', radius: 0.003342293, orbit: 83 * AU, angle: 4.9,
+      lift: 2600, spin: 0.05, shape: { stretch: [1, 1, 1], lump: 0.04, seed: 85 },
+      tex: { style: 'ice', palette: P.sedna, seed: 85, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'On its way out to eleven thousand years of cold, and the reddest thing in the system.',
+    },
+    {
+      id: 'gonggong', name: 'Gonggong', kind: 'dwarf', sub: 'Dwarf planet · 67 AU', radius: 0.004111021, orbit: 67 * AU, angle: 6.2,
+      lift: -1700, spin: 0.05, shape: { stretch: [1, 1, 1], lump: 0.04, seed: 86 },
+      tex: { style: 'ice', palette: P.makemake, seed: 86, scale: 2.2, accent: '#4a2f24' }, range: 30000,
+      desc: 'Red, slow, and orbiting beyond even Eris at times.',
+    },
+    {
+      id: 'halley', name: 'Halley\'s Comet', kind: 'comet', sub: 'Comet · 1.6 AU', radius: 5.0134e-05, orbit: 1.6 * AU, angle: 5.4,
+      lift: 90, spin: 0.2, shape: { stretch: [1, 0.55, 0.55], lump: 0.16, seed: 90 }, tail: 55, coma: 0.5,
+      tex: moonTex(90, P.comet, 2.6), range: 12000,
+      desc: 'Back every seventy-six years, and known for two thousand: a black nucleus the size of a city, with a tail that can stretch a hundred million kilometres.',
+    },
+    {
+      id: 'halebopp', name: 'Hale-Bopp', kind: 'comet', sub: 'Comet · 1.9 AU', radius: 0.000200538, orbit: 1.9 * AU, angle: 2.6,
+      lift: -150, spin: 0.2, shape: { stretch: [1, 0.8, 0.8], lump: 0.16, seed: 91 }, tail: 110, coma: 0.9,
+      tex: moonTex(91, P.comet, 2.6), range: 12000,
+      desc: 'The great comet of 1997: a nucleus ten times Halley\'s, with a dust tail you could read by.',
+    },
+    {
+      id: '67p', name: 'Churyumov–Gerasimenko', kind: 'comet', sub: 'Comet · 2.4 AU', radius: 1.3369e-05, orbit: 2.4 * AU, angle: 0.2,
+      lift: 40, spin: 0.2, shape: { stretch: [1, 0.5, 0.5], lump: 0.16, seed: 92 }, tail: 30, coma: 0.3,
+      tex: moonTex(92, P.comet, 2.6), range: 12000,
+      desc: 'Two lobes stuck together like a rubber duck. A probe orbited it for two years, then crashed into it.',
+    },
+    {
+      id: 'tempel1', name: 'Tempel 1', kind: 'comet', sub: 'Comet · 2.2 AU', radius: 2.0054e-05, orbit: 2.2 * AU, angle: 3.6,
+      lift: -60, spin: 0.2, shape: { stretch: [1, 0.7, 0.7], lump: 0.16, seed: 93 }, tail: 25, coma: 0.3,
+      tex: moonTex(93, P.comet, 2.6), range: 12000,
+      desc: 'The first comet anyone hit on purpose, to see what it was made of.',
+    },
+    {
+      id: 'swifttuttle', name: 'Swift–Tuttle', kind: 'comet', sub: 'Comet · 3.1 AU', radius: 8.69e-05, orbit: 3.1 * AU, angle: 4.2,
+      lift: 220, spin: 0.2, shape: { stretch: [1, 0.8, 0.8], lump: 0.16, seed: 94 }, tail: 70, coma: 0.6,
+      tex: moonTex(94, P.comet, 2.6), range: 12000,
+      desc: 'The biggest thing that regularly crosses Earth\'s orbit. Its dust is the Perseid meteors.',
+    },
+    {
+      id: 'borisov', name: 'Borisov', kind: 'comet', sub: 'Interstellar comet', radius: 2.674e-06, orbit: 5.5 * AU, angle: 1.0,
+      lift: 1100, spin: 0.2, shape: { stretch: [1, 0.8, 0.7], lump: 0.16, seed: 95 }, tail: 40, coma: 0.3,
+      tex: moonTex(95, P.comet, 2.6), range: 12000,
+      desc: 'The second visitor from another star, and the first one to look like a comet. It was never coming back.',
+    },
+    {
+      id: 'amalthea', name: 'Amalthea', kind: 'moon', sub: 'Moon of Jupiter', radius: 0.000558163, parent: 'jupiter', orbit: 1.2126, angle: 3.4,
+      shape: { stretch: [1, 0.6, 0.55], lump: 0.1, seed: 100 },
+      tex: moonTex(100, P.makemake, 3), range: MOON_RANGE,
+      desc: 'Red, elongated and close in, throwing off the dust that feeds Jupiter\'s faint ring.',
+    },
+    {
+      id: 'himalia', name: 'Himalia', kind: 'moon', sub: 'Moon of Jupiter', radius: 0.00056819, parent: 'jupiter', orbit: 76.6, angle: 0.8,
+      tex: moonTex(101, P.dark, 3), range: MOON_RANGE,
+      desc: 'The largest of the outer irregular moons, and a long way from home.',
+    },
+    {
+      id: 'mimas', name: 'Mimas', kind: 'moon', sub: 'Moon of Saturn', radius: 0.001323548, parent: 'saturn', orbit: 1.2402, angle: 5.2,
+      tex: moonTex(102, P.ice, 3), range: MOON_RANGE,
+      desc: 'Its one enormous crater makes it look like a particular battle station. It is not.',
+    },
+    {
+      id: 'tethys', name: 'Tethys', kind: 'moon', sub: 'Moon of Saturn', radius: 0.003549516, parent: 'saturn', orbit: 1.9698, angle: 0.3,
+      tex: moonTex(103, P.ice, 3), range: MOON_RANGE,
+      desc: 'A bright ball of ice split along its equator by a canyon that runs three-quarters of the way round.',
+    },
+    {
+      id: 'dione', name: 'Dione', kind: 'moon', sub: 'Moon of Saturn', radius: 0.003750053, parent: 'saturn', orbit: 2.5228, angle: 2.0,
+      tex: moonTex(104, P.ice, 3), range: MOON_RANGE,
+      desc: 'Wispy ice cliffs on a pale grey moon.',
+    },
+    {
+      id: 'hyperion', name: 'Hyperion', kind: 'moon', sub: 'Moon of Saturn', radius: 0.000902419, parent: 'saturn', orbit: 9.9, angle: 4.1,
+      shape: { stretch: [1, 0.75, 0.6], lump: 0.1, seed: 105 },
+      tex: moonTex(105, P.dark, 3), range: MOON_RANGE,
+      desc: 'A sponge in space: tumbling chaotically, riddled with deep craters.',
+    },
+    {
+      id: 'phoebe', name: 'Phoebe', kind: 'moon', sub: 'Moon of Saturn', radius: 0.000711909, parent: 'saturn', orbit: 86.6, angle: 0.9,
+      tex: moonTex(106, P.dark, 3), range: MOON_RANGE,
+      desc: 'A captured rock far out, and the source of the dark dust on Iapetus.',
+    },
+    {
+      id: 'ariel', name: 'Ariel', kind: 'moon', sub: 'Moon of Uranus', radius: 0.003870376, parent: 'uranus', orbit: 1.276, angle: 0.6,
+      tex: moonTex(107, P.ice, 3), range: MOON_RANGE,
+      desc: 'Bright and scarred with huge canyons.',
+    },
+    {
+      id: 'umbriel', name: 'Umbriel', kind: 'moon', sub: 'Moon of Uranus', radius: 0.003910483, parent: 'uranus', orbit: 1.778, angle: 3.4,
+      tex: moonTex(108, P.dark, 3), range: MOON_RANGE,
+      desc: 'The darkest of the big moons of Uranus.',
+    },
+    {
+      id: 'proteus', name: 'Proteus', kind: 'moon', sub: 'Moon of Neptune', radius: 0.001403763, parent: 'neptune', orbit: 0.7864, angle: 5.3,
+      shape: { stretch: [1, 0.9, 0.85], lump: 0.1, seed: 109 },
+      tex: moonTex(109, P.dark, 3), range: MOON_RANGE,
+      desc: 'Dark and boxy, as big as a body can be without pulling itself round.',
+    },
+    {
+      id: 'nereid', name: 'Nereid', kind: 'moon', sub: 'Moon of Neptune', radius: 0.00113638, parent: 'neptune', orbit: 36.8, angle: 1.9,
+      tex: moonTex(110, P.ice, 3), range: MOON_RANGE,
+      desc: 'On one of the most stretched orbits of any moon: Neptune\'s outermost.',
+    },
     ship('thomasprince', 'UNN Thomas Prince', 'dreadnought', 'Xerxes-class battleship · UN Navy',
       'Sent to the Ring with a delegation of clergy, poets and politicians aboard, to bear witness to whatever lay on the other side.',
       undefined, 21.2 * AU - 0.05, 5.6 + 1e-6, 2.67e-6, 0.02, 2.6),
   ],
   belts: [
-    { seed: 101, inner: 2.1 * AU, outer: 3.3 * AU, height: 90, dust: 26000, rocks: 3200, color: '#b8a48a', opacity: 0.6, dustSize: 1.6, size: [1.2e-5, 3e-4], clusters: ['ceres', 'tycho', 'vesta', 'pallas'] },
-    { seed: 102, inner: 31 * AU, outer: 48 * AU, height: 2600, dust: 30000, rocks: 1500, color: '#9fb4c8', opacity: 0.5, dustSize: 2.2, size: [2e-5, 4e-4], clusters: ['pluto'] },
+    { seed: 101, inner: 2.1 * AU, outer: 3.3 * AU, height: 90, dust: 30000, rocks: 6000, color: '#b8a48a', opacity: 0.6, dustSize: 1.6, size: [1.2e-5, 3e-4], clusters: ['ceres', 'tycho', 'vesta', 'pallas', 'hygiea', 'psyche', 'ida', 'eros'] },
+    // Jupiter's Trojans: two swarms, sixty degrees ahead of the planet and sixty behind.
+    { seed: 104, inner: 4.85 * AU, outer: 5.6 * AU, height: 380, dust: 5000, rocks: 700, color: '#8a7e72', opacity: 0.5, dustSize: 1.5, size: [1.5e-5, 3.5e-4], arc: [1.9 + 0.45, 1.9 + 1.5], clusters: ['hektor'] },
+    { seed: 105, inner: 4.85 * AU, outer: 5.6 * AU, height: 380, dust: 5000, rocks: 700, color: '#8a7e72', opacity: 0.5, dustSize: 1.5, size: [1.5e-5, 3.5e-4], arc: [1.9 - 1.5, 1.9 - 0.45] },
+    { seed: 102, inner: 31 * AU, outer: 48 * AU, height: 2600, dust: 34000, rocks: 2600, color: '#9fb4c8', opacity: 0.5, dustSize: 2.2, size: [2e-5, 4e-4], clusters: ['pluto'] },
     { seed: 103, inner: 58 * AU, outer: 98 * AU, height: 0, dust: 42000, rocks: 0, color: '#bcd4ee', opacity: 0.45, dustSize: 1.4, size: [2e-5, 3e-4], shell: true, clusters: ['oort'] },
   ],
 };

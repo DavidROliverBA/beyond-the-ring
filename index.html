@@ -80,6 +80,8 @@
   body.help-open #keys-tip { display: none; }
   /* Photo mode: everything but the picture goes, bar a quiet strip of keys. */
   body.photo #hud, body.photo #labels { display: none; }
+  /* On a voyage the screen is the film: only the captions stay. */
+  body.voyage #hud > :not(#banner), body.voyage #labels { opacity: 0; pointer-events: none; transition: opacity 0.6s; }
   #photo-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 11px; color: rgba(220, 235, 245, 0.55); letter-spacing: 0.08em; display: none; pointer-events: none; text-shadow: 0 0 6px #000; }
   body.photo #photo-bar { display: block; }
 
@@ -156,7 +158,7 @@
     <div class="fly-only"><b>G</b>fly to the nearest ring</div>
     <div class="fly-only"><b>M</b>star map: where everything is, and plot a course</div>
     <div class="fly-only"><b>I</b>inspect what you aim at: the mouse turns round it, wheel zooms</div>
-    <div class="fly-only"><b>T</b>tour this system</div>
+    <div class="fly-only"><b>T</b>voyages: guided tours of Sol, the Ring and the gates</div>
     <div class="fly-only"><b>Tab</b>destinations</div>
     <div class="fly-only"><b>Right mouse</b>hold to look around</div>
     <div class="fly-only"><b>V</b>cockpit / chase view</div>
