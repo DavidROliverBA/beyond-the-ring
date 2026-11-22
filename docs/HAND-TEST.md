@@ -192,3 +192,11 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Phone width: the strip is two rows (buttons, then a full-width scrub bar), captions sit above it, buttons are easy to tap. Touch drag on the scrub bar seeks. Check on a real phone.
 - [ ] Card (T, then Rocinante's voyages): "Hide later books" with "I have read up to" a book; with all voyages in Book 1 nothing disappears at Book 1 (check again when a later book is added). Setting survives a reload.
 - [ ] Leave a voyage midway (Exit or any key): the card shows "Resume at m:ss" under it; clicking resumes there; R resumes the highlighted one; finishing the film or leaving in the first 5 s clears it. Private window: nothing remembered, no error.
+
+## Eros and lw-eros (branch eros-model)
+- [ ] T, then Rocinante's voyages: "The run to Eros" sits after "The run to Tycho". Its spoiler line is honest (the crew go to Eros Station; nothing inside is shown). Plays about 2:56 with captions, plume, flip, and the last 4 km at real speed.
+- [ ] Eros looks like a long lumpy peanut with a pinched waist and craters, dark grey-brown (not white), with fine bumpy relief up close and no pops or stretching. Lit domes, a pad with a warm glow, two slim towers and a docking spar with a lit disc stand on its sunlit side; the Rocinante ends hovering over the disc. Check the end shot and the orbit shot for anything floating or buried.
+- [ ] Eros builds in well under a second on first use (no visible hitch at film start); check on a slower machine.
+- [ ] Venus film (lw-venus): the rock is the same Eros shape, bare, no station lights.
+- [ ] Captions say plainly that the station dressing and the speed are invented. Judge whether the last caption (the story turns dark) is too much of a spoiler.
+

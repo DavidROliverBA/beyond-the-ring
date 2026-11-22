@@ -97,7 +97,7 @@ export const EROS: Scenario = {
     S({ t0: 54, id: 'eros', mode: 'static', at: [-70000, 36000, -105000], secs: 22, fov: 30 }),
     // Close in at true speed: the last 4 km.
     S({ t0: T2, id: 'roci', mode: 'chase', back: 150, up: 30, secs: 18, fov: 40 }),
-    S({ t0: T2 + 18, id: 'roci', mode: 'static', at: add(add(DOCK, OUT, 2300), [1, 0, 0.1], 1800), secs: 22, fov: 40 }),
+    S({ t0: T2 + 18, id: 'eros', from: [1.5, 0.45, 0.3], to: [1.15, 0.5, 0.35], secs: 22, fov: 34 }),
     S({ t0: T2 + 40, id: 'roci', mode: 'static', at: add(add(DOCK, OUT, 250), [1, 0, 0.3], 520), secs: T_END - T2 - 40, fov: 22 }),
     // At the ring, then the whole station from a distance.
     S({ t0: T_END, id: 'roci', mode: 'static', at: add(add(DOCK, OUT, 90), [0, 0, 1], 260), secs: 12, fov: 30 }),
@@ -113,7 +113,13 @@ export const EROS: Scenario = {
     { t: T_END + 1, dur: 11, title: 'Docked', text: 'The Rocinante is at the dock. What happens inside the station is not shown here.' },
     { t: T_END + 13, dur: 12, title: 'A quiet rock', text: 'From here the story turns very dark.' },
   ],
-  chapters: ['Tycho to Eros'],
+  chapters: [
+    { t: 0, title: 'The Rocinante sets out' },
+    { t: 36, title: 'Flip' },
+    { t: 54, title: 'Eros comes into view' },
+    { t: T2, title: 'The last four kilometres' },
+    { t: T_END, title: 'At the dock' },
+  ],
   notes: [
     `Flight: ${EROS_GAP_AU.toFixed(2)} AU between Tycho and Eros as our data places them, 0.3 g, ${REAL_FLIP / 60}-minute flip: ${days} days, peak ${peak} km/s. The 0.3 g, the flip and the places are assumptions (the note: where the books put Eros is unconfirmed); the maths is transit().`,
     `The long leg is drawn as 400 km in ${FILM_T} s (${Math.round(FILM_G)} g in the film). Not physical. Only the last 4 km runs at real speed and acceleration.`,
