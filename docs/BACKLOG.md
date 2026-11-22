@@ -210,13 +210,13 @@ Things that may need research and a big change. None starts without a decision g
 - [ ] E4.4 [research] [replatform] Hosting: here.now now; revisit Cloudflare Pages or GitHub Pages if the size or traffic changes (see ROADMAP section 3)
 - [ ] E4.5 Cross-browser and device matrix: Chrome, Safari, Firefox; Mac, Windows, iPad; touch controls; a low-power mode
 - [ ] E4.6 Testing: a repeatable visual regression harness (the Playwright contact sheets already exist), and a real-GPU run on David's machine recorded in `docs/HAND-TEST.md`
-- [ ] E4.7 Accessibility and localisation: captions, reduced motion (the tour sway and grain), colour contrast, keyboard-only play, language files
+- [~] (branch interface-fixes, agent) E4.7 Accessibility and localisation: captions, reduced motion (the tour sway and grain), colour contrast, keyboard-only play, language files
 
 ---
 
 ## E5. Interface and quality (carried over)
 
-- [ ] E5.1 Interface gap-analysis fixes: hint overlap, stale start-screen controls, banner and label collision, clipped destination list, settings panel
+- [~] (branch interface-fixes, agent) E5.1 Interface gap-analysis fixes: hint overlap, stale start-screen controls, banner and label collision, clipped destination list, settings panel
 - [ ] E5.2 Smoother tours on a real GPU: texture upload hitches of 60–275 ms at each stop (consider KTX2 and progressive mips, E1.7.b)
 - [ ] E5.3 Far ring-space gates: use the ring model rather than a plain hoop
 - [ ] E5.4 Sound: positional audio, per-room reverb, footsteps, ventilation and crowd murmur (parked at David's request; synthesised or CC0 only)
