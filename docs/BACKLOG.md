@@ -48,12 +48,12 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 **Why it is a backlog and not a task:** photorealism at this scale is mostly a content and pipeline problem, and parts of it may not be reachable on the current renderer.
 
-### E1.1 [research] Define "photoreal" and set a measurable bar
+### E1.1 [~] (research, 2026-11-22, agent) [research] Define "photoreal" and set a measurable bar
 - [ ] E1.1.a Pick 10 reference shots (real NASA photos for planets and moons, film stills for ships) and write them to `docs/research/photoreal-targets.md`
 - [ ] E1.1.b Decide the performance budget: target frame rate and GPU (David's Mac, and a mid laptop) so the bar is realistic
 - [ ] E1.1.c Capture side-by-side comparison frames (game vs reference) from fixed camera positions; keep them in `docs/studies/` and re-shoot after each milestone
 
-### E1.2 [research] Renderer decision: stay on WebGL, or replatform
+### E1.2 [~] (research, 2026-11-22, agent) [research] Renderer decision: stay on WebGL, or replatform
 - [ ] E1.2.a Re-read the WebGPU spike (`docs/WEBGPU-SPIKE.md`, branch `webgpu-spike`) and list which photoreal features it would enable (GTAO, SSGI, compute crowds, path-traced stills) versus what WebGL can do with libraries
 - [ ] E1.2.b [research] Survey of alternatives to a browser three.js build: Unreal/Unity WebGL export, Godot web, Babylon.js, a native app (Tauri or Swift/Metal) with the web build as the light version. Record cost, licence, loss of the browser reach, and what of the codebase survives
 - [ ] E1.2.c [research] Reversed-Z on WebGL (shelved 2026-11-21): reopen only if E1.2.a shows it blocks a photoreal feature
@@ -100,9 +100,9 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 **Goal:** when the player comes across a real object in Sol (a planet, moon, asteroid, comet, probe, telescope, station, landing site), they can open an information panel and learn what science has found, with sources and links. Fictional objects (the Rocinante, Medina) are marked clearly as fiction and, where it helps, linked to the real thing they resemble.
 
-**Agencies and sources to consider** (David wrote EASA; that is the European aviation safety agency, so this is assumed to mean ESA, the European Space Agency; confirm): NASA (Solar System Exploration, NSSDC, PDS, JPL Small-Body Database, JPL Horizons, Eyes on the Solar System, NASA Image and Video Library), ESA (science and technology pages, Gaia, Rosetta, Hera, JUICE), JAXA (Hayabusa2), ISRO, CNSA, USGS Astrogeology (Gazetteer of Planetary Nomenclature through the IAU), Minor Planet Center, IAU. Wikipedia and Wikidata for connective facts, with the licence kept.
+**Agencies and sources to consider** (David confirmed 2026-11-22: ESA, the European Space Agency): NASA (Solar System Exploration, NSSDC, PDS, JPL Small-Body Database, JPL Horizons, Eyes on the Solar System, NASA Image and Video Library), ESA (science and technology pages, Gaia, Rosetta, Hera, JUICE), JAXA (Hayabusa2), ISRO, CNSA, USGS Astrogeology (Gazetteer of Planetary Nomenclature through the IAU), Minor Planet Center, IAU. Wikipedia and Wikidata for connective facts, with the licence kept.
 
-### E2.1 [research] Sources, licences and shape of the data
+### E2.1 [~] (research, 2026-11-22, agent) [research] Sources, licences and shape of the data
 - [ ] E2.1.a Per source: what is free to use, in what form (API, bulk download, scraped page), the exact attribution wording, and whether text may be copied or only facts used. NASA media is usually public domain but individual items may carry third-party credits; ESA content is often CC BY-SA 3.0 IGO with exceptions. Write the findings to `docs/research/real-data-sources.md`
 - [ ] E2.1.b Decide online or offline: ship a curated static dataset (fast, safe, no calls) or fetch live from the agencies (always current, but depends on their APIs and adds a network call). Recommended default: curated static dataset built by a script, with a link out to the live page; no runtime calls to third parties
 - [ ] E2.1.c Privacy: no calls that carry user information; no analytics
@@ -138,7 +138,7 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 **Source material and rights:** the novels by James S. A. Corey (the nine main books: *Leviathan Wakes*, *Caliban's War*, *Abaddon's Gate*, *Cibola Burn*, *Nemesis Games*, *Babylon's Ashes*, *Persepolis Rising*, *Tiamat's Wrath*, *Leviathan Falls*, plus the novellas and stories). This is a fan project. Re-enact events and use our own words; **do not reproduce text from the books** in captions or narration beyond a few words, and do not use show audio, music or screenshots. Keep the unofficial and non-commercial notice. Check the project's stance on spoilers: each tour shows a spoiler warning.
 
-### E3.1 [research] Canon and timeline
+### E3.1 [~] (research, 2026-11-22, agent) [research] Canon and timeline
 - [ ] E3.1.a Build a canon timeline per book from the novels themselves: where the Roci is, who is aboard, what ships and stations are present, what happens, in what order, over what real durations. Write to `docs/research/canon/<book>.md`. Mark each claim with a book and chapter reference (a pointer, not a quote)
 - [ ] E3.1.b List the set pieces per book and rate each by how well the book describes it (positions, ships, weapons) and how feasible it is to build
 - [ ] E3.1.c Resolve differences between book and show: books are the authority; where the show differs, record both and use the book
