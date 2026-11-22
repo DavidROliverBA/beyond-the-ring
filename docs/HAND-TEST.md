@@ -100,3 +100,11 @@ Every station now has grime, clutter, railings and signs that tell you where thi
 - [ ] The panel says "AI-assisted summary, sources below" and nothing reads as "NASA says". Is the wording right to you, and does anything look wrong or too sure?
 - [ ] Aim at Tycho, a ship, a gate: the aim card shows a purple FICTION tag. Mars and the other bodies show no tag yet. With H open the panel shrinks above the key list; on a phone it sits at the bottom.
 
+## The Rocinante's voyages: The Canterbury (2026-11-22, branch scenario-engine, not merged)
+- [ ] Press T, choose "The Rocinante's voyages" (9). A card should warn "Spoilers for Leviathan Wakes" and list The Canterbury. Enter or a click starts it; Esc closes the card.
+- [ ] Watch all 190 seconds: widescreen bars, graded picture, lower-third captions. The hauler flips and brakes, the shuttle crosses and comes back, two torpedoes run in, the hauler is vaporised in a flash and shell, and the shuttle burns away through the debris. Is the pacing right? Is anything too bright, too dark, too slow, or nauseating (flash, sway)? Can you see the stealth ship at all (it is deliberately black; a muzzle flash lights it for a moment)?
+- [ ] Any key hands the ship back where you left it, with the normal HUD returning. Does it? At the end the film hands back by itself with a closing line.
+- [ ] No sound design yet: only the tour score plays. Does the silence at the blast read, or should the score fade out there?
+- [ ] Any hitch at the start (a lamp is added to the scene, which recompiles shaders once) or at the blast (first frame of the flash).
+- [ ] Safari and Firefox: the flash and trails with and without `?logdepth`.
+- [ ] Facts to check against the books (the research could not read them): Canterbury and Knight sizes, whether the Knight is nearly hit by debris, where the Scopuli ends up, how many missiles. Each actor's confidence is in `src/scenarios/canterbury.ts` and shown with `?debug`.

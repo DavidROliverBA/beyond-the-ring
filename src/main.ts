@@ -22,6 +22,9 @@ import { makeComet } from './comet';
 import { createSound } from './sound';
 import { createTour, genericShots, gateShot, type Voyage } from './tour';
 import { VOYAGES, createVoyageMenu } from './voyages';
+import { createScenarioPlayer, type Scenario } from './scenario';
+import { SCENARIOS } from './scenarios';
+import { createScenarioCard } from './scenarioCard';
 import { FLIP_SECS, planTrip } from './course';
 import { createMap } from './starmap';
 import { makeSky } from './sky';
@@ -1340,8 +1343,27 @@ function startTour() {
   tour.start(space.id, space.things, tourSun());
 }
 
+/** The Rocinante's voyages (E3): scripted sequences from the novels, played by the scenario engine (src/scenario.ts). */
+const scn = createScenarioPlayer({
+  scene, renderer,
+  sunPos: tourSun,
+  caption: (t, x) => banner(t, x),
+  end: () => { const n = scn.scenario?.title ?? ''; banner(n, 'The sequence is over. Your ship is where you left her.'); stopTour(true); },
+});
+function startScenario(sc: Scenario) {
+  if (!started || busy || walk || tour.active || voyage || space.id !== sc.frame.space) return;
+  const save = { pos: ship.pos.clone(), q: ship.q.clone(), space: space.id };
+  if (!scn.start(sc)) return;
+  tourSave = save;
+  auto = null; brake = null; escort = null;
+  ship.speed = ship.throttle = 0;
+  voyage = { v: VOYAGES.find((v) => v.id === 'roci')!, n: 0 };
+  document.body.classList.add('voyage');
+}
+
 /** A voyage: stages in one place after another, carried between them through the gates. */
 function startVoyage(v: Voyage) {
+  if (v.id === 'roci') { if (!(busy || walk || tour.active)) scnCard.open(); return; }
   if (busy || walk || tour.active) return;
   if (!v.stages.length) { startTour(); return; }
   tourSave = { pos: ship.pos.clone(), q: ship.q.clone(), space: space.id };
@@ -1373,6 +1395,7 @@ function stopTour(keepBanner = false) {
   voyage = null;
   document.body.classList.remove('voyage');
   tour.stop();
+  scn.stop();
   if (!keepBanner) $('banner').classList.remove('show');
   if (tourSave) {
     if (tourSave.space === space.id) {
@@ -2183,6 +2206,8 @@ const voyageMenu = createVoyageMenu(
   () => started && !busy && !walk && !!space && !tour.active,
 );
 
+const scnCard = createScenarioCard(SCENARIOS, startScenario);
+
 const starMap = createMap({
   space: () => space,
   ship: () => ({ pos: ship.pos, fwd: new V3(0, 0, -1).applyQuaternion(ship.q), speed: ship.speed }),
@@ -2198,6 +2223,17 @@ const starMap = createMap({
 });
 if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __map: typeof starMap; __sound: typeof sound }).__map = starMap;
 if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __sound: typeof sound }).__sound = sound;
+
+// For tests and tuning: start a scenario, pause and seek it, and read what is on screen.
+if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as { __scn: unknown }).__scn = {
+  start: (id = SCENARIOS[0].id) => startScenario(SCENARIOS.find((s) => s.id === id)!),
+  seek: (t: number) => scn.seek(t),
+  pause: (on = true) => { scn.paused = on; },
+  speed: (x: number) => { scn.speed = x; },
+  info: () => scn.info(),
+  get active() { return scn.active; },
+  get time() { return scn.time; },
+};
 
 // With ?debug in the address, keep the last few thousand frame times for tests (hitch hunting).
 const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug') ? [] : null;
@@ -2242,7 +2278,7 @@ function frame(now: number) {
     lookPitch = clamp(lookPitch - mdy * 0.003, -1.4, 1.4);
     mdx = mdy = 0;
   }
-  if (!busy && started && !tour.active && !inspect.on) step(dt);
+  if (!busy && started && !tour.active && !scn.active && !inspect.on) step(dt);
   lodTick();
 
   shipModel.position.copy(ship.pos);
@@ -2277,6 +2313,11 @@ function frame(now: number) {
   tourDt += (Math.min(dt, 0.05) - tourDt) * 0.12;
   if (tour.active && tour.update(photo ? 0 : tourDt, camera, !started)) {
     // The tour drives the camera; the ship rides along unseen, so maps sharpen where we're looking.
+    shipModel.visible = false;
+    ship.pos.copy(camera.position);
+    ship.prev.copy(camera.position);
+  }
+  if (scn.active && scn.update(photo ? 0 : tourDt, camera)) {
     shipModel.visible = false;
     ship.pos.copy(camera.position);
     ship.prev.copy(camera.position);
