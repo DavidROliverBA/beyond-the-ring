@@ -210,13 +210,13 @@ Things that may need research and a big change. None starts without a decision g
 - [ ] E4.4 [research] [replatform] Hosting: here.now now; revisit Cloudflare Pages or GitHub Pages if the size or traffic changes (see ROADMAP section 3)
 - [ ] E4.5 Cross-browser and device matrix: Chrome, Safari, Firefox; Mac, Windows, iPad; touch controls; a low-power mode
 - [ ] E4.6 Testing: a repeatable visual regression harness (the Playwright contact sheets already exist), and a real-GPU run on David's machine recorded in `docs/HAND-TEST.md`
-- [~] (branch interface-fixes, agent) E4.7 Accessibility and localisation: captions, reduced motion (the tour sway and grain), colour contrast, keyboard-only play, language files
+- [~] 2026-11-22 1c1734e (branch interface-fixes, not merged) PARTLY DONE: reduced motion (system setting plus a switch; sway, grain, flashes, fades), focus handling in panels, keyboard-only reach of the destination list, facts panel and settings, phone layout check. STILL OPEN: captions, colour contrast audit, language files. E4.7 Accessibility and localisation: captions, reduced motion (the tour sway and grain), colour contrast, keyboard-only play, language files
 
 ---
 
 ## E5. Interface and quality (carried over)
 
-- [~] (branch interface-fixes, agent) E5.1 Interface gap-analysis fixes: hint overlap, stale start-screen controls, banner and label collision, clipped destination list, settings panel
+- [x] 2026-11-22 1c1734e (branch interface-fixes, not merged; needs hand-test) E5.1 Interface gap-analysis fixes: hint overlap, stale start-screen controls, banner and label collision, clipped destination list, settings panel
 - [ ] E5.2 Smoother tours on a real GPU: texture upload hitches of 60–275 ms at each stop (consider KTX2 and progressive mips, E1.7.b)
 - [ ] E5.3 Far ring-space gates: use the ring model rather than a plain hoop
 - [ ] E5.4 Sound: positional audio, per-room reverb, footsteps, ventilation and crowd murmur (parked at David's request; synthesised or CC0 only)
@@ -242,3 +242,4 @@ Newest first. One line per piece of work finished, so a new session can see the 
 - 2026-11-22 Reversed-Z on the WebGL renderer (replaces log depth): same pictures, Tycho dock about 1.55x faster in headless Retina (63 to 41 ms). Fallback and `?logdepth` kept.
 - 2026-11-22 Research notes written for E1.1, E1.2, E2.1, E3.1 (three agents). Decisions pending.
 - 2026-11-22 Backlog created. Cinematic tours (letterbox, film look, momentum camera, gate dive, score) shipped earlier the same day.
+- 2026-11-22 E5.1 and E4.7 (part) on branch interface-fixes (1c1734e, not merged): settings panel (U; quality 50/75/100%, volume, mute, film look, reduced motion; localStorage, try/catch), key list as a centred card (no more overlap with the hint), start-screen controls rewritten to the real keys (M, I, T and 9 voyages, P, K H U), banner on a soft pool over the labels, destination list folds moons and ships (More/Fewer) and fades at the foot, Tab opens the list with focus in it (Up/Down/Enter/Esc), facts panel takes and returns focus (Esc closes), dialogs have roles, phone layout (list starts closed, compact card and flight panel, no letterbox in portrait). Open: touch controls (E4.5), captions, contrast audit, language files, a way to resize the destination list.

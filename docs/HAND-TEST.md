@@ -125,3 +125,14 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Sound, on speakers: inside the Donnager (28-42 s) PDC rattle, impact and railgun thump; inside the Tachi (132-150 s) drive roar and her cannons; wide exterior shots silent apart from the score, which fades at the scuttling. Too loud, too boomy, too clicky?
 - [ ] Any hitch at the start (one ~90 ms pause as everything is drawn once) or mid-film. Safari and Firefox, with and without `?logdepth`.
 - [ ] Facts the research could not settle: number of attackers (we show four, invented), whether the Tachi has a railgun, boarding (not shown). Confidence is in `src/scenarios/donnager.ts` and `?debug`.
+
+## Interface fixes and settings (2026-11-22, branch interface-fixes, not merged)
+- [ ] U opens Settings. Set picture quality to Low: is the picture soft but faster? Back to High. Move the volume slider while a drive is sounding; tick Sound off, then K: do the two agree? Reload: are all choices remembered?
+- [ ] Reduced motion: tick it, then start a tour (T, 1). Is the camera steady (no breathing sway), the picture free of grain, gate jumps a fade to black rather than a white flash? Untick: sway and grain return. Also with macOS Reduce Motion on, and a fresh browser profile: does the box start ticked?
+- [ ] Film look off: tours play with no bars, grade or streaks, and the captions sit in the middle as in normal flight.
+- [ ] H opens the key list in the middle; does anything else show through it badly? Does it list every key you use (I, P, T, 1-9, K, U)? Esc or a click outside closes it.
+- [ ] Start screen: do the listed controls all work as stated?
+- [ ] Tab with no mouse: the list opens with focus in it; Up / Down move, Enter flies, Esc closes. Press I on a planet, then Tab through the facts links; Esc closes and flight keys work again.
+- [ ] On a short window (about 600 px high) does the destination list scroll, fold with More / Fewer, and show a fade at the foot?
+- [ ] Phone or a narrow window: nothing collides, the destination list starts closed, Tab-equivalent is the MAP button only (touch controls do not exist yet).
+
