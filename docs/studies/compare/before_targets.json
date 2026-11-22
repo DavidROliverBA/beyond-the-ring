@@ -1,0 +1,72 @@
+[
+ {
+  "id": "earth-full",
+  "n": 1,
+  "title": "Whole Earth, Sun behind camera",
+  "ref": "NASA Apollo 17 AS17-148-22727",
+  "body": "earth"
+ },
+ {
+  "id": "earth-glint",
+  "n": 1,
+  "title": "Earth, ocean glint",
+  "ref": "any NASA frame of sun glint on the ocean (e.g. ISS Earth observations)",
+  "body": "earth"
+ },
+ {
+  "id": "earth-limb",
+  "n": 2,
+  "title": "Orbital sunset limb",
+  "ref": "NASA ISS iss023e057948",
+  "body": "earth"
+ },
+ {
+  "id": "earth-night",
+  "n": 3,
+  "title": "Earth at night",
+  "ref": "NASA ISS iss035e017673",
+  "body": "earth"
+ },
+ {
+  "id": "saturn-back",
+  "n": 4,
+  "title": "Saturn backlit",
+  "ref": "NASA Cassini PIA08329 In Saturn's Shadow",
+  "body": "saturn"
+ },
+ {
+  "id": "saturn-shadow",
+  "n": 4,
+  "title": "Saturn, ring shadow on the globe",
+  "ref": "any Cassini frame of the ring shadow on the globe",
+  "body": "saturn"
+ },
+ {
+  "id": "moon-hard",
+  "n": 5,
+  "title": "Hard-lit airless world",
+  "ref": "NASA Apollo 8 as08-14-2383 (Earthrise)",
+  "body": "luna"
+ },
+ {
+  "id": "pluto-twilight",
+  "n": 6,
+  "title": "Backlit haze on a small world",
+  "ref": "NASA New Horizons PIA19931",
+  "body": "pluto"
+ },
+ {
+  "id": "comet-67p",
+  "n": 7,
+  "title": "Small body in raw sunlight",
+  "ref": "ESA Rosetta OSIRIS, NASA PIA19040 (licence: check at source)",
+  "body": "67p"
+ },
+ {
+  "id": "sun",
+  "n": 8,
+  "title": "The Sun",
+  "ref": "NASA SDO visible-light image (pick at sdo.gsfc.nasa.gov)",
+  "body": "sun"
+ }
+]

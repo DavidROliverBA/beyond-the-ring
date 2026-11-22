@@ -2262,7 +2262,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
-if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ reversed: REVERSED, rev: renderer.capabilities.reversedDepthBuffer, ship, space, faceShip, dust, sky, auto, escort, camera }) });
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ reversed: REVERSED, rev: renderer.capabilities.reversedDepthBuffer, renderer, ship, space, faceShip, dust, sky, auto, escort, camera }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
