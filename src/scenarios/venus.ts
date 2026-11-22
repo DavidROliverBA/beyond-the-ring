@@ -113,7 +113,15 @@ export const VENUS: Scenario = {
     { t: 160, dur: 14, title: 'Two towers', text: 'Two crystalline spires climb from the planet. Their shape and height here are guesses; only the fact of them is in the story.' },
     { t: 177, dur: 14, title: 'The end of the book', text: 'The thing that took Eros has what it wanted. The story that follows is a larger one.' },
   ],
-  chapters: ['Eros and Venus', 'Epilogue: what grew on Venus'],
+  chapters: [
+    { t: 0, title: 'Eros under way' },
+    { t: 24, title: 'The Rocinante follows' },
+    { t: 47, title: 'A new course' },
+    { t: 62, title: 'Time-lapse inward' },
+    { t: 97, title: 'Breaking off' },
+    { t: 123, title: 'Impact on Venus' },
+    { t: 143, title: 'Afterwards: the towers' },
+  ],
   notes: [
     'Order of events: B (impact on Venus: Wikipedia and an aggregator agree). Everything geometric is invented: the approach, the strike point, the speeds.',
     `The dive is a time-lapse: its last stretch is ${(DIVE_DISTANCE / 1000).toFixed(0)} km in ${T_HIT - T_BEND} s, about ${DIVE_LAPSE.toFixed(0)} times faster than a ship at 3 g. The real trip would take ${tripRange(0.3, 1.5, 3)} at 3 g for 0.3 to 1.5 AU (src/transit.ts, rest to rest); the note's own figures disagree with this and are not used.`,

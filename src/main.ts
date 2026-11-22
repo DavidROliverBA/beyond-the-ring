@@ -27,6 +27,7 @@ import { VOYAGES, createVoyageMenu } from './voyages';
 import { createScenarioPlayer, type Scenario } from './scenario';
 import { SCENARIOS } from './scenarios';
 import { createScenarioCard } from './scenarioCard';
+import { createScenarioBar } from './scenarioBar';
 import { FLIP_SECS, planTrip } from './course';
 import { createMap } from './starmap';
 import { makeSky } from './sky';
@@ -1396,7 +1397,7 @@ async function transit(g: Thing, quiet = false) {
 const locked = () => document.pointerLockElement === canvas;
 
 canvas.addEventListener('click', () => {
-  if (started && !locked()) canvas.requestPointerLock()?.catch?.(() => {});
+  if (started && !locked() && !scn.active) canvas.requestPointerLock()?.catch?.(() => {});
 });
 document.addEventListener('mousemove', (e) => {
   if (locked()) {
@@ -1458,7 +1459,9 @@ const scn = createScenarioPlayer({
   scene, renderer,
   sunPos: tourSun,
   bodyPos: (id) => space.things.find((t) => t.id === id)?.pos ?? null,
-  caption: (t, x) => banner(t, x),
+  // A film caption lives as long as its time and no longer: no 7 s timer, so it stays while paused and is taken down by the player after a seek.
+  caption: (t, x) => { banner(t, x); clearTimeout(bannerTimer); },
+  captionOff: () => { clearTimeout(bannerTimer); $('banner').classList.remove('show'); },
   camera,
   warm: (s, c) => {
     renderer.setRenderTarget(composer.renderTarget1);
@@ -1474,15 +1477,18 @@ const scn = createScenarioPlayer({
   duck: (secs) => sound.duck(secs),
   end: () => { const n = scn.scenario?.title ?? ''; banner(n, 'The sequence is over. Your ship is where you left her.'); stopTour(true); },
 });
-function startScenario(sc: Scenario) {
+function startScenario(sc: Scenario, at = 0) {
   if (!started || busy || walk || tour.active || voyage || space.id !== sc.frame.space) return;
   const save = { pos: ship.pos.clone(), q: ship.q.clone(), space: space.id };
   if (!scn.start(sc)) return;
+  if (at > 0) scn.seek(at);
+  document.exitPointerLock();
   tourSave = save;
   auto = null; brake = null; escort = null;
   ship.speed = ship.throttle = 0;
   voyage = { v: VOYAGES.find((v) => v.id === 'roci')!, n: 0 };
   document.body.classList.add('voyage');
+  scnBar.show(sc);
 }
 
 /** A voyage: stages in one place after another, carried between them through the gates. */
@@ -1519,6 +1525,7 @@ function stopTour(keepBanner = false) {
   voyage = null;
   document.body.classList.remove('voyage');
   tour.stop();
+  scnBar.hide();
   scn.stop();
   if (!keepBanner) $('banner').classList.remove('show');
   if (tourSave) {
@@ -2400,6 +2407,10 @@ const voyageMenu = createVoyageMenu(
 );
 
 const scnCard = createScenarioCard(SCENARIOS, startScenario);
+const scnBar = createScenarioBar({
+  scenario: () => scn.scenario, time: () => scn.time, paused: () => scn.paused, speed: () => scn.speed,
+  setPaused: (on) => { scn.paused = on; }, setSpeed: (x) => { scn.speed = x; }, seek: (t) => scn.seek(t), exit: () => stopTour(),
+});
 
 const starMap = createMap({
   space: () => space,
@@ -2512,6 +2523,7 @@ function frame(now: number) {
     ship.prev.copy(camera.position);
   }
   if (scn.active && scn.update(photo ? 0 : tourDt, camera)) {
+    scnBar.update();
     shipModel.visible = false;
     ship.pos.copy(camera.position);
     ship.prev.copy(camera.position);

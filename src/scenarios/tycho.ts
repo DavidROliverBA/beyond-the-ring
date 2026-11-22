@@ -108,7 +108,14 @@ export const TYCHO: Scenario = {
     { t: SWAP + 24, dur: 14, title: 'An errand', text: 'Johnson has a favour to ask: find a man on Eros who may know who attacked them.' },
     { t: SWAP + 40, dur: 14, title: 'Next: Eros', text: 'That trip is not in this film.' },
   ],
-  chapters: ['Tycho: the ship gets a name'],
+  chapters: [
+    { t: 0, title: 'The corvette sets out' },
+    { t: 20, title: 'Flip' },
+    { t: 56, title: 'Tycho comes into view' },
+    { t: T2, title: 'Into the bay' },
+    { t: SWAP - 8, title: 'A new name' },
+    { t: SWAP + 24, title: 'An errand' },
+  ],
   notes: [
     `Flight: ${REAL_AU.toFixed(2)} AU between the two pinned places, 0.3 g, ${REAL_FLIP / 60}-minute flip: ${days} days, peak ${peak} km/s. All four inputs invented; the maths is transit().`,
     `The long leg is drawn as 150 km in ${FILM_T} s (${Math.round(FILM_G)} g in the film). Not physical. Only the last 3 km runs at real speed and acceleration.`,

@@ -80,7 +80,16 @@ export const ANUBIS: Scenario = {
     { t: 122, dur: 12, title: 'Gone', text: 'The Anubis is destroyed. Space carries no sound, so there is none here.' },
     { t: 136, dur: 12, title: 'Onward', text: 'The Rocinante turns away. What the dead ship\'s makers started is not over.' },
   ],
-  chapters: ['The Anubis found and destroyed'],
+  chapters: [
+    { t: 0, title: 'The rock' },
+    { t: 18, title: 'Flip and brake' },
+    { t: 38, title: 'A ship in the dark' },
+    { t: 54, title: 'Across' },
+    { t: 74, title: 'Backing off' },
+    { t: 109, title: 'One torpedo' },
+    { t: 122, title: 'The Anubis is gone' },
+    { t: 136, title: 'Onward' },
+  ],
   notes: [
     'Order and outcome: B and A. The place, the rock, the Anubis\'s pose, all timings and accelerations: invented.',
     'The Anubis is shown bare (the books have her covered in growth; we have no model). Boarding and the recording are interior scenes and are not shown.',
