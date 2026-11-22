@@ -87,7 +87,7 @@ To jump, fly through the middle of a ring.
 
 Everything is its true size: a ship is tens or hundreds of metres long in a system billions of kilometres across. Ships from different points in the story are all on show at once.
 
-What comes next is in [docs/ROADMAP.md](docs/ROADMAP.md).
+What comes next is in [docs/BACKLOG.md](docs/BACKLOG.md) (the live task list) and [docs/ROADMAP.md](docs/ROADMAP.md) (the reasoning).
 
 ## Accuracy
 
