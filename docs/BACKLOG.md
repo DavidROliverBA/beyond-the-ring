@@ -111,7 +111,7 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E2.2 Data model and build script
 - [x] 2026-11-22 E2.2.a (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Schema `Fact` with value, unit, source name, source URL, date retrieved, licence; schema `Entity` with id, name, kind (planet, moon, asteroid, comet, probe, station, site), real or fictional, links
-- [x] 2026-11-22 E2.2.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged; rest of the real bodies on branch facts-all-bodies, 9d4a497, not merged, humanReviewed=false everywhere) A build script `tools/build-facts.ts` that pulls from JPL SBDB and Horizons and the curated lists and writes `assets/data/facts.json`; re-runnable and versioned, with a diff of what changed
+- [x] 2026-11-22 E2.2.b [~] follow-ups (branch data-and-maths, agent) (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged; rest of the real bodies on branch facts-all-bodies, 9d4a497, not merged, humanReviewed=false everywhere) A build script `tools/build-facts.ts` that pulls from JPL SBDB and Horizons and the curated lists and writes `assets/data/facts.json`; re-runnable and versioned, with a diff of what changed
 - [x] 2026-11-22 E2.2.c (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Tests: every fact has a source and a date; no entity without a licence line
 
 ### E2.3 What appears in the game
@@ -130,8 +130,8 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E2.5 Content care
 - [ ] E2.5.a Write in our own words. Do not copy agency prose; summarise facts and link. Where we quote, keep it short and attribute
-- [ ] E2.5.b `CREDITS.md` entry per source, and a visible credits link in the game for the data
-- [ ] E2.5.c Review pass for accuracy before release; mark each fact as verified by a person or not
+- [~] (branch data-and-maths, agent) E2.5.b `CREDITS.md` entry per source, and a visible credits link in the game for the data
+- [~] (branch data-and-maths, agent) E2.5.c Review pass for accuracy before release; mark each fact as verified by a person or not
 
 ---
 
@@ -145,7 +145,7 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 - [ ] E3.1.a Build a canon timeline per book from the novels themselves: where the Roci is, who is aboard, what ships and stations are present, what happens, in what order, over what real durations. Write to `docs/research/canon/<book>.md`. Mark each claim with a book and chapter reference (a pointer, not a quote)
 - [ ] E3.1.b List the set pieces per book and rate each by how well the book describes it (positions, ships, weapons) and how feasible it is to build
 - [ ] E3.1.c Resolve differences between book and show: books are the authority; where the show differs, record both and use the book
-- [ ] E3.1.d Orbital timing: for each voyage, compute the real transit with brachistochrone at the book's accelerations (Epstein drive), so the flights are physically honest; reuse and extend the existing flight maths
+- [~] (branch data-and-maths, agent) E3.1.d Orbital timing: for each voyage, compute the real transit with brachistochrone at the book's accelerations (Epstein drive), so the flights are physically honest; reuse and extend the existing flight maths
 
 ### E3.2 [build] Scenario engine (the technical core)
 This is the piece that makes a battle different from a camera tour: many moving actors on scripted or simulated paths, events, and a director.
