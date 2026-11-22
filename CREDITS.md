@@ -46,6 +46,15 @@ NASA material is used in line with NASA's media guidelines. Its use here does no
 
 Every other body in the game (Io, Titan, Pluto, the small moons and all worlds beyond the Ring) is painted by the project's own code.
 
+## Facts about real objects (`assets/data/facts.json`)
+
+Numbers and launch dates in the info panel (Earth and Luna so far) are read by `tools/build-facts.ts` from the cached NASA pages in `tools/facts-raw/`; each fact in the file carries its source name, URL, the day it was read, its licence and its credit. The summaries and "what we know / do not know" lists are our own words, drafted with AI help from those pages; they are marked "AI-assisted" in the game and are not a statement by NASA. No agency images or prose are used, and the game makes no calls to these sites.
+
+| Data | Source | Credit | Licence |
+|---|---|---|---|
+| Earth and Moon bulk, orbital and atmosphere numbers | [NSSDCA Earth Fact Sheet](https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html), [Moon Fact Sheet](https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html) | NASA Space Science Data Coordinated Archive, Goddard Space Flight Center | NASA content is generally not subject to copyright in the US ([NASA media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/)); facts only, no endorsement implied |
+| Launch dates of Apollo 8, 11 and 17, Landsat 1, Lunar Reconnaissance Orbiter | [NSSDCA Master Catalog](https://nssdc.gsfc.nasa.gov/nmc/) entries 1968-118A, 1969-059C, 1972-096A, 1972-058A, 2009-031A | NASA NSSDCA | As above |
+
 ## Surface materials (`assets/pbr`)
 
 Colour, normal and roughness maps from [ambientCG](https://ambientcg.com) by Lennart Demes, released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). No credit is required; it is given gladly.

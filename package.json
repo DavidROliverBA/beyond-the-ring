@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "bun --port=5180 ./index.html",
     "build": "bun build ./index.html --outdir dist --minify",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "facts": "bun tools/build-facts.ts",
+    "test": "bun test tools"
   },
   "dependencies": {
     "three": "^0.187.0"

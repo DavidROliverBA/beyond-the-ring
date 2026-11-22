@@ -9,6 +9,7 @@ import {
   AU, GATE_COUNT, NAMED, SLOW_RADIUS, SOL, gateName, genSystem,
   type BeltSpec, type BodySpec, type Kind, type SystemSpec,
 } from './data';
+import * as info from './infopanel';
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
 import { buildModel, glowSprite, glowTex, loadModels, playerShip, ringModel, ROCI_UNIT, tickShipLights, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
@@ -1130,6 +1131,8 @@ let engine = 0;
 const BRAKE_SECS = 7;       // a manual burn to a stop
 const smoother = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
 let aimed: Thing | null = null;
+/** What the aim card is showing this frame (aimed, autopilot target or the nearby body): the subject of the info panel. */
+let cardFocus: Thing | null = null;
 let nearest: Thing | null = null;
 let busy = true;
 let started = false;
@@ -1410,6 +1413,13 @@ function startInspect() {
   inspect.from.copy(camera.position);
   banner(th.name, th.desc ?? th.sub ?? '');
 }
+/** The Real / Fiction tag on the aim card. 'Based on' shows only when we have said what the fiction resembles. */
+function setBadge(b: ReturnType<typeof info.badge>) {
+  const el = $('card-badge');
+  el.className = b ? `badge ${b.label === 'Real' ? 'real' : 'fiction'}` : 'badge';
+  el.textContent = b ? b.label : '';
+  el.title = b?.basedOn ? `Based on ${b.basedOn}` : '';
+}
 function stopInspect() {
   if (!inspect.on) return;
   inspect.on = false;
@@ -1483,7 +1493,15 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyK') { const on = sound.toggle(); $('hint').textContent = on ? 'Sound on' : 'Sound off'; return; }
   if (e.code === 'Comma' || e.code === 'Period') { rateIdx = clamp(rateIdx + (e.code === 'Period' ? 1 : -1), 0, RATES.length - 1); return; }
   if (e.code === 'KeyT') { if (tour.active || voyage) stopTour(); else voyageMenu.open(); return; }
-  if (e.code === 'KeyI') { if (inspect.on) stopInspect(); else startInspect(); return; }
+  if (e.code === 'KeyI') {
+    // On a thing we hold facts about (Earth, Luna), I also opens the info panel; I again closes both.
+    if (info.isOpen()) { info.close(); if (inspect.on) stopInspect(); return; }
+    if (inspect.on) { stopInspect(); return; }
+    const ent = info.entityFor(aimed ?? cardFocus);
+    if (ent) { info.open(ent); if (aimed) startInspect(); return; }
+    startInspect();
+    return;
+  }
   if (inspect.on && (STEER.includes(e.code) || e.code === 'Escape')) stopInspect();
   // X in the middle of the autopilot's own flip and burn changes nothing: it is already doing it.
   if (e.code === 'KeyX' && auto && (auto.phase === 'flip' || auto.phase === 'burn')) return;
@@ -2088,6 +2106,7 @@ function updateHud(dt: number) {
     const g = SPIN_ON && walk.spin ? ` · ${(walk.spin.g * walker.weight).toFixed(2)} g` : '';
     $('loc-sub').textContent = `On foot${g} · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time`;
     const pt = nearPoint as Point | null;
+    if (info.isOpen()) info.close();
     $('card').style.display = pt ? 'block' : 'none';
     if (pt) {
       $('card-name').textContent = pt.title;
@@ -2095,6 +2114,7 @@ function updateHud(dt: number) {
       $('card-desc').textContent = pt.text;
       $('card-dist').textContent = '';
       $('card-key').textContent = pt.kind === 'exit' ? 'E — board and undock' : '';
+      setBadge(null);
     }
     $('hint').textContent = !locked() && !document.body.classList.contains('nav-open')
       ? 'Click the view to look around · Tab for places'
@@ -2120,6 +2140,7 @@ function updateHud(dt: number) {
   // (The slack is for Sol's planets; in the ring space it would be the whole bubble.)
   const close = near && near.pos.distanceTo(ship.pos) < near.radius * 10 + (space.id === 'slow' ? 0 : 30) ? near : null;
   const focus = auto?.thing ?? aimed ?? close;
+  cardFocus = focus;
   const card = $('card');
   if (focus) {
     card.style.display = 'block';
@@ -2132,6 +2153,8 @@ function updateHud(dt: number) {
     $('card-key').textContent = auto ? 'En route — any flight key takes back control'
       : focus.dock ? (focus === here ? 'L — dock and go aboard' : 'F — fly there · you can dock here')
       : focus === aimed ? 'F — fly there' : '';
+    if (info.entityFor(focus)) $('card-key').textContent += ($('card-key').textContent ? ' · ' : '') + 'I — facts and sources';
+    setBadge(info.badge(focus));
   } else {
     card.style.display = 'none';
   }

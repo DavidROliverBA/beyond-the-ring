@@ -1,0 +1,451 @@
+{
+  "version": 1,
+  "generated": "2026-11-22",
+  "entities": [
+    {
+      "id": "earth",
+      "name": "Earth",
+      "kind": "planet",
+      "real": true,
+      "summary": "The third planet from the Sun and the only place known to host life, with liquid water on its surface under a nitrogen-and-oxygen atmosphere.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Mean radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 6371,
+          "display": "6,371 km"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 5.9722e+24,
+          "display": "5.972 × 10²⁴ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 5513,
+          "display": "5,513 kg/m3"
+        },
+        {
+          "id": "gravity",
+          "label": "Surface gravity",
+          "unit": "m/s2",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 9.82,
+          "display": "9.82 m/s2"
+        },
+        {
+          "id": "escape",
+          "label": "Escape velocity",
+          "unit": "km/s",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 11.186,
+          "display": "11.2 km/s"
+        },
+        {
+          "id": "distance",
+          "label": "Mean distance from the Sun",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 149598000,
+          "display": "1.496 × 10⁸ km"
+        },
+        {
+          "id": "year",
+          "label": "Orbit period (sidereal)",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 365.256,
+          "display": "365.26 days"
+        },
+        {
+          "id": "rotation",
+          "label": "Rotation period (sidereal)",
+          "unit": "hours",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 23.9345,
+          "display": "23.93 hours"
+        },
+        {
+          "id": "tilt",
+          "label": "Axial tilt",
+          "unit": "degrees",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 23.44,
+          "display": "23.44°"
+        },
+        {
+          "id": "temp",
+          "label": "Average surface temperature",
+          "unit": "K",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 288,
+          "display": "288 K"
+        },
+        {
+          "id": "moons",
+          "label": "Natural satellites",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Earth Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 15 November 2024",
+          "value": 1,
+          "display": "1"
+        }
+      ],
+      "know": [
+        "Its air is about 78% nitrogen and 21% oxygen by volume (dry), and the surface carries roughly 1.4 × 10²¹ kg of water in oceans, ice and rivers.",
+        "It turns once in about 23.93 hours, and its axis is tilted by about 23.4 degrees, which is why there are seasons.",
+        "A magnetic field, roughly that of a tilted bar magnet, surrounds it and turns aside most charged particles from the Sun.",
+        "It has one natural satellite, the Moon, and no rings."
+      ],
+      "unknown": [
+        "How and where life first began is still an open question.",
+        "The core and deep interior are probed only indirectly, by earthquake waves and magnetic measurements, so details of their makeup and heat flow remain uncertain.",
+        "Exactly how Earth gained its water (already present as it formed, or delivered later by asteroids and comets) is debated."
+      ],
+      "missions": [
+        {
+          "name": "Apollo 8",
+          "what": "First crewed flight to leave Earth's gravity and go into orbit round the Moon; the crew looked back at Earth and sent live television.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1968-12-21",
+            "unit": "date",
+            "display": "21 December 1968",
+            "sourceName": "NASA NSSDCA Master Catalog: Apollo 8",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1968-118A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Landsat 1",
+          "what": "Launched as ERTS-1, the first of a long line of Earth-watching satellites that image land, water and weather from a polar orbit.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1972-07-23",
+            "unit": "date",
+            "display": "23 July 1972",
+            "sourceName": "NASA NSSDCA Master Catalog: Landsat 1",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1972-058A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        }
+      ],
+      "links": [
+        {
+          "label": "NASA Science: Earth",
+          "url": "https://science.nasa.gov/earth/"
+        },
+        {
+          "label": "NSSDCA Earth Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
+      "id": "luna",
+      "name": "The Moon (Luna)",
+      "kind": "moon",
+      "real": true,
+      "summary": "Earth's only natural satellite: a dry, almost airless world of rock that always shows us the same face, and the only other body humans have walked on.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Mean radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 1737.4,
+          "display": "1,737.4 km"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 7.3459999999999995e+22,
+          "display": "7.346 × 10²² kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 3344,
+          "display": "3,344 kg/m3"
+        },
+        {
+          "id": "gravity",
+          "label": "Surface gravity",
+          "unit": "m/s2",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 1.62,
+          "display": "1.62 m/s2"
+        },
+        {
+          "id": "escape",
+          "label": "Escape velocity",
+          "unit": "km/s",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 2.38,
+          "display": "2.38 km/s"
+        },
+        {
+          "id": "distance",
+          "label": "Mean distance from Earth",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 384400,
+          "display": "384,400 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 27.3217,
+          "display": "27.32 days"
+        },
+        {
+          "id": "rotation",
+          "label": "Rotation period (sidereal)",
+          "unit": "hours",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 655.72,
+          "display": "655.72 hours"
+        },
+        {
+          "id": "recession",
+          "label": "Moving away from Earth",
+          "unit": "cm/yr",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": 3.8,
+          "display": "3.8 cm/yr"
+        },
+        {
+          "id": "temp",
+          "label": "Temperature range at the equator",
+          "unit": "K",
+          "sourceName": "NASA NSSDCA Moon Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 January 2024",
+          "value": "95 to 390",
+          "display": "95 K to 390 K over a lunar day"
+        }
+      ],
+      "know": [
+        "Its spin takes 655.7 hours and its orbit 27.3 days: the two match, so the same side always faces Earth.",
+        "It is drifting away from Earth by about 3.8 cm a year.",
+        "Six Apollo missions put crews on the surface between 1969 and 1972, the last being Apollo 17.",
+        "It has almost no atmosphere, only about 25,000 kg of gas in total, and the surface swings between roughly 95 K and 390 K at the equator."
+      ],
+      "unknown": [
+        "How it formed. The leading idea is a giant impact on the young Earth, but the makeup of the impactor and the details are still argued over.",
+        "How much water ice lies in permanently shadowed polar craters, in what form, and how easily it could be used.",
+        "What its thin atmosphere is made of: the mix is poorly known and changes, and daytime levels were hard to measure."
+      ],
+      "missions": [
+        {
+          "name": "Apollo 8",
+          "what": "The first crew to orbit the Moon, photographing its near and far sides to prepare the landings.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1968-12-21",
+            "unit": "date",
+            "display": "21 December 1968",
+            "sourceName": "NASA NSSDCA Master Catalog: Apollo 8",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1968-118A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Apollo 11",
+          "what": "Its lunar module Eagle made the first crewed landing, on 20 July 1969: Neil Armstrong and Buzz Aldrin walked on the surface.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1969-07-16",
+            "unit": "date",
+            "display": "16 July 1969",
+            "sourceName": "NASA NSSDCA Master Catalog: Apollo 11 Lunar Module",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-059C",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Apollo 17",
+          "what": "The sixth and last Apollo landing, at Taurus-Littrow in December 1972, and the first with a scientist on the surface.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1972-12-07",
+            "unit": "date",
+            "display": "7 December 1972",
+            "sourceName": "NASA NSSDCA Master Catalog: Apollo 17 Command and Service Module",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1972-096A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Lunar Reconnaissance Orbiter",
+          "what": "An orbiter launched in 2009 to map the surface, look for resources such as ice, and survey possible landing sites.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2009-06-18",
+            "unit": "date",
+            "display": "18 June 2009",
+            "sourceName": "NASA NSSDCA Master Catalog: Lunar Reconnaissance Orbiter",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2009-031A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        }
+      ],
+      "links": [
+        {
+          "label": "NASA Science: Earth's Moon",
+          "url": "https://science.nasa.gov/moon/"
+        },
+        {
+          "label": "NSSDCA Moon Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
+        },
+        {
+          "label": "NASA Science: Lunar Reconnaissance Orbiter",
+          "url": "https://science.nasa.gov/mission/lro/"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    }
+  ]
+}
