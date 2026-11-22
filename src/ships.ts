@@ -102,7 +102,7 @@ function windows(g: G, x: number, y: number, z0: number, z1: number, n: number, 
 
 export type ShipModel =
   | 'corvette' | 'battleship' | 'dreadnought' | 'hauler' | 'racer' | 'wreck' | 'freighter' | 'stealth'
-  | 'survey' | 'magnetar' | 'tycho' | 'medina' | 'mirrors' | 'player';
+  | 'survey' | 'magnetar' | 'tycho' | 'medina' | 'mirrors' | 'asteroid' | 'spire' | 'player';
 
 const MCRN = () => [metal(0x62675f), metal(0xa8452c, { roughness: 0.6 }), metal(0x2b2e30)] as const;
 const UNN = () => [metal(0x7c8998), metal(0xd7dde2, { roughness: 0.6 }), metal(0x2d3540)] as const;
@@ -518,8 +518,48 @@ export function playerShip(): { group: G; plume: DrivePlume } {
   return { group: g, plume };
 }
 
+/** A small rock for the scenarios (Eros, the Anubis's asteroid): one unit long along Z, a lumpy peanut with a pinched waist.
+ *  Made from sums of sines of position, so every rock is the same each time. Not the real shape of any rock. */
+function asteroid(): G {
+  const g = new THREE.Group();
+  const geo = new THREE.IcosahedronGeometry(0.5, 20);
+  const p = geo.getAttribute('position'), v = new THREE.Vector3();
+  const bump = (x: number, y: number, z: number, f: number, ph: number) => Math.sin(x * f + ph) * Math.sin(y * f * 1.3 + ph * 2.1) * Math.sin(z * f * 0.9 + ph * 0.7);
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    const n = 0.5 * bump(v.x, v.y, v.z, 3, 1) + 0.3 * bump(v.x, v.y, v.z, 7, 2) + 0.15 * bump(v.x, v.y, v.z, 15, 3);
+    // Long along Z, flatter in x and y, narrower at the waist.
+    const z = v.z * 0.5, waist = 1 - 0.3 * Math.exp(-((z / 0.14) ** 2));
+    const k = 1 + 0.16 * n;
+    p.setXYZ(i, v.x * 0.27 * waist * k, v.y * 0.24 * waist * k, z * k);
+  }
+  geo.computeVertexNormals();
+  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x4d463f, roughness: 0.95, metalness: 0.02, flatShading: true })));
+  return g;
+}
+
+/** A crystalline spire for the Venus epilogue: a hexagonal shaft with a point, two shorter ones leaning against it. One unit long, its foot at the
+ *  origin and its tip towards -Z (so a leg that faces along the surface normal stands it upright). A guess at a shape the books leave open. */
+function spire(): G {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0xcfe9ff, emissive: 0x8fc4ff, emissiveIntensity: 0.9, roughness: 0.12, metalness: 0.15, transparent: true, opacity: 0.88, flatShading: true });
+  const shaft = (r: number, len: number, lean: [number, number]) => {
+    const body = new THREE.CylinderGeometry(r, r * 1.15, len * 0.86, 6).translate(0, len * 0.43, 0);
+    const tip = new THREE.CylinderGeometry(0, r, len * 0.14, 6).translate(0, len * 0.93, 0);
+    for (const geo of [body, tip]) {
+      geo.rotateX(-Math.PI / 2);                               // +Y (up the shaft) becomes -Z
+      geo.rotateX(lean[0]); geo.rotateY(lean[1]);
+      g.add(new THREE.Mesh(geo, mat));
+    }
+  };
+  shaft(0.05, 1, [0, 0]);
+  shaft(0.035, 0.6, [0.28, 0.6]);
+  shaft(0.03, 0.45, [0.34, -2.1]);
+  return g;
+}
+
 const BUILDERS: Record<Exclude<ShipModel, 'player'>, () => G> = {
-  corvette, battleship, dreadnought, hauler, racer: () => racer(1), wreck: () => racer(0), freighter, stealth, survey, magnetar, tycho, medina, mirrors,
+  corvette, battleship, dreadnought, hauler, racer: () => racer(1), wreck: () => racer(0), freighter, stealth, survey, magnetar, tycho, medina, mirrors, asteroid, spire,
 };
 
 // ---- Models made in Blender (tools/blender), loaded once at start-up. The

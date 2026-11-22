@@ -43,6 +43,8 @@ export interface ActorDef {
   /** Present only between these times (seconds); the default is the whole film. */
   life?: [number, number];
   crew?: number;
+  /** Grows from `from` of her size at `t0` to her whole size at `t1` (seconds), about her origin; before `t0` she is at `from`. */
+  grow?: { t0: number; t1: number; from: number };
   note?: string;
 }
 
@@ -119,6 +121,9 @@ export interface Scenario {
     /** The place, pinned: `au` from the star at `angle` radians round the system (the planets' own angle), `lift` scene units above the plane.
      *  It does not depend on where the planets are when the film starts, so the sky behind is the same every time. */
     origin: { au: number; angle: number; lift?: number };
+    /** Pin the film to a body in the scene instead: the frame's origin is that body's centre (it follows the body as it goes round the star)
+     *  and, if `sunward`, the frame's +x points at the star, so the sky and the light are the same every time whatever the date. `origin` is the fallback. */
+    body?: { id: string; sunward?: boolean };
     seed: number;
   };
   time: { duration: number; storyMinutes?: number; scale: 'real' | 'compressed'; note?: string };
@@ -270,6 +275,8 @@ export interface PlayerOptions {
   renderer: THREE.WebGLRenderer;
   /** Where the star is (it lights everything, and azimuth 0 in a shot is towards it). */
   sunPos(): V3 | null;
+  /** Where a body of the scene is now (scene units), for a film pinned to a body (`frame.body`). */
+  bodyPos?(id: string): V3 | null;
   /** A lower third. */
   caption(title: string, text: string): void;
   /** The film has run to its end. */
@@ -320,6 +327,23 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
   let loading = false;
   let cues: Cue[] = [], cueIx = 0, soundT = 0, hearing = { ship: false, actor: '' };
   const _st = newState();
+  let rotY = 0;
+  /** Put the frame where it belongs: pinned in space, or on its body (which goes round the star, so this is done every frame). */
+  function place() {
+    if (!sc || !root) return;
+    const og = sc.frame.origin, r = og.au * 1000, bp = sc.frame.body ? o.bodyPos?.(sc.frame.body.id) : null;
+    if (bp) origin.copy(bp); else origin.set(Math.cos(og.angle) * r, og.lift ?? 0, Math.sin(og.angle) * r);
+    const sun = o.sunPos();
+    const toSun = (sun ? _a.copy(sun).sub(origin) : _a.set(0, 0, 1)).clone();
+    rotY = 0;
+    if (bp && sc.frame.body?.sunward) {
+      // Turn the frame about the vertical so that +x points at the star: then sunDir in the frame is +x.
+      rotY = Math.atan2(-toSun.z, toSun.x);
+      sunDir.set(1, 0, 0);
+    } else sunDir.copy(toSun).normalize();
+    root.position.copy(origin);
+    root.rotation.y = rotY;
+  }
   const qB = new THREE.Quaternion(), qT = new THREE.Quaternion();
   let ended = false, overlay: HTMLDivElement | null = null;
   const debug = new URLSearchParams(location.search).has('debug');
@@ -330,12 +354,8 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
     start(s) {
       P.stop();
       sc = s; P.scenario = s;
-      const og = s.frame.origin, r = og.au * 1000;
-      origin = new THREE.Vector3(Math.cos(og.angle) * r, og.lift ?? 0, Math.sin(og.angle) * r);
-      const sun = o.sunPos();
-      sunDir = (sun ? _a.copy(sun).sub(origin) : _a.set(0, 0, 1)).normalize().clone();
       root = new THREE.Group();
-      root.position.copy(origin);
+      place();
       root.scale.setScalar(SOL_UNIT);
       actors = new Map();
       for (const d of s.actors) {
@@ -425,6 +445,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
       if (!P.active || !sc || !root) return false;
       cam = camera;
       if (!baseFov) baseFov = camera.fov;
+      if (sc.frame.body) place();
       if (!P.paused && !loading) P.time += dt * P.speed;
       const dur = sc.time.duration;
       if (P.time >= dur) {
@@ -442,6 +463,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
         ac.track.at(t, ac.st);
         ac.g.position.copy(ac.st.p);
         ac.g.quaternion.copy(ac.st.q);
+        if (d.grow) ac.g.scale.setScalar(d.grow.from + (1 - d.grow.from) * smooth(clamp01((t - d.grow.t0) / (d.grow.t1 - d.grow.t0))));
         for (const pl of ac.plumes) pl.update(show ? ac.st.thrust : 0, t, jumped || P.paused);
       }
       const t0 = performance.now();
@@ -461,8 +483,8 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
 
     info() {
       const ac: Record<string, unknown> = {};
-      for (const a of actors.values()) ac[a.def.id] = { conf: a.def.confidence, standin: !!a.def.standin, invented: !!a.def.invented, visible: a.g.visible, p: a.st.p.toArray().map(Math.round), thrust: a.st.thrust };
-      return { id: sc?.id, t: P.time, prewarmMs, hearing, sfxFired, duration: sc?.time.duration, paused: P.paused, shot: shotIx, caption: capIx, actors: ac, fxMs, fx: fx?.stats(), camera: cam ? cam.position.toArray() : null };
+      for (const a of actors.values()) ac[a.def.id] = { conf: a.def.confidence, standin: !!a.def.standin, invented: !!a.def.invented, visible: a.g.visible, p: a.st.p.toArray().map(Math.round), q: a.st.q.toArray().map((x) => +x.toFixed(3)), scale: a.g.scale.x, thrust: a.st.thrust, off: cam ? +(_c.copy(a.g.getWorldPosition(_tp)).sub(cam.position).normalize().angleTo(_r.set(0, 0, -1).applyQuaternion(cam.quaternion)) * 57.3).toFixed(1) : null };
+      return { id: sc?.id, t: P.time, prewarmMs, hearing, sfxFired, shotDist: Math.round(shotDist), duration: sc?.time.duration, paused: P.paused, shot: shotIx, caption: capIx, actors: ac, fxMs, fx: fx?.stats(), camera: cam ? cam.position.toArray() : null };
     },
   };
   let cam: THREE.PerspectiveCamera | null = null;
@@ -477,7 +499,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
     return lines.join('\n');
   }
 
-  let sfxFired = 0;
+  let sfxFired = 0, shotDist = 0;
   /** Which of the film's sounds the camera can hear, and the score's fades. Only played forward in real time: a seek or a pause is silent. */
   function sound(t: number, jumped: boolean) {
     if (!sc) return;
@@ -512,7 +534,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
   }
 
   /** Metres in the frame to scene units. */
-  const toWorld = (m: V3, out: V3) => out.copy(m).multiplyScalar(SOL_UNIT).add(origin);
+  const toWorld = (m: V3, out: V3) => out.copy(m).applyAxisAngle(UP, rotY).multiplyScalar(SOL_UNIT).add(origin);
 
   function director(t: number, dt: number, camera: THREE.PerspectiveCamera, jumped: boolean) {
     if (!sc) return;
@@ -549,6 +571,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
     }
     // Slow push in and out of the lens, as the tour does.
     const fov = (s.fov ?? 40) * (1.03 - 0.06 * k);
+    shotDist = pos.distanceTo(subj);
     toWorld(pos, camera.position);
     _tp.copy(look);
     toWorld(_tp, _tp);
