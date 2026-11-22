@@ -125,3 +125,9 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Sound, on speakers: inside the Donnager (28-42 s) PDC rattle, impact and railgun thump; inside the Tachi (132-150 s) drive roar and her cannons; wide exterior shots silent apart from the score, which fades at the scuttling. Too loud, too boomy, too clicky?
 - [ ] Any hitch at the start (one ~90 ms pause as everything is drawn once) or mid-film. Safari and Firefox, with and without `?logdepth`.
 - [ ] Facts the research could not settle: number of attackers (we show four, invented), whether the Tachi has a railgun, boarding (not shown). Confidence is in `src/scenarios/donnager.ts` and `?debug`.
+
+## Hull names and true sizes (2026-11-22, branch ships-true-size)
+- [ ] Fly close to the Donnager, Canterbury, Agatha King and Tycho (sunlit side): names and badges readable, sitting on the hull, not floating or z-fighting. Rocinante and Tachi (Donnager film) carry names too. Any letter buried or badge on a bad spot?
+- [ ] Tycho is now a 1 km sphere with rings about 1.7 km across; ships at its ports should clear the rings. Looks right beside the Donnager (476 m)? Docking still works?
+- [ ] The Tachi and escorts in the Donnager film are 46 m now (were 57 m): any scene that now looks wrong?
+- [ ] Pitting on hulls: fine specks, not noisy or sparkly in motion?
