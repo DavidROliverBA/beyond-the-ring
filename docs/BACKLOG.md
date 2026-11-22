@@ -53,10 +53,12 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 - [ ] E1.1.b Decide the performance budget: target frame rate and GPU (David's Mac, and a mid laptop) so the bar is realistic
 - [ ] E1.1.c Capture side-by-side comparison frames (game vs reference) from fixed camera positions; keep them in `docs/studies/` and re-shoot after each milestone
 
-### E1.2 [~] note written 2026-11-22 (docs/research/photoreal-and-renderer.md); awaiting David's decision [research] Renderer decision: stay on WebGL, or replatform
+### E1.2 [x] 2026-11-22 DECIDED by David: stay on WebGL (three r187); reversed-Z first; bounded WebGPU stills trial in parallel; no migration, engine or native move now (docs/research/photoreal-and-renderer.md) [research] Renderer decision: stay on WebGL, or replatform
 - [ ] E1.2.a Re-read the WebGPU spike (`docs/WEBGPU-SPIKE.md`, branch `webgpu-spike`) and list which photoreal features it would enable (GTAO, SSGI, compute crowds, path-traced stills) versus what WebGL can do with libraries
 - [ ] E1.2.b [research] Survey of alternatives to a browser three.js build: Unreal/Unity WebGL export, Godot web, Babylon.js, a native app (Tauri or Swift/Metal) with the web build as the light version. Record cost, licence, loss of the browser reach, and what of the codebase survives
-- [ ] E1.2.c [research] Reversed-Z on WebGL (shelved 2026-11-21): reopen only if E1.2.a shows it blocks a photoreal feature
+- [x] E1.2.c Reversed-Z on WebGL: done 2026-11-22 (branch reversed-z, see log). Falls back to the old log depth where EXT_clip_control is missing; `?logdepth` forces the old scheme
+- [ ] E1.2.e Bounded WebGPU stills trial (3–5 days): a separate page rendering path-traced stills of ships and interiors with the WebGPU path tracer; does not touch the game. Decide after: keep as a photo-mode export or drop
+- [ ] E1.2.f Verify reversed-Z on Safari and Firefox (EXT_clip_control); David to hand-test
 - [ ] E1.2.d Decision note and gate for David: stay, migrate to WebGPU, or move platform. Nothing in E1.3 onwards that is renderer-specific starts before this, except the renderer-neutral content work marked (neutral)
 
 ### E1.3 Planets, moons and small bodies
@@ -113,6 +115,7 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 - [ ] E2.2.c Tests: every fact has a source and a date; no entity without a licence line
 
 ### E2.3 What appears in the game
+- [ ] E2.0 Decisions recorded 2026-11-22 (David, on my recommendation): panel labelled AI-assisted with a Sources list, never 'NASA says'; no ESA images (facts and links only); JAXA facts and links only; date control 'today' only for now; ISRO/CNSA deferred; NASA 3D: rely on media guidelines and note the licence conflict in CREDITS.md
 - [ ] E2.3.a Info panel: open from the aim card or a key (`I`), shows the name, a one-sentence summary, key numbers (size, mass, orbit, day, temperature, discoveries), a short "what we know", "what we do not know", missions that visited, and links
 - [ ] E2.3.b A "Real" or "Fiction" badge on every object so it is never unclear
 - [ ] E2.3.c For fiction objects, a "based on" link to the real equivalent (Tycho station to O'Neill cylinders, Ceres concourse to real Ceres data)
@@ -232,5 +235,6 @@ Things that may need research and a big change. None starts without a decision g
 
 Newest first. One line per piece of work finished, so a new session can see the history without reading git.
 
+- 2026-11-22 Reversed-Z on the WebGL renderer (replaces log depth): same pictures, Tycho dock about 1.55x faster in headless Retina (63 to 41 ms). Fallback and `?logdepth` kept.
 - 2026-11-22 Research notes written for E1.1, E1.2, E2.1, E3.1 (three agents). Decisions pending.
 - 2026-11-22 Backlog created. Cinematic tours (letterbox, film look, momentum camera, gate dive, score) shipped earlier the same day.

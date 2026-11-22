@@ -39,13 +39,21 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 // ---------------------------------------------------------------- renderer
 
 // Ships here are metres across in a world measured in thousandths of an AU, so the stock
-// logarithmic depth (which works on 1 + distance) cannot separate them. Scale the distance
-// first, and give every camera a far plane scaled to match.
-const LOGK = 1e9;
-THREE.ShaderChunk.logdepthbuf_vertex = THREE.ShaderChunk.logdepthbuf_vertex.replace('1.0 + gl_Position.w', `1.0 + gl_Position.w * ${LOGK.toExponential(1)}`);
+// logarithmic depth (which works on 1 + distance) cannot separate them. The way through is
+// reversed-Z: a 32-bit float depth buffer with the far plane at zero, which orders everything from
+// a bolt to a sun (the WebGPU spike showed zero wrong pixels, and it is much faster than writing
+// depth in every shader). It needs the EXT_clip_control extension; a browser without it falls back
+// to the old scheme, which scales the distance first and gives every camera a far plane to match.
+// `?logdepth` in the address forces the old scheme, for comparing.
+const REVERSED = (() => {
+  if (new URLSearchParams(location.search).has('logdepth')) return false;
+  try { return !!document.createElement('canvas').getContext('webgl2')?.getExtension('EXT_clip_control'); } catch { return false; }
+})();
+const LOGK = REVERSED ? 1 : 1e9;
+if (!REVERSED) THREE.ShaderChunk.logdepthbuf_vertex = THREE.ShaderChunk.logdepthbuf_vertex.replace('1.0 + gl_Position.w', `1.0 + gl_Position.w * ${LOGK.toExponential(1)}`);
 
 const canvas = $('view') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: !REVERSED, reversedDepthBuffer: REVERSED });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000003);
@@ -59,7 +67,7 @@ const PROBE_FAR = 400 * LOGK;
 renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
-const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4, depthTexture: REVERSED ? new THREE.DepthTexture(1, 1, THREE.FloatType) : null }));
 const renderPass = new RenderPass(scene, camera);
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.32, 0.4, 1.0);
 // Render, bloom, then the lens: sun rays and ghosts from the bloom's bright image, tone mapping, film finish.
@@ -2173,7 +2181,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
-if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ ship, space, faceShip, dust, sky, auto, escort, camera }) });
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ reversed: REVERSED, rev: renderer.capabilities.reversedDepthBuffer, ship, space, faceShip, dust, sky, auto, escort, camera }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });
