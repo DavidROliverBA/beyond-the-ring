@@ -149,18 +149,18 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E3.2 [build] Scenario engine (the technical core)
 This is the piece that makes a battle different from a camera tour: many moving actors on scripted or simulated paths, events, and a director.
-- [ ] E3.2.a Scenario file format (JSON or TypeScript): actors (ships with class, faction, position), keyed paths or brachistochrone legs, events (fire, hit, explode, dock, hail), timeline, and camera shots. One file per sequence in `src/scenarios/`
-- [ ] E3.2.b Actor playback: ships follow authored paths with correct flip-and-burn orientation, using the existing traffic and flight code; deterministic, seekable, pausable, with a scrubber for development
-- [ ] E3.2.c Weapons and effects: point-defence cannon (PDC) tracers and bursts, torpedoes and railgun slugs with trails, impacts, hull breach, explosions, debris, decompression venting, drive flares, EM and laser glints
+- [~] (branch scenario-engine, agent) E3.2.a Scenario file format (JSON or TypeScript): actors (ships with class, faction, position), keyed paths or brachistochrone legs, events (fire, hit, explode, dock, hail), timeline, and camera shots. One file per sequence in `src/scenarios/`
+- [~] (branch scenario-engine, agent) E3.2.b Actor playback: ships follow authored paths with correct flip-and-burn orientation, using the existing traffic and flight code; deterministic, seekable, pausable, with a scrubber for development
+- [~] (branch scenario-engine, agent; partial: drive flare, missile trail, nuke flash, debris) E3.2.c Weapons and effects: point-defence cannon (PDC) tracers and bursts, torpedoes and railgun slugs with trails, impacts, hull breach, explosions, debris, decompression venting, drive flares, EM and laser glints
 - [ ] E3.2.d Damage model for show only: hull sections lost, fires, venting, tumbling wrecks
 - [ ] E3.2.e Sound for combat: PDC bursts, impacts through the hull (not in space, so for interior and ship cameras), drive roars, silent exterior shots where the book is clear that space is quiet (extend `src/sound.ts`)
-- [ ] E3.2.f Director: shot list per scenario that follows the Roci with the cinematic camera (follow, over the shoulder, long lens from a distance, cockpit, POV from other ships); reuse the tour spring, fov, bars and grade
-- [ ] E3.2.g Tour menu: a new "The Rocinante's voyages" section, separate from place tours, with a spoiler warning and a chapter list
+- [~] (branch scenario-engine, agent) E3.2.f Director: shot list per scenario that follows the Roci with the cinematic camera (follow, over the shoulder, long lens from a distance, cockpit, POV from other ships); reuse the tour spring, fov, bars and grade
+- [~] (branch scenario-engine, agent; partial: menu entry and spoiler card) E3.2.g Tour menu: a new "The Rocinante's voyages" section, separate from place tours, with a spoiler warning and a chapter list
 - [ ] E3.2.h Performance: many actors and effects at once; budget and test on a mid GPU; instanced tracers and particles
 
 ### E3.3 Set pieces, by book (each is a scenario; build in this order of value and feasibility)
 **Book 1, Leviathan Wakes**
-- [ ] E3.3.a The *Canterbury* destroyed and the *Knight* shuttle escape
+- [~] (branch scenario-engine, agent) E3.3.a The *Canterbury* destroyed and the *Knight* shuttle escape
 - [ ] E3.3.b The *Donnager* battle: the Roci's escape from the stealth ships
 - [ ] E3.3.c The Roci's flight from Tycho to Eros; Eros and Phoebe sequences
 - [ ] E3.3.d Venus and the Ring creation event; final approach to Eros's crash
