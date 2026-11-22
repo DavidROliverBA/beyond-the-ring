@@ -111,7 +111,7 @@ export const EROS: Scenario = {
     { t: T2 + 2, dur: 14, title: 'True speed', text: `The last 4 km are drawn at the real 0.3 g and take their real time, about ${Math.round(APPROACH.time)} seconds.` },
     { t: T2 + 20, dur: 18, title: 'The station', text: 'In the story the asteroid is a hollowed-out station with a spaceport. Everything lit on its skin is our invention; no source says what it looked like.' },
     { t: T_END + 1, dur: 11, title: 'Docked', text: 'The Rocinante is at the dock. What happens inside the station is not shown here.' },
-    { t: T_END + 13, dur: 12, title: 'A quiet rock', text: 'From here the story turns very dark.' },
+    { t: T_END + 13, dur: 12, title: 'A quiet rock', text: 'A hollowed-out rock, and a long way from anyone.' },
   ],
   chapters: [
     { t: 0, title: 'The Rocinante sets out' },
