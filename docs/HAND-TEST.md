@@ -93,3 +93,10 @@ Every station now has grime, clutter, railings and signs that tell you where thi
 - [ ] Fly close to a ship and a planet, and tour the Sol voyages: no flicker, no parts of hulls missing or drawn through each other, no planets drawn in front of nearer ships.
 - [ ] Dock at Tycho and walk: smoother than before on your Mac.
 - [ ] Try Safari and Firefox. If the picture breaks, add `?logdepth` to the address to compare, and tell me which browser.
+
+## Facts panel for Earth and Luna (2026-11-22, branch real-facts)
+- [ ] Aim at Earth (or Luna): the aim card shows a green REAL tag and "I — facts and sources". Press I: the camera glides in as before and a panel opens on the right with the numbers, what we know, what we do not, the missions and links. I again (or the x) closes both.
+- [ ] Esc frees the mouse; click a link in the panel (it opens NASA's page in a new tab). Do the numbers match the sheet it links to?
+- [ ] The panel says "AI-assisted summary, sources below" and nothing reads as "NASA says". Is the wording right to you, and does anything look wrong or too sure?
+- [ ] Aim at Tycho, a ship, a gate: the aim card shows a purple FICTION tag. Mars and the other bodies show no tag yet. With H open the panel shrinks above the key list; on a phone it sits at the bottom.
+
