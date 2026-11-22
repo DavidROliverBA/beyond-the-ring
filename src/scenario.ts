@@ -132,7 +132,8 @@ export interface Scenario {
   events: EventDef[];
   shots: ScnShot[];
   captions: Caption[];
-  chapters?: string[];
+  /** Where the viewer can jump to: a start time and a short name (our words), the first at 0. */
+  chapters?: { t: number; title: string }[];
   /** Choices made where the sources disagree. */
   notes?: string[];
 }

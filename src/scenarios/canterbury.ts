@@ -74,7 +74,15 @@ export const CANTERBURY: Scenario = {
     { t: 142, dur: 10, title: 'Gone', text: 'The Canterbury is vaporised. Space carries no sound, so there is none here.' },
     { t: 160, dur: 11, title: 'The Knight', text: 'The shuttle burns away from the wreckage. Who did this will be the question from now on.' },
   ],
-  chapters: ['The Canterbury and the Knight'],
+  chapters: [
+    { t: 0, title: 'An ice hauler on the way' },
+    { t: 26, title: 'Flip and burn' },
+    { t: 64, title: 'The Knight crosses over' },
+    { t: 90, title: 'The empty Scopuli' },
+    { t: 127, title: 'A shadow behind them' },
+    { t: 140, title: 'The Canterbury is gone' },
+    { t: 154, title: 'The shuttle burns away' },
+  ],
   notes: [
     'Order of events: B (Wikipedia, aggregator, study guide agree). Positions, weapons, timings, accelerations: invented.',
     'The Anubis is shown with two torpedoes and no breaching pods; the research note gives armament only at grade C.',

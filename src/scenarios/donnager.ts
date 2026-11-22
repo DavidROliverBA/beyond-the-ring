@@ -175,7 +175,17 @@ export const DONNAGER: Scenario = {
     { t: 140, dur: 9, title: 'Scuttled', text: 'Her captain chooses to destroy her. The nearest attackers go with her. Space carries no sound, so there is none.' },
     { t: 160, dur: 12, title: 'Away', text: 'The Tachi runs. She will not keep that name for long.' },
   ],
-  chapters: ['The Donnager and the Tachi'],
+  chapters: [
+    { t: 0, title: 'The battleship and her escorts' },
+    { t: 24, title: 'The first salvo' },
+    { t: 40, title: 'The railgun answers' },
+    { t: 51, title: 'The escorts fall' },
+    { t: 62, title: 'Closing in' },
+    { t: 96, title: 'Alone' },
+    { t: 120, title: 'The Tachi slips out' },
+    { t: 140, title: 'Scuttled' },
+    { t: 158, title: 'Away' },
+  ],
   notes: [
     'Attackers shown: four (invented). The note\'s two readings: six ships and 24 missiles (F, grade C) against "never a fleet" (reviewer, grade B). We take the smaller number.',
     'No boarding fight, no breaching pods, no interior scenes: the boarding is show-only (unsettled) and the film stays outside the hull.',
