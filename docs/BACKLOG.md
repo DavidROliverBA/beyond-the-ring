@@ -151,9 +151,9 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 This is the piece that makes a battle different from a camera tour: many moving actors on scripted or simulated paths, events, and a director.
 - [x] 2026-11-22 b507285 (branch scenario-engine, not merged; TypeScript, `src/scenario.ts` types + `src/scenarios/canterbury.ts`; leg types hold/burn/coast/accel only, keyed/follow/tumble still to do) E3.2.a Scenario file format (JSON or TypeScript): actors (ships with class, faction, position), keyed paths or brachistochrone legs, events (fire, hit, explode, dock, hail), timeline, and camera shots. One file per sequence in `src/scenarios/`
 - [x] 2026-11-22 b507285 (branch scenario-engine; deterministic, pause and seek, `?debug` `window.__scn` scrubber hook; no on-screen scrubber UI yet; own closed-form legs, not `traffic.ts`) E3.2.b Actor playback: ships follow authored paths with correct flip-and-burn orientation, using the existing traffic and flight code; deterministic, seekable, pausable, with a scrubber for development
-- [~] 2026-11-22 b507285 (branch scenario-engine; done: drive flare, torpedo trail, nuclear flash and shell with light, debris; still to do: PDC tracers, railgun, impacts, breach, venting, glints) E3.2.c Weapons and effects: point-defence cannon (PDC) tracers and bursts, torpedoes and railgun slugs with trails, impacts, hull breach, explosions, debris, decompression venting, drive flares, EM and laser glints
-- [ ] E3.2.d Damage model for show only: hull sections lost, fires, venting, tumbling wrecks
-- [ ] E3.2.e Sound for combat: PDC bursts, impacts through the hull (not in space, so for interior and ship cameras), drive roars, silent exterior shots where the book is clear that space is quiet (extend `src/sound.ts`)
+- [~] 2026-11-22 b507285 (branch scenario-engine; done: drive flare, torpedo trail, nuclear flash and shell with light, debris; still to do: PDC tracers, railgun, impacts, breach, venting, glints) [~] (branch combat-donnager, agent) E3.2.c Weapons and effects: point-defence cannon (PDC) tracers and bursts, torpedoes and railgun slugs with trails, impacts, hull breach, explosions, debris, decompression venting, drive flares, EM and laser glints
+- [~] (branch combat-donnager, agent) E3.2.d Damage model for show only: hull sections lost, fires, venting, tumbling wrecks
+- [~] (branch combat-donnager, agent) E3.2.e Sound for combat: PDC bursts, impacts through the hull (not in space, so for interior and ship cameras), drive roars, silent exterior shots where the book is clear that space is quiet (extend `src/sound.ts`)
 - [~] 2026-11-22 b507285 (branch scenario-engine; orbit, static long lens, pov and chase shots with cuts, lower thirds, bars and grade reused; no spring reuse beyond a simple damped turn; no cockpit interiors) E3.2.f Director: shot list per scenario that follows the Roci with the cinematic camera (follow, over the shoulder, long lens from a distance, cockpit, POV from other ships); reuse the tour spring, fov, bars and grade
 - [~] 2026-11-22 b507285 (branch scenario-engine; done: menu entry and spoiler card; still to do: chapter list, hide-later-books toggle) E3.2.g Tour menu: a new "The Rocinante's voyages" section, separate from place tours, with a spoiler warning and a chapter list
 - [ ] E3.2.h Performance: many actors and effects at once; budget and test on a mid GPU; instanced tracers and particles
@@ -161,7 +161,7 @@ This is the piece that makes a battle different from a camera tour: many moving 
 ### E3.3 Set pieces, by book (each is a scenario; build in this order of value and feasibility)
 **Book 1, Leviathan Wakes**
 - [x] 2026-11-22 b507285 (branch scenario-engine, not merged; 190 s; timings, ranges, accelerations invented; Scopuli not destroyed; needs a hand-test, see HAND-TEST.md) E3.3.a The *Canterbury* destroyed and the *Knight* shuttle escape
-- [ ] E3.3.b The *Donnager* battle: the Roci's escape from the stealth ships
+- [~] (branch combat-donnager, agent) E3.3.b The *Donnager* battle: the Roci's escape from the stealth ships
 - [ ] E3.3.c The Roci's flight from Tycho to Eros; Eros and Phoebe sequences
 - [ ] E3.3.d Venus and the Ring creation event; final approach to Eros's crash
 
