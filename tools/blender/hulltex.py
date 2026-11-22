@@ -1,7 +1,7 @@
 """Paints the textures every ship shares, from nothing but arithmetic (no downloads):
 
   assets/pbr/hull_color.jpg   paint wear: panel tones, dirt in the seams, drips, chipped edges
-  assets/pbr/hull_normal.jpg  relief: seams, access hatches, vents, fasteners
+  assets/pbr/hull_normal.jpg  relief: seams, access hatches, vents, fasteners, micrometeorite pits
   assets/pbr/hull_rough.jpg   sheen: scuffs, dull dirt, polished fasteners
   assets/pbr/windows.jpg      a sheet of 32 small lit rooms seen through a window
 
@@ -153,6 +153,18 @@ def hull():
                 else:
                     rect(H, x0 + p, y0 + 10, x0 + p + 5, y1 - 10, lift + 0.4)
 
+    # Micrometeorite pitting: a scatter of tiny craters, each a sunk bowl with a raised lip and a speck of
+    # bare metal at the bottom. Its own random stream, so the panels above come out exactly as before.
+    prng = np.random.default_rng(77)
+    pitted = np.zeros((N, N), np.float32)
+    for i in range(420):
+        cx, cy = int(prng.integers(0, N)), int(prng.integers(0, N))
+        r = int(prng.choice((2, 2, 3, 3, 4, 6)))
+        dot(H, cx, cy, r + 2, 0.18), dot(H, cx, cy, r, -0.55)   # lip, then bowl
+        dot(shiny, cx, cy, max(1, r - 1), 1)
+        dot(pitted, cx, cy, r, 1)
+    pitted = blur(pitted, 1)
+
     H = H - seam * 0.9 - dark * 1.2
     Hs = blur(H, 1)
     # Slight buckling of the plates, and a fine grain.
@@ -188,6 +200,7 @@ def hull():
     paint = paint * (1 - seam * 0.5) * (1 - dark * 0.75)
     paint = paint * (1 - chips) + chips * 1.0
     paint = paint * (1 - shiny * 0.25) + shiny * 0.25
+    paint = paint * (1 - pitted * 0.18)  # the bowls are a little darker round the bright core
     warm = dirt * 0.5 + near * 0.2  # dirt is brown, not grey
     col = np.stack([paint, paint * (1 - warm * 0.07), paint * (1 - warm * 0.16)], axis=2)
     save('hull_color.jpg', srgb(col), quality=84)

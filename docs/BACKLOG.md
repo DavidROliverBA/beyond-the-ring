@@ -38,7 +38,7 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 - [x] Tours: shot types, continuous camera, film grade, letterbox and lower thirds, gate dive, score and whooshes (2026-11-22)
 - [x] Traffic with sidestep and keep-out; Blender procedural ship pipeline with meshopt GLBs
 - [x] Public repo, live on here.now (`silken-marvel-d95y`)
-- Unbuilt and still open from earlier work: depth of field, motion blur, adaptive exposure; hull names and insignia decals; interface gap-analysis fixes (hint overlap, stale start-screen controls, banner and label collision, clipped destination list, settings panel); far ring-space gates are still a plain hoop; hauler, battleship and tycho GLBs not rebuilt at true size.
+- Unbuilt and still open from earlier work: depth of field, motion blur, adaptive exposure; interface gap-analysis fixes (hint overlap, stale start-screen controls, banner and label collision, clipped destination list, settings panel); far ring-space gates are still a plain hoop.
 
 ---
 
@@ -72,9 +72,9 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E1.4 Ships and stations
 - [ ] E1.4.a [research] Reference gathering for each hero vessel: Rocinante, Donnager, Canterbury, Agatha King, Tycho, Medina, Behemoth, Nauvoo, Pella, Razorback, Mormon ships, MCRN and UNN classes. Note what the books give (lengths, drive, look) as the authority; the show's design where the books are silent, credited as fan homage
-- [ ] E1.4.b [rework] Hull material pass: panel lines, weathering, scorch, micrometeorite pitting, real-metal roughness, emissive windows; the existing hero-ship pass (branch `hero-ships`) is the starting point
-- [ ] E1.4.c [rework] Rebuild hauler, battleship and tycho GLBs at true size with the same pass (outstanding)
-- [ ] E1.4.d Hull names, insignia and registry decals (outstanding)
+- [x] E1.4.b 2026-11-22 (branch ships-true-size, a6bdcf1, not merged) [rework] Hull material pass: panel lines, weathering, scorch, micrometeorite pitting, real-metal roughness, emissive windows; the existing hero-ship pass (branch `hero-ships`) is the starting point
+- [x] E1.4.c 2026-11-22 (branch ships-true-size, a6bdcf1 + e0a25f0, not merged) [rework] Rebuild hauler, battleship and tycho GLBs at true size with the same pass. Tycho's sphere was 360 m, now 1 km; Tachi/escort corvettes were 57 m, now 46 m
+- [x] E1.4.d 2026-11-22 (branch ships-true-size, e0a25f0, not merged) Hull names, insignia and registry decals (src/decals.ts; own designs, invented registry numbers). Open: other ships and traffic carry none
 - [ ] E1.4.e Station exteriors: spin structures, docking arms, solar and radiator arrays, real-world detail density
 - [ ] E1.4.f Real spacecraft in Sol: use real models for the ISS, Tiangong, JWST, Hubble, Voyager, Cassini, Parker, Perseverance etc. (see E2)
 - [ ] E1.4.g Engine and reaction-control effects, exhaust and plume; extend the existing plume shader
@@ -233,6 +233,7 @@ Things that may need research and a big change. None starts without a decision g
 
 ## Log
 - 2026-11-22 Data and maths on branch `data-and-maths` (not merged; 816ca05, e7367df, 744e6c4, ba098e7): `src/transit.ts` honest flip-and-burn timing (E3.1.d) reproduced the canon table and now drives the scenario burn leg; 11 more small moons and 18 more missions in the facts (71 entities); Galileo, Cassini, Magellan, Rosetta, Hayabusa2, Giotto, Ulysses are not in the NSSDCA Master Catalog under any form tried; 'Data and sources' on the start screen and panels (E2.5.b); person-review CLI `tools/review-facts.ts` (E2.5.c), nothing approved.
+- 2026-11-22 E1.4.b/c/d on branch `ships-true-size` (a6bdcf1, e0a25f0, not merged): micrometeorite pits in the hull textures; hauler, battleship and Tycho rebuilt (airlocks, ladders, thruster quads; Tycho sphere now 1 km, rings and yard grow with it, `reach` keeps traffic clear); corvette scaled by true length (Tachi 57 m to 46 m); decals on Rocinante, Tachi, Donnager, Canterbury, Agatha King, Thomas Prince, Tycho. GLBs +90, +83, +33 KB. Headless sheets only; needs a hand-test.
 
 Newest first. One line per piece of work finished, so a new session can see the history without reading git.
 

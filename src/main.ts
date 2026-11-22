@@ -11,7 +11,7 @@ import {
 } from './data';
 import * as info from './infopanel';
 import { Noise, mapKinds, paintBody, paintRing, rng, type Maps } from './textures';
-import { buildModel, glowSprite, glowTex, loadModels, playerShip, ringModel, ROCI_UNIT, tickShipLights, type ShipModel } from './ships';
+import { buildModel, modelLength, glowSprite, glowTex, loadModels, playerShip, ringModel, ROCI_UNIT, tickShipLights, type ShipModel } from './ships';
 import { buildInterior, type Interior, type Point } from './interior';
 import { BAKING, canBounce, savedProbes } from './probes';
 import { loadPeople } from './skinned';
@@ -568,8 +568,8 @@ async function showPhoto(l: Lod, sharp: boolean) {
 async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildCtx) {
   const R = b.radius;
   if (b.model) {
-    const m = b.model in MODELS ? MODELS[b.model as keyof typeof MODELS]() : buildModel(b.model as ShipModel);
-    m.scale.setScalar(b.kind === 'ship' ? R * 2 : R);
+    const m = b.model in MODELS ? MODELS[b.model as keyof typeof MODELS]() : buildModel(b.model as ShipModel, b.id);
+    m.scale.setScalar(b.kind === 'ship' ? R * 2 / modelLength(b.model as ShipModel) : R);
     m.rotation.y = b.yaw ?? 0;
     holder.add(m);
     if (b.spin) ctx.spin.push({ o: m, r: b.spin });
@@ -877,7 +877,7 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
       { ports: [{ pos: gpos.clone().addScaledVector(normal, 0.05), inner: 0.004, outer: 0.15 }], n: 22 },
     ];
   // Stations and parked ships are solid: the traffic keeps out of them and sidesteps them.
-  const solids = spec.bodies.filter((b) => b.kind === 'station' || b.kind === 'ship').flatMap((b) => { const pp = posOf.get(b.id); return pp ? [{ pos: pp, radius: b.radius }] : []; });
+  const solids = spec.bodies.filter((b) => b.kind === 'station' || b.kind === 'ship').flatMap((b) => { const pp = posOf.get(b.id); return pp ? [{ pos: pp, radius: b.radius * (b.reach ?? 1) }] : []; });
   const traffic = makeTraffic(fleets.filter((f) => f.ports.length), spec.id.length * 977 + spec.id.charCodeAt(spec.id.length - 1), undefined, undefined, solids);
   group.add(traffic.group);
   ctx.anim.push((dt) => traffic.tick(dt, ship.pos, escort?.thing.pos));
@@ -2339,7 +2339,7 @@ const FRAMES: number[] | null = new URLSearchParams(location.search).has('debug'
 if (FRAMES) (globalThis as unknown as { __frames: number[] }).__frames = FRAMES;
 // (walker is declared further down; expose it lazily for tests)
 if (FRAMES) (globalThis as unknown as { __look: typeof look }).__look = look;
-if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ reversed: REVERSED, rev: renderer.capabilities.reversedDepthBuffer, ship, space, faceShip, dust, sky, auto, escort, camera }) });
+if (FRAMES) Object.defineProperty(globalThis, '__dbg', { get: () => ({ reversed: REVERSED, rev: renderer.capabilities.reversedDepthBuffer, ship, space, faceShip, dust, sky, auto, escort, camera, setLook: (yaw: number, pitch: number) => { freeLook = true; lookYaw = yaw; lookPitch = pitch; } }) });
 // For tests: put you down somewhere else in the place you are walking, facing `yaw`.
 if (FRAMES) (globalThis as unknown as { __goto: (x: number, z: number, yaw?: number) => void }).__goto = (x, z, yaw) => { walker.x = x; walker.z = z; walker.vx = walker.vz = 0; if (yaw !== undefined) walker.yaw = yaw; };
 if (FRAMES) Object.defineProperty(globalThis, '__walker', { get: () => ({ ...walker, free: walk ? walk.free(walker.x, walker.z) : null, cam: walkCam.position.toArray(), up: new V3(0, 1, 0).applyQuaternion(walkCam.quaternion).toArray(), fwd: new V3(0, 0, -1).applyQuaternion(walkCam.quaternion).toArray() }) });

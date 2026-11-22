@@ -243,6 +243,22 @@ def battleship():
             s.bell(0.03, (sx * 0.062, -0.476, sz * 0.046), name=f'drive_{sx}_{sz}', length=0.036)
     s.mast((0, 0.5, 0), 0.05, axis=(0, 1, 0))
 
+    # True-size detail pass (E1.4.c): things sized for people. At 476 m one model unit is 476 m, so a
+    # 0.004 hatch is a 1.9 m airlock; the ship carries them in pairs along each flank with a ladder to
+    # each, thruster quads at every corner of the hull, and a row of flush maintenance lamps.
+    for sx in (1, -1):
+        for y in (0.31, 0.12, -0.14, -0.33):
+            xw = at(y)[1]
+            s.hatch((sx * xw, y, 0.04), (sx, 0, 0), 0.0045, 0.0062, along=(0, 1, 0), lit=True)
+            s.rungs((sx * xw, y + 0.018, 0.034), (sx * xw, y + 0.018, 0.052), (sx, 0, 0), n=4, w=0.0035, r=0.0004)
+        for y in (0.44, -0.40):
+            q = at(y)
+            s.rcs((sx * (q[1] - q[3] * 0.5), y, q[2] - q[4] * 0.2), (sx * 0.5, 0, 1), s=0.0035)
+            s.rcs((sx * (q[1] - q[3] * 0.5), y, -(q[2] - q[4] * 0.2)), (sx * 0.5, 0, -1), s=0.0035)
+        for y in (0.4, 0.18, -0.05, -0.28, -0.42):
+            q = at(y)
+            s.lamp((sx * (q[1] + 0.0005), y, -0.03), 'window', 0.0012)
+
     # A warship this size is a town: fittings all over the hull (clear of the window rows and the gun
     # turrets), plant on the deck roofs, a radiator bank and sensor towers aft of the bridge.
     s.greeble(hp, 0.12, keep=lambda c, n: not (abs(n.x) > 0.7 and abs(c.z) < 0.03) and not (abs(n.z) > 0.7 and abs(c.x) < 0.035 and c.y > 0.0))
@@ -314,6 +330,18 @@ def hauler():
             s.ball(0.03, (sx * 0.058, -0.37, sz * 0.085), 'pale', u=14, v=8)
             s.bell(0.02, (sx * 0.05, -0.43, sz * 0.05), glow='window', name=f'drive_small_{sx}_{sz}')
         s.windows((sx * 0.0845, -0.33, 0.01), (sx * 0.0845, -0.39, 0.01), 8, (sx, 0, 0), s=0.003)
+    # True-size detail pass (E1.4.c): at 500 m a model unit is 500 m. Airlocks and ladders on the command
+    # module and engineering, thruster quads at both ends, and a ladder along the spine between cradles.
+    for sx in (1, -1):
+        s.hatch((sx * 0.0612, 0.385, -0.01), (sx, 0, 0), 0.0045, 0.006, along=(0, 1, 0), lit=True)
+        s.rungs((sx * 0.0612, 0.405, -0.022), (sx * 0.0612, 0.405, 0.0), (sx, 0, 0), n=3, w=0.0035, r=0.0004)
+        s.hatch((sx * 0.0852, -0.36, -0.015), (sx, 0, 0), 0.0045, 0.006, along=(0, 1, 0))
+        s.rcs((sx * 0.0505, 0.44, 0.03), (sx, 0, 0.6), s=0.0035)
+        s.rcs((sx * 0.0505, 0.44, -0.03), (sx, 0, -0.6), s=0.0035)
+        s.rcs((sx * 0.08, -0.31, 0.03), (sx, 0, 0.6), s=0.0035)
+    for k in range(6):
+        y0 = 0.28 - k * 0.092
+        s.rungs((0.0, y0, 0.021), (0.0, y0 - 0.07, 0.021), (0, 0, 1), n=7, w=0.004, r=0.0004)
     s.cyl(0.06, 0.05, 0.03, (0, -0.44, 0), 'dark', segs=20)
     s.bell(0.085, (0, -0.445, 0), glow='window', name='drive_main', length=0.085)
     return s
@@ -330,7 +358,7 @@ def tycho():
         c = f.calc_center_median()
         if abs(c.z) < 0.02 or 0.2 < c.z < 0.215 or -0.215 < c.z < -0.2:
             f.material_index = kit.NAMES.index('hull2')
-    s.uv_scale = 0.035
+    s.uv_scale = 0.0126  # (the whole station is scaled up 2.78x after the build; see SIZE_K)
     sp = s.plate(sph, merge=0.5, inset=0.0026, depth=0.002, accents=[('hull', 0.22), ('hull2', 0.06)])
     # Plant on the skin: tanks, grilles and housings, thinning out towards the poles.
     s.greeble(sp, 0.09, m=('hull2', 'hull', 'dark'), keep=lambda c, n: 0.03 < abs(c.z) < 0.3 and abs(abs(c.z) - 0.07) > 0.02)
@@ -910,12 +938,14 @@ def pack(path):
         print('not packed (the file still loads, it is just larger):', e)
 
 
+SIZE_K = {'tycho': 1 / 0.36}
+
 # Where to stand for a third, close-up still of each ship.
 CLOSE = {
     'corvette': ((0.42, 0.34, 0.2), (0.1, 0.05, 0.04)),
     'battleship': ((0.3, -0.05, 0.22), (0.05, -0.15, 0.08)),
     'player': ((0.55, 0.75, 0.3), (0.05, 0.25, 0.05)),
-    'tycho': ((0.75, -0.6, 0.3), (0.3, 0.0, 0.05)),
+    'tycho': ((2.0, -1.6, 0.8), (0.8, 0.0, 0.1)),
     'hauler': ((0.3, 0.75, 0.16), (0.0, 0.42, 0.0)),
 }
 
@@ -926,6 +956,12 @@ for name in which:
     reset()
     ship = BUILD[name]()
     objs = ship.finish()
+    if name in SIZE_K:
+        # Build in the old coordinates, then scale: Tycho's sphere is 0.36 across its radius here and must be
+        # 1.0 (the station's `radius` in src/data.ts, 500 m), so everything grows by 1/0.36.
+        for o in objs:
+            o.data.transform(Matrix.Scale(SIZE_K[name], 4))
+        ship.scorches[:] = [(Vector(l) * SIZE_K[name], r * SIZE_K[name], k) for (l, r, k) in ship.scorches]
     ys = [v.co.y for o in objs for v in o.data.vertices]
     print(name, 'y range %.3f to %.3f' % (min(ys), max(ys)), 'width %.3f' % (2 * max(abs(v.co.x) for o in objs for v in o.data.vertices)))
     print(name, 'tris ~', sum(len(p.vertices) - 2 for o in objs for p in o.data.polygons))
@@ -936,7 +972,7 @@ for name in which:
     if '--nopack' not in argv:
         pack(os.path.join(ROOT, 'assets', 'models', name + '.glb'))
     if prev:
-        far = ((1.6, -1.5, 0.9), (-1.5, 1.7, -0.6)) if name in ('tycho', 'player') else ((1.25, -1.15, 0.7), (-1.1, 1.3, -0.45))
+        far = ((4.4, -4.2, 2.4), (-4.2, 4.7, -1.6)) if name in ('tycho', 'player') else ((1.25, -1.15, 0.7), (-1.1, 1.3, -0.45))
         if '--std' in argv:  # front three-quarter, side, rear three-quarter
             far = ((1.0, 1.35, 0.55), (1.9, 0.0, 0.15), (1.0, -1.35, 0.55))
         extra = ()

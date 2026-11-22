@@ -142,3 +142,8 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Mars now lists 17 missions and the Moon 9; is the folded "Missions that visited" list too long on a phone?
 - [ ] Person review: `bun tools/review-facts.ts` lists the 71 unchecked entities; `--show mars` prints one with its sources. If you want to try an approval, use a scratch copy (`--file` and `--reviews` point at other files), because a real approval is recorded in tools/facts-reviews.json. The panel then says "Checked by a person: name, date, note".
 - [ ] Honest transit times (src/transit.ts) are tested but not shown anywhere yet; the Canterbury burn should look exactly as before (it is bit-identical in the numbers; seeking at 0, 20, 40, 60 s gives the same positions).
+## Hull names and true sizes (2026-11-22, branch ships-true-size)
+- [ ] Fly close to the Donnager, Canterbury, Agatha King and Tycho (sunlit side): names and badges readable, sitting on the hull, not floating or z-fighting. Rocinante and Tachi (Donnager film) carry names too. Any letter buried or badge on a bad spot?
+- [ ] Tycho is now a 1 km sphere with rings about 1.7 km across; ships at its ports should clear the rings. Looks right beside the Donnager (476 m)? Docking still works?
+- [ ] The Tachi and escorts in the Donnager film are 46 m now (were 57 m): any scene that now looks wrong?
+- [ ] Pitting on hulls: fine specks, not noisy or sparkly in motion?

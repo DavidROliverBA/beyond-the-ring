@@ -15,6 +15,8 @@ What this project does and does not use:
 - The descriptive text in the game is newly written for this project.
 - The ship and station models are new, built by script (see `tools/blender`). They are impressions made from memory, not copies of the production designs. The Rocinante model was reshaped by eye from publicly shared promotional stills and fan-wiki images of the ship as a visual reference only; no image, texture, logo or marking from the show is used, and the hand-built mesh is original to this project. The Ceres concourse (a street under a vaulted ceiling with terraced housing) was likewise laid out with a publicly shared still as a visual reference for proportion and mood only; its geometry, textures, signs and brand names are all original to this project. The wear and clutter in the interiors (stains, markings, signs, railings, stalls and lights) are likewise drawn and built by script here (`src/wear.ts`, `src/dressing.ts`); nothing in them comes from elsewhere.
 
+- Hull names, registry marks and badges (`src/decals.ts`) are drawn by script: lettering in a system sans face, and badges (a red disc with chevron, a blue disc with three stars, a water drop in a ring, a lance and shield, a sphere with rings) designed for this project. The registry numbers are invented. No insignia, lettering style or number from the series is used.
+
 If you are a rights holder and would like something changed or removed, please open an issue on this repository and it will be dealt with promptly.
 
 ## Planet and moon maps (`assets/tex`)

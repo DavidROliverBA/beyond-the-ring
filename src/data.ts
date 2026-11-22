@@ -24,6 +24,8 @@ export interface RingSpec {
 }
 
 export interface BodySpec {
+  /** How far the thing reaches beyond `radius` (for a station whose rings or yard stand out from its core): ships keep this far clear. */
+  reach?: number;
   id: string;
   name: string;
   kind: Kind;
@@ -183,7 +185,7 @@ export const SOL: SystemSpec = {
     },
     {
       id: 'tycho', name: 'Tycho Station', kind: 'station', sub: 'Mobile construction yard · the Belt', radius: 3.34e-6,
-      orbit: 2.95 * AU, angle: 0.25, lift: 30, model: 'tycho', spin: 0, range: 8000, dock: 'tycho',
+      orbit: 2.95 * AU, angle: 0.25, lift: 30, model: 'tycho', spin: 0, range: 8000, dock: 'tycho', reach: 1.85,
       desc: 'A shipyard that can move itself: a sphere a kilometre across, two counter-rotating habitat rings and a yard on top. Its engineers spun up Ceres and built the largest ship ever attempted.',
     },
     ship('molinari', 'Guy Molinari', 'freighter', 'Belter freighter · OPA',
