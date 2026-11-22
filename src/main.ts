@@ -2425,6 +2425,7 @@ async function boot() {
 }
 
 $('launch').addEventListener('click', () => {
+  info.close();
   sound.start();
   stopTour();
   started = true;

@@ -15,6 +15,7 @@ import {
   type FactSpec, type MissionSpec,
 } from './facts-curated';
 import { BODY_TEXT, FICTION_TEXT } from './facts-text';
+import { applyReviews, readReviews } from './review-lib';
 import { validateFacts, type Entity, type Fact, type FactsFile, type Link } from '../src/facts';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -163,6 +164,10 @@ for (const s of SMALL) built.set(s.id, smallEntity(s.id, s.sstr));
 const missing = ORDER.filter((id) => !built.has(id)), extra = [...built.keys()].filter((id) => !ORDER.includes(id));
 if (missing.length || extra.length) { console.error(`order mismatch: missing ${missing}, extra ${extra}`); process.exit(1); }
 const entities = [...ORDER.map((id) => built.get(id)!), ...FICTION_TEXT.map(fictionEntity)];
+// Person reviews (E2.5.c) recorded by tools/review-facts.ts are applied only while what was checked is unchanged.
+const reviewed = applyReviews(entities, readReviews(`${ROOT}tools/facts-reviews.json`));
+for (const id of reviewed.stale) console.warn(`review of '${id}' is out of date (its words or numbers changed), so it is unchecked again; run tools/review-facts.ts --approve ${id} after checking it`);
+for (const id of reviewed.unknown) console.warn(`tools/facts-reviews.json has a review for '${id}', which is not an entity`);
 const file: FactsFile = { version: 1, generated: Object.values(stamps).sort().pop()!, entities };
 
 const errs = validateFacts(file);

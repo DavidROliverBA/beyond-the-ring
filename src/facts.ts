@@ -41,7 +41,11 @@ export interface Entity {
   credit: string;
   textBy: 'ai-assisted'; // the summary and the lists were drafted with AI help and checked against the sources
   humanReviewed: boolean;// E2.5.c: has a person checked this entity?
+  /** Set only with humanReviewed: who checked it, a note, and the day. Written from tools/facts-reviews.json by the build. */
+  review?: Review;
 }
+
+export interface Review { by: string; note: string; date: string }
 
 export interface FactsFile { version: 1; generated: string; entities: Entity[] }
 
@@ -89,6 +93,8 @@ export function validateFacts(file: FactsFile): string[] {
     if (ids.has(e.id)) errs.push(`${w}: duplicate id`);
     ids.add(e.id);
     for (const k of ['name', 'kind', 'summary', 'licence', 'credit'] as const) if (!e[k] || !String(e[k]).trim()) errs.push(`${w}: no ${k}`);
+    if (e.humanReviewed && (!e.review?.by?.trim() || !e.review.note?.trim() || !DATE.test(e.review.date ?? ''))) errs.push(`${w}: marked as checked by a person without a reviewer, a note and a date`);
+    if (!e.humanReviewed && e.review) errs.push(`${w}: has a review record but is not marked as checked`);
     if (e.textBy !== 'ai-assisted') errs.push(`${w}: textBy must be 'ai-assisted'`);
     if (/\b(according to|NASA says|NASA states|NASA reports)\b/i.test([e.summary, ...e.know, ...e.unknown].join(' '))) errs.push(`${w}: text attributes a statement to the agency`);
     if (!e.real && e.facts.length) errs.push(`${w}: a fiction entity may not carry facts`);
