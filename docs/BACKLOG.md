@@ -51,7 +51,7 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 ### E1.1 [x] 2026-11-22 research note: docs/research/photoreal-and-renderer.md [research] Define "photoreal" and set a measurable bar
 - [ ] E1.1.a Pick 10 reference shots (real NASA photos for planets and moons, film stills for ships) and write them to `docs/research/photoreal-targets.md`
 - [ ] E1.1.b Decide the performance budget: target frame rate and GPU (David's Mac, and a mid laptop) so the bar is realistic
-- [ ] E1.1.c Capture side-by-side comparison frames (game vs reference) from fixed camera positions; keep them in `docs/studies/` and re-shoot after each milestone
+- [~] (branch planet-shading, agent) E1.1.c Capture side-by-side comparison frames (game vs reference) from fixed camera positions; keep them in `docs/studies/` and re-shoot after each milestone
 
 ### E1.2 [x] 2026-11-22 DECIDED by David: stay on WebGL (three r187); reversed-Z first; bounded WebGPU stills trial in parallel; no migration, engine or native move now (docs/research/photoreal-and-renderer.md) [research] Renderer decision: stay on WebGL, or replatform
 - [ ] E1.2.a Re-read the WebGPU spike (`docs/WEBGPU-SPIKE.md`, branch `webgpu-spike`) and list which photoreal features it would enable (GTAO, SSGI, compute crowds, path-traced stills) versus what WebGL can do with libraries
@@ -64,10 +64,10 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 ### E1.3 Planets, moons and small bodies
 - [ ] E1.3.a [research] Best open data for each body: NASA Blue Marble and Black Marble (Earth), LRO and LROC (Moon), MOLA and HiRISE (Mars), MESSENGER (Mercury), Magellan (Venus), Juno, Cassini, New Horizons (Pluto), OSIRIS-REx (Bennu), Hayabusa2, Rosetta (67P), Dawn (Ceres, Vesta). Licence and resolution for each; list in the research note
 - [ ] E1.3.b Displacement and normal maps from elevation data where it exists, so terminators and limbs show real relief (neutral)
-- [ ] E1.3.c Earth: clouds as a separate moving layer, city lights, ocean specular and sun glint, atmosphere scattering that matches photographs at the limb and from orbit
-- [ ] E1.3.d Gas and ice giants: banding, storms and rings with proper shadowing and forward-scatter brightening; Saturn's ring-on-planet shadow
+- [~] (branch planet-shading, agent) E1.3.c Earth: clouds as a separate moving layer, city lights, ocean specular and sun glint, atmosphere scattering that matches photographs at the limb and from orbit
+- [~] (branch planet-shading, agent) E1.3.d Gas and ice giants: banding, storms and rings with proper shadowing and forward-scatter brightening; Saturn's ring-on-planet shadow
 - [ ] E1.3.e Irregular bodies (Eros, Psyche, Ida, Halley, 67P, Bennu): replace spheres with real shape models (NASA 3D Resources, JPL, ESA), with true albedo maps
-- [ ] E1.3.f Sun: limb darkening, corona, granulation texture
+- [~] (branch planet-shading, agent) E1.3.f Sun: limb darkening, corona, granulation texture
 - [ ] E1.3.g Where a texture is limited by resolution (Moon 18 MB, Mars 10 MB already large), add tiled streaming or KTX2 and LOD by distance; budget for download size
 
 ### E1.4 Ships and stations
