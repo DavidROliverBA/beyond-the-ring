@@ -93,3 +93,12 @@ Every station now has grime, clutter, railings and signs that tell you where thi
 - [ ] Fly close to a ship and a planet, and tour the Sol voyages: no flicker, no parts of hulls missing or drawn through each other, no planets drawn in front of nearer ships.
 - [ ] Dock at Tycho and walk: smoother than before on your Mac.
 - [ ] Try Safari and Firefox. If the picture breaks, add `?logdepth` to the address to compare, and tell me which browser.
+
+## The Rocinante's voyages: The Canterbury (2026-11-22, branch scenario-engine, not merged)
+- [ ] Press T, choose "The Rocinante's voyages" (9). A card should warn "Spoilers for Leviathan Wakes" and list The Canterbury. Enter or a click starts it; Esc closes the card.
+- [ ] Watch all 190 seconds: widescreen bars, graded picture, lower-third captions. The hauler flips and brakes, the shuttle crosses and comes back, two torpedoes run in, the hauler is vaporised in a flash and shell, and the shuttle burns away through the debris. Is the pacing right? Is anything too bright, too dark, too slow, or nauseating (flash, sway)? Can you see the stealth ship at all (it is deliberately black; a muzzle flash lights it for a moment)?
+- [ ] Any key hands the ship back where you left it, with the normal HUD returning. Does it? At the end the film hands back by itself with a closing line.
+- [ ] No sound design yet: only the tour score plays. Does the silence at the blast read, or should the score fade out there?
+- [ ] Any hitch at the start (a lamp is added to the scene, which recompiles shaders once) or at the blast (first frame of the flash).
+- [ ] Safari and Firefox: the flash and trails with and without `?logdepth`.
+- [ ] Facts to check against the books (the research could not read them): Canterbury and Knight sizes, whether the Knight is nearly hit by debris, where the Scopuli ends up, how many missiles. Each actor's confidence is in `src/scenarios/canterbury.ts` and shown with `?debug`.
