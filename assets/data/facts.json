@@ -602,6 +602,22 @@
           }
         },
         {
+          "name": "Pioneer Venus Large Probe",
+          "what": "Plunged into the Venus atmosphere in December 1978, measuring the air as it fell.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1978-08-08",
+            "unit": "date",
+            "display": "8 August 1978",
+            "sourceName": "NASA NSSDCA Master Catalog: Pioneer Venus Large Probe",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1978-078D",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
           "name": "Pioneer Venus Orbiter",
           "what": "Orbited Venus from 1978 and mapped its surface by radar, as well as studying the clouds and upper air.",
           "launch": {
@@ -1043,6 +1059,86 @@
           }
         },
         {
+          "name": "Ranger 7",
+          "what": "Sent back the first close-up pictures of the lunar surface in July 1964, in the minutes before it struck the Moon on purpose.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1964-07-28",
+            "unit": "date",
+            "display": "28 July 1964",
+            "sourceName": "NASA NSSDCA Master Catalog: Ranger 7",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1964-041A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Surveyor 1",
+          "what": "The first American soft landing on the Moon, in June 1966, which showed that the surface could carry the weight of a lander.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1966-05-30",
+            "unit": "date",
+            "display": "30 May 1966",
+            "sourceName": "NASA NSSDCA Master Catalog: Surveyor 1",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1966-045A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Lunar Prospector",
+          "what": "Mapped the Moon from a low polar orbit in 1998 and 1999 and found signs of hydrogen near the poles, consistent with water ice.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1998-01-07",
+            "unit": "date",
+            "display": "7 January 1998",
+            "sourceName": "NASA NSSDCA Master Catalog: Lunar Prospector",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1998-001A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "GRAIL",
+          "what": "Two spacecraft flying in step in 2012, measuring the Moon’s gravity field in fine detail to learn about its interior.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2011-09-10",
+            "unit": "date",
+            "display": "10 September 2011",
+            "sourceName": "NASA NSSDCA Master Catalog: GRAIL",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2011-046A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "LADEE",
+          "what": "Orbited the Moon in 2013 and 2014 to sample its thin atmosphere and the dust that rises above the surface.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2013-09-07",
+            "unit": "date",
+            "display": "7 September 2013",
+            "sourceName": "NASA NSSDCA Master Catalog: LADEE",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2013-047A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
           "name": "Lunar Reconnaissance Orbiter",
           "what": "An orbiter launched in 2009 to map the surface, look for resources such as ice, and survey possible landing sites.",
           "launch": {
@@ -1329,6 +1425,182 @@
             "display": "26 November 2011",
             "sourceName": "NASA NSSDCA Master Catalog: Mars Science Laboratory",
             "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2011-070A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Mariner 6",
+          "what": "Flew past Mars in July 1969 and sent back pictures of the surface, and measured the thin atmosphere.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1969-02-25",
+            "unit": "date",
+            "display": "25 February 1969",
+            "sourceName": "NASA NSSDCA Master Catalog: Mariner 6",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-014A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Mariner 7",
+          "what": "Passed Mars a few days after Mariner 6, in August 1969, extending the coverage of the surface and polar caps.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1969-03-27",
+            "unit": "date",
+            "display": "27 March 1969",
+            "sourceName": "NASA NSSDCA Master Catalog: Mariner 7",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1969-030A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Viking 2 Lander",
+          "what": "Landed on Utopia Planitia in September 1976 and worked on the surface for years, taking pictures and testing the soil.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1975-09-09",
+            "unit": "date",
+            "display": "9 September 1975",
+            "sourceName": "NASA NSSDCA Master Catalog: Viking 2 Lander",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1975-083C",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Mars Global Surveyor",
+          "what": "Orbited Mars from 1997 to 2006, mapping the surface in detail and measuring patches of old magnetism in the crust.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "1996-11-07",
+            "unit": "date",
+            "display": "7 November 1996",
+            "sourceName": "NASA NSSDCA Master Catalog: Mars Global Surveyor",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=1996-062A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "2001 Mars Odyssey",
+          "what": "An orbiter that arrived in October 2001; its instruments found hydrogen just under the surface near the poles, a sign of buried ice.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2001-04-07",
+            "unit": "date",
+            "display": "7 April 2001",
+            "sourceName": "NASA NSSDCA Master Catalog: 2001 Mars Odyssey",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2001-013A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Spirit",
+          "what": "A rover that landed in Gusev crater in January 2004 and found rocks changed by water, before it became stuck in soft soil in 2009.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2003-06-10",
+            "unit": "date",
+            "display": "10 June 2003",
+            "sourceName": "NASA NSSDCA Master Catalog: Spirit",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2003-027A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Opportunity",
+          "what": "A rover that landed on Meridiani Planum in January 2004, meant to work for three months and which kept going until a dust storm in 2018.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2003-07-08",
+            "unit": "date",
+            "display": "8 July 2003",
+            "sourceName": "NASA NSSDCA Master Catalog: Opportunity",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2003-032A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Mars Reconnaissance Orbiter",
+          "what": "An orbiter working since 2006, whose camera can pick out objects about the size of a table on the surface.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2005-08-12",
+            "unit": "date",
+            "display": "12 August 2005",
+            "sourceName": "NASA NSSDCA Master Catalog: Mars Reconnaissance Orbiter",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2005-029A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "Phoenix",
+          "what": "Landed near the north pole in May 2008 and dug into the soil to reach water ice just beneath it.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2007-08-04",
+            "unit": "date",
+            "display": "4 August 2007",
+            "sourceName": "NASA NSSDCA Master Catalog: Phoenix Mars Lander",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2007-034A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "MAVEN",
+          "what": "An orbiter that arrived in 2014 to study how the Sun and its wind have stripped away much of the Mars atmosphere.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2013-11-18",
+            "unit": "date",
+            "display": "18 November 2013",
+            "sourceName": "NASA NSSDCA Master Catalog: MAVEN",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2013-063A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        },
+        {
+          "name": "InSight",
+          "what": "A lander that touched down on Elysium Planitia in November 2018 and listened for marsquakes to learn about the planet’s interior.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2018-05-05",
+            "unit": "date",
+            "display": "5 May 2018",
+            "sourceName": "NASA NSSDCA Master Catalog: InSight",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2018-042A",
             "retrieved": "2026-11-22",
             "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
             "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
@@ -3112,7 +3384,24 @@
         "How much of it is metal, and whether it is the exposed core of a broken planetary building block or something else.",
         "Its true density, which depends on how much empty space is inside."
       ],
-      "missions": [],
+      "missions": [
+        {
+          "name": "Psyche",
+          "what": "Launched in October 2023 on a trip to the metal-rich asteroid it is named for, due to reach it in 2029.",
+          "launch": {
+            "id": "launch",
+            "label": "Launched",
+            "value": "2023-10-13",
+            "unit": "date",
+            "display": "13 October 2023",
+            "sourceName": "NASA NSSDCA Master Catalog: Psyche",
+            "sourceUrl": "https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=2023-157A",
+            "retrieved": "2026-11-22",
+            "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+            "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center"
+          }
+        }
+      ],
       "links": [
         {
           "label": "NSSDCA Master Catalog: Psyche spacecraft",
