@@ -155,3 +155,14 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Luna and other moons: the dark side is darker than before, with a faint blue-white earthshine when its planet is lit. Too dark to see surface detail anywhere you need it?
 - [ ] Ships and stations should look exactly as before (only planet materials changed). Check one near Earth.
 
+## The Rocinante's voyages: The Anubis, and Eros and Venus (2026-11-22, branch anubis-venus, not merged)
+- [ ] T, 9, arrow down: the card lists four sequences; the Anubis and Eros and Venus say "Spoils the ending of Leviathan Wakes". Is the warning plain enough?
+- [ ] The Anubis (150 s): the made-up rock, the Rocinante's flip and burn in, the black stealth ship against the dark (is she visible at all in the wide shot?), the hull close-up while "the party crosses", the Rocinante backing away, one torpedo (trail, then the fireball and scattering wreckage), silence. Does the torpedo read from the wide camera? Does the rock hide the explosion at any point (it sits to one side from 92 s)?
+- [ ] The rock: it is flat-shaded and a little blocky. Acceptable, or does it look like a prop?
+- [ ] Eros and Venus (196 s): Eros close up with a small orange Venus behind it; the Rocinante trailing a speck beside a mountain; the bend at 46 s; the dive (Venus growing behind Eros, the Rocinante peeling away with her plume at 96 s); the strike flash on the sunlit face at 122 s; then the epilogue with two pale spires growing from the planet. Is Eros visible when the camera is behind it (108-122 s)? Does the flash read against the cream cloud-top? Do the spires read as "something growing", or as sticks?
+- [ ] During this film the planets stand still (the clock is held); after it ends or a key hands the ship back, do they go round again and the ship is where you left it?
+- [ ] Impact flash and spires are drawn far larger than real, and the dive is a time-lapse; the captions say so. Is that clear enough, or too much text?
+- [ ] Sound on speakers: the Anubis is all exterior (silent but for the score) except nothing inside the hull; the score fades at the torpedo hit and at the strike. Too long a silence?
+- [ ] Safari and Firefox, with and without `?logdepth`: Venus close up with the flash and the tall translucent spires (alpha sorting against the atmosphere).
+- [ ] Facts the research could not settle: where the Anubis's asteroid is (invented rock and place), her state (the books have her covered in growth; ours is bare), who fires, Eros's course and the strike point (invented), the missiles launched at Eros (not shown), what the towers look like and how many (two, grade C). Confidence is in `src/scenarios/anubis.ts`, `src/scenarios/venus.ts` and `?debug`.
+
