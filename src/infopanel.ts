@@ -37,6 +37,7 @@ function fold(title: string): [HTMLElement, HTMLElement] {
 
 const root = () => document.getElementById('info')!;
 let current: Entity | null = null;
+let opener: HTMLElement | null = null; // what had focus before, so it gets it back
 let cameFrom: Entity | null = null; // the story place the reader followed a 'based on' link from
 export const isOpen = () => current !== null;
 
@@ -50,12 +51,12 @@ export function open(e: Entity, from: Entity | null = null) {
   const x = el('button', 'info-x', '×'); x.type = 'button'; x.title = 'Close (I)'; x.setAttribute('aria-label', 'Close');
   x.addEventListener('click', close);
   head.append(x);
-  if (cameFrom) { const b = el('p', 'back'); const a = el('a', undefined, `\u2190 back to ${cameFrom.name}`); const f = cameFrom; a.addEventListener('click', () => open(f)); b.append(a); p.append(b); }
+  if (cameFrom) { const b = el('p', 'back'); const a = el('a', undefined, `\u2190 back to ${cameFrom.name}`); const f = cameFrom; a.tabIndex = 0; a.setAttribute('role', 'button'); a.addEventListener('click', () => open(f)); a.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') open(f); }); b.append(a); p.append(b); }
   p.append(head, el('div', 'ai', e.real ? 'AI-assisted summary, sources below' : 'AI-assisted note about a made-up place'), el('p', 'summary', e.summary));
   if (e.basedOn) {
     const b = el('p', 'based', `Based on ${e.basedOn}`);
     const real = e.basedOnId ? entities.get(e.basedOnId) : undefined;
-    if (real) { b.append(' \u00b7 '); const a = el('a', undefined, `see the real ${real.name}`); a.addEventListener('click', () => open(real, e)); b.append(a); }
+    if (real) { b.append(' \u00b7 '); const a = el('a', undefined, `see the real ${real.name}`); a.tabIndex = 0; a.setAttribute('role', 'button'); a.addEventListener('click', () => open(real, e)); a.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') open(real, e); }); b.append(a); }
     p.append(b);
   }
 
@@ -94,13 +95,18 @@ export function open(e: Entity, from: Entity | null = null) {
     for (const [url, text] of seen) { const li = el('li'); li.append(link(text, url)); sl.append(li); }
     d.append(sl, ...foot); p.append(d);
   } else { const [ss] = section(e.real ? 'Sources' : 'Credit'); ss.append(...foot); p.append(ss); }
-  p.append(el('p', 'small keyhint', 'I or × closes. Esc frees the mouse so you can click a link.'));
+  p.append(el('p', 'small keyhint', 'I, Esc or × closes. Tab moves along the links.'));
 
   p.scrollTop = 0;
+  if (!document.body.classList.contains('info-open')) opener = document.activeElement as HTMLElement | null;
   document.body.classList.add('info-open');
+  x.focus({ preventScroll: true });
 }
 
 export function close() {
+  const had = current !== null;
   current = null;
   document.body.classList.remove('info-open');
+  if (had) { if (opener && document.contains(opener) && opener !== document.body) opener.focus({ preventScroll: true }); else if (root().contains(document.activeElement)) (document.activeElement as HTMLElement).blur(); }
+  opener = null;
 }

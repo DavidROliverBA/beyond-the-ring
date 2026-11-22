@@ -179,7 +179,7 @@ export function createVoyageMenu(can: (v: Voyage) => boolean, go: (v: Voyage) =>
   style.textContent = CSS;
   document.head.append(style);
   const root = document.createElement('div');
-  root.id = 'voyages';
+  root.id = 'voyages'; root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true"); root.setAttribute("aria-label", "Voyages");
   root.innerHTML = '<div id="voyages-box"><h2>VOYAGES</h2><p class="sub">Choose one; any key hands the ship back.</p><div id="voy-list"></div><div class="foot">1–9 or click · Enter starts the highlighted one · T or Esc closes</div></div>';
   document.body.append(root);
   const listEl = root.querySelector('#voy-list') as HTMLElement;

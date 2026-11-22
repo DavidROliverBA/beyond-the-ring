@@ -20,6 +20,7 @@ import { createLook } from './look';
 import { addLightning } from './lightning';
 import { makeComet } from './comet';
 import { createSound } from './sound';
+import { createSettingsPanel } from './settings';
 import { createTour, genericShots, gateShot, type Voyage } from './tour';
 import { VOYAGES, createVoyageMenu } from './voyages';
 import { createScenarioPlayer, type Scenario } from './scenario';
@@ -58,7 +59,10 @@ if (!REVERSED) THREE.ShaderChunk.logdepthbuf_vertex = THREE.ShaderChunk.logdepth
 
 const canvas = $('view') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: !REVERSED, reversedDepthBuffer: REVERSED });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/** Picture resolution as a share of the screen's own (the settings panel); 1 is full. */
+let pixelScale = 1;
+const pixelRatio = () => Math.min(devicePixelRatio, 2) * pixelScale;
+renderer.setPixelRatio(pixelRatio());
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000003);
 const camera = new THREE.PerspectiveCamera(60, 1, 1e-9, 4e6 * LOGK);
@@ -133,7 +137,8 @@ scene.environmentIntensity = 1;
 const NO_ENV = new THREE.PMREMGenerator(renderer).fromScene(new THREE.Scene(), 0).texture;
 
 function resize() {
-  composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(pixelRatio());
+  composer.setPixelRatio(pixelRatio());
   composer.setSize(innerWidth, innerHeight);
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = walkCam.aspect = innerWidth / innerHeight;
@@ -1343,6 +1348,17 @@ function startTour() {
   tour.start(space.id, space.things, tourSun());
 }
 
+/** Settings (U): picture quality, sound level, the film look, reduced motion. */
+let filmLook = true;
+const settings = createSettingsPanel((s) => {
+  filmLook = s.film;
+  sound.setVolume(s.volume);
+  tour.sway = !s.reduced;
+  look.grain = s.reduced ? 0 : 1;
+  document.body.classList.toggle('reduce-motion', s.reduced);
+  if (s.scale !== pixelScale) { pixelScale = s.scale; resize(); }
+}, sound);
+
 /** The Rocinante's voyages (E3): scripted sequences from the novels, played by the scenario engine (src/scenario.ts). */
 const scn = createScenarioPlayer({
   scene, renderer,
@@ -1501,9 +1517,42 @@ function savePicture() {
   }, 'image/png');
 }
 
+/** Tab / N: show or hide the destination list. Shown, it takes keyboard focus so Up, Down and Enter choose. */
+function toggleNav() {
+  const open = document.body.classList.toggle('nav-open');
+  if (open) { document.exitPointerLock(); (document.querySelector('#nav-list .nav-item') as HTMLElement | null)?.focus({ preventScroll: true }); }
+  else (document.activeElement as HTMLElement | null)?.blur();
+}
+
+/** Keys for focus that sits inside the facts panel or the destination list. True if handled, so the game ignores the key. */
+function panelKey(e: KeyboardEvent): boolean {
+  const t = e.target instanceof HTMLElement ? e.target : null;
+  const inNav = !!t?.closest('#nav-list'), inInfo = !!t?.closest('#info');
+  if (inNav) {
+    if (e.code === 'Tab') return true; // the browser moves focus along the list
+    if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+      const items = [...document.querySelectorAll<HTMLElement>('#nav-list .nav-item')].filter((i) => i.offsetParent);
+      const n = items.indexOf(t as HTMLElement) + (e.code === 'ArrowDown' ? 1 : -1);
+      items[Math.max(0, Math.min(items.length - 1, n))]?.focus();
+      e.preventDefault(); return true;
+    }
+    if (e.code === 'Enter' || e.code === 'Space') return true; // presses the button
+    if (e.code === 'Escape' || e.code === 'KeyN') { document.body.classList.remove('nav-open'); (t as HTMLElement).blur(); e.preventDefault(); return true; }
+  }
+  if (inInfo) {
+    if (e.code === 'Tab' || e.code === 'Enter' || e.code === 'Space') return true;
+    if (e.code === 'Escape') { info.close(); e.preventDefault(); return true; }
+  }
+  return false;
+}
+
 addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
   if (e.metaKey || e.ctrlKey) return;
+  // Keyboard-only: while focus is in a panel (facts, destinations, keys), Tab, arrows and Enter work the panel, and Esc leaves it.
+  if (panelKey(e)) return;
+  if (e.code === 'KeyU' && !photo) { settings.open(); return; }
+  if (document.body.classList.contains('help-open') && e.code === 'Escape') { setHelp(false); return; }
   if (started && !busy && e.code === 'KeyP') { setPhoto(!photo); return; }
   // Any key but T (and the panels) ends a tour and only does that, so the ship doesn't lurch off.
   if (started && (tour.active || voyage) && !['KeyT', 'Tab', 'KeyN', 'KeyH'].includes(e.code)) { stopTour(); return; }
@@ -1519,11 +1568,10 @@ addEventListener('keydown', (e) => {
   if (walk) {
     if (e.code === 'Tab' || e.code === 'KeyN') {
       e.preventDefault();
-      document.body.classList.toggle('nav-open');
-      if (document.body.classList.contains('nav-open')) document.exitPointerLock();
+      toggleNav();
     } else if (e.code === 'KeyE' && nearPoint?.kind === 'exit') void undock();
     else if (e.code === 'KeyK') sound.toggle();
-    else if (e.code === 'KeyH') document.body.classList.toggle('help-open');
+    else if (e.code === 'KeyH') setHelp(!document.body.classList.contains('help-open'));
     else if (e.code === 'KeyI') {
       // Inside a place from the story, I opens what is real about it and what is made up (E2.3.c).
       if (info.isOpen()) info.close();
@@ -1552,13 +1600,12 @@ addEventListener('keydown', (e) => {
     case 'Tab':
     case 'KeyN':
       e.preventDefault();
-      document.body.classList.toggle('nav-open');
-      if (document.body.classList.contains('nav-open')) document.exitPointerLock();
+      toggleNav();
       break;
     case 'KeyX': ship.throttle = 0; startBrake(); break;
     case 'KeyV': chase = !chase; break;
     case 'KeyO': orbitsOn = !orbitsOn; applyOrbits(); break;
-    case 'KeyH': document.body.classList.toggle('help-open'); break;
+    case 'KeyH': setHelp(!document.body.classList.contains('help-open')); break;
     case 'KeyF': if (aimed) engage(aimed); break;
     case 'KeyL': {
       const d = dockable();
@@ -1587,6 +1634,19 @@ function nearestGate(): Thing | null {
 
 // -------------------------------------------------------------------- nav
 
+let navMore = true;
+function syncNavFold() {
+  const list = $('nav-list');
+  const has = !!list.querySelector('.indent');
+  list.classList.toggle('fold', has && !navMore);
+  const b = $('nav-fold') as HTMLButtonElement;
+  b.style.display = has && !walk ? '' : 'none';
+  b.textContent = navMore ? 'Fewer' : 'More';
+  b.setAttribute('aria-expanded', String(navMore));
+  b.title = navMore ? 'Hide the moons and ships' : 'Show the moons and ships';
+}
+$('nav-fold').addEventListener('click', () => { navMore = !navMore; syncNavFold(); });
+
 function buildNav() {
   const list = $('nav-list');
   list.innerHTML = '';
@@ -1596,9 +1656,10 @@ function buildNav() {
       const el = document.createElement('button');
       el.className = 'nav-item';
       el.textContent = pl.name;
-      el.addEventListener('click', () => Object.assign(walker, { x: pl.x, z: pl.z, yaw: pl.yaw, pitch: 0, vx: 0, vz: 0 }));
+      el.addEventListener('click', () => { Object.assign(walker, { x: pl.x, z: pl.z, yaw: pl.yaw, pitch: 0, vx: 0, vz: 0 }); el.blur(); });
       list.append(el);
     }
+    syncNavFold();
     $('nav-any').style.display = 'none';
     return;
   }
@@ -1606,10 +1667,14 @@ function buildNav() {
     const el = document.createElement('button');
     el.className = `nav-item ${th.kind}${th.indent ? ' indent' : ''}`;
     el.textContent = th.dock ? `${th.name} · dock` : th.name;
-    el.addEventListener('click', () => engage(th));
+    el.addEventListener('click', () => { engage(th); el.blur(); });
     list.append(el);
   };
   for (const th of space.things) if (th.nav) add(th);
+  // A long list on a short screen folds its moons and ships away; the toggle in the heading brings them back.
+  const rows = list.children.length, fits = innerHeight - 2 * 96 - 90 >= rows * 26;
+  navMore = fits;
+  syncNavFold();
   $('nav-any').style.display = space.id === 'slow' ? '' : 'none';
 }
 
@@ -1618,6 +1683,18 @@ function goToGateNumber(n: number) {
   const g = space.gates[clamp(Math.round(n), 0, GATE_COUNT - 1)];
   engage(g);
 }
+/** H: the key list as a card in the middle; focus goes into it, and back out when it closes. */
+let helpFrom: HTMLElement | null = null;
+function setHelp(on: boolean) {
+  document.body.classList.toggle('help-open', on);
+  if (on) { helpFrom = document.activeElement as HTMLElement | null; ($('keys-box') as HTMLElement).focus({ preventScroll: true }); }
+  else { if (helpFrom && document.contains(helpFrom) && helpFrom !== document.body) helpFrom.focus(); else (document.activeElement as HTMLElement | null)?.blur(); helpFrom = null; }
+}
+$('keys-open').addEventListener('click', () => setHelp(true));
+$('keys-x').addEventListener('click', () => setHelp(false));
+$('keys').addEventListener('mousedown', (e) => { if (e.target === $('keys')) setHelp(false); });
+$('settings-open').addEventListener('click', () => settings.open());
+$('settings-open2').addEventListener('click', () => settings.open());
 $('gate-go').addEventListener('click', () => goToGateNumber(Number(($('gate-num') as HTMLInputElement).value)));
 $('gate-num').addEventListener('keydown', (e) => {
   if ((e as KeyboardEvent).key === 'Enter') goToGateNumber(Number(($('gate-num') as HTMLInputElement).value));
@@ -2216,7 +2293,7 @@ function updateHud(dt: number) {
 // ------------------------------------------------------------------- loop
 
 const _off = new V3(), _lookQ = new THREE.Quaternion(), _qI = new THREE.Quaternion();
-let camHold = 0, tourDt = 1 / 60, cineState = false;
+let camHold = 0, tourDt = 1 / 60, cineState = false, scoreState = false;
 let last = performance.now();
 let clock = 0;
 
@@ -2345,8 +2422,10 @@ function frame(now: number) {
     ship.prev.copy(camera.position);
   }
   // Tours get the film look: widescreen bars, a graded, grainy picture, anamorphic streaks.
-  const cineOn = (tour.active || !!voyage) && started;
-  if (cineOn !== cineState) { cineState = cineOn; document.body.classList.toggle('cine', cineOn); look.cine = cineOn ? 1 : 0; sound.score(cineOn); }
+  const touring = (tour.active || !!voyage) && started;
+  const cineOn = touring && filmLook;
+  if (cineOn !== cineState) { cineState = cineOn; document.body.classList.toggle('cine', cineOn); look.cine = cineOn ? 1 : 0; }
+  if (touring !== scoreState) { scoreState = touring; sound.score(touring); }
   sky.position.copy(camera.position);
   // The star's glint in the environment faces the star.
   if (space.star) {
@@ -2422,9 +2501,11 @@ async function boot() {
   // Behind the start screen, show the system off.
   startTour();
   $('launch').textContent = 'Launch';
+  ($('launch') as HTMLElement).focus({ preventScroll: true });
 }
 
 $('launch').addEventListener('click', () => {
+  if (matchMedia('(max-width: 700px)').matches) document.body.classList.remove('nav-open');
   sound.start();
   stopTour();
   started = true;

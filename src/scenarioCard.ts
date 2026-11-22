@@ -25,7 +25,7 @@ export function createScenarioCard(list: Scenario[], go: (s: Scenario) => void):
   style.textContent = CSS;
   document.head.append(style);
   const root = document.createElement('div');
-  root.id = 'scncard';
+  root.id = 'scncard'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'The Rocinante\'s voyages');
   root.innerHTML = '<div id="scncard-box"><h2>The Rocinante\'s voyages</h2><div class="warn"><b>SPOILERS FOR LEVIATHAN WAKES</b>These sequences re-enact events from the novel, including battles and the loss of ships, in our own words. Unofficial, non-commercial fan work.</div><div id="scn-list"></div><div class="foot">Click or Enter to watch · any key hands the ship back · Esc closes</div></div>';
   document.body.append(root);
   const listEl = root.querySelector('#scn-list') as HTMLElement;

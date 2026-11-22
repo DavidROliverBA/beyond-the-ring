@@ -136,13 +136,14 @@ const FINISH = {
     gamma: { value: new THREE.Vector3(1, 1, 1) },
     vignette: { value: 0.35 },
     grain: { value: 0.025 },
+    grainK: { value: 1 },
     time: { value: 0 },
     aspect: { value: 1 },
     cine: { value: 0 },
   },
   vertexShader: FULL_V,
   fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse; uniform vec3 gain, lift, gamma; uniform float vignette, grain, time, aspect, cine;
+    uniform sampler2D tDiffuse; uniform vec3 gain, lift, gamma; uniform float vignette, grain, grainK, time, aspect, cine;
     varying vec2 vUv;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
@@ -159,7 +160,7 @@ const FINISH = {
       x = pow(max(x, vec3(0.0)), 1.0 / gamma);
       float r = length((vUv - 0.5) * vec2(aspect, 1.0));
       x *= mix(1.0, smoothstep(1.05, 0.35, r), vignette + 0.22 * cine);
-      x += (hash(vUv * 1024.0 + fract(time) * 97.0) - 0.5) * (grain + 0.02 * cine);
+      x += (hash(vUv * 1024.0 + fract(time) * 97.0) - 0.5) * (grain + 0.02 * cine) * grainK;
       gl_FragColor = vec4(x, c.a);
     }`,
 };
@@ -222,6 +223,8 @@ export interface Look {
   enabled: boolean;
   /** 1 for the film look (tours): streaks, split-tone grade, fringing, heavier vignette and grain; it eases in and out. */
   cine: number;
+  /** 0 turns the film grain off (reduced motion), 1 is normal. */
+  grain: number;
   rays: Pass;
   lens: ShaderPass;
   finish: ShaderPass;
@@ -241,11 +244,12 @@ export function createLook(bloom: UnrealBloomPass): Look {
   let t = 0, rayK = 0, cineK = 0;
 
   return {
-    rays, lens, finish, enabled: true, cine: 0,
+    rays, lens, finish, enabled: true, cine: 0, grain: 1,
     update(dt, place, camera, sun, aspect) {
       t += dt;
       cineK += (this.cine - cineK) * (1 - Math.exp(-dt * 2.5));
       finish.uniforms.cine.value = cineK;
+      finish.uniforms.grainK.value = this.grain;
       lens.uniforms.streak.value = this.enabled ? cineK : 0;
       lens.enabled = finish.enabled = this.enabled;
       // Grade: ease towards the place's look over about a second, so docking doesn't snap.

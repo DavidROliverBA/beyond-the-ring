@@ -48,6 +48,7 @@
   #mode { font-size: 11px; letter-spacing: 0.12em; color: var(--dim); }
   #mode.auto { color: var(--amber); }
   #ship-name { margin-top: 4px; font-size: 10px; letter-spacing: 0.34em; color: rgba(143, 220, 255, 0.5); }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
   #hint { position: absolute; left: 50%; bottom: 112px; transform: translateX(-50%); color: var(--cyan); font-size: 12px;
     text-shadow: 0 0 6px #000; white-space: nowrap; }
 
@@ -71,7 +72,6 @@
     font: 13px/1.5 -apple-system, "Helvetica Neue", sans-serif; color: #c3d3df; }
   body.info-open #info { display: block; }
   body.info-open #card { display: none !important; }
-  body.help-open #info { max-height: calc(100% - 28px - 380px); }
   body.info-open:not(.voyage) #banner { display: none; }
   #info header { display: flex; align-items: center; gap: 2px; }
   #info h2 { margin: 0; font: 16px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.08em; color: #fff; font-weight: 400; }
@@ -95,12 +95,16 @@
   #info details summary { cursor: pointer; color: var(--dim); font: 400 11px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase; margin: 12px 0 4px; }
   #info .small { margin: 6px 0 0; font-size: 11px; color: var(--dim); }
   #info .keyhint { margin-top: 12px; }
-  @media (max-width: 700px) { #info { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 60%; } body.help-open #info { max-height: 30%; } }
+  @media (max-width: 700px) { #info { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 60%; } }
 
   #nav { position: absolute; left: 16px; top: 96px; bottom: 96px; width: 216px; padding: 10px 8px; display: none; flex-direction: column; pointer-events: auto; }
   body.nav-open #nav { display: flex; }
-  #nav h2 { margin: 0 6px 8px; font-size: 11px; font-weight: 400; letter-spacing: 0.16em; color: var(--dim); }
-  #nav-list { overflow-y: auto; flex: 1; }
+  #nav h2 { margin: 0 6px 8px; font-size: 11px; font-weight: 400; letter-spacing: 0.16em; color: var(--dim); display: flex; align-items: center; }
+  #nav-fold { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--cyan); font: 10px ui-monospace, Menlo, monospace; letter-spacing: 0.1em; padding: 1px 7px; cursor: pointer; text-transform: uppercase; }
+  #nav-fold:hover { background: rgba(143, 220, 255, 0.2); color: #fff; }
+  /* The list scrolls; a fade at the foot says there is more. */
+  #nav-list { overflow-y: auto; flex: 1; min-height: 0; -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); padding-bottom: 20px; scrollbar-width: thin; }
+  #nav-list.fold .indent { display: none; }
   .nav-item { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 3px; padding: 4px 8px;
     color: var(--cyan); font: inherit; cursor: pointer; }
   .nav-item.indent { padding-left: 22px; color: #9fb3c2; font-size: 12px; }
@@ -113,11 +117,20 @@
   #nav-any button, #launch { background: rgba(143, 220, 255, 0.12); border: 1px solid var(--line); border-radius: 3px; color: var(--cyan); font: inherit; padding: 3px 9px; cursor: pointer; }
   #nav-any button:hover, #launch:hover:not([disabled]) { background: rgba(143, 220, 255, 0.28); color: #fff; }
 
-  #keys { position: absolute; right: 16px; bottom: 18px; padding: 10px 14px; font-size: 11px; color: var(--dim); display: none; }
-  body.help-open #keys { display: block; }
-  #keys b { color: var(--cyan); font-weight: 400; display: inline-block; min-width: 92px; }
-  #keys-tip { position: absolute; right: 16px; bottom: 18px; font-size: 11px; color: var(--dim); }
-  body.help-open #keys-tip { display: none; }
+  /* The key list is a card in the middle of the screen, so it can never sit on the hint or the flight panel. */
+  #keys { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(1, 4, 10, 0.5); pointer-events: auto; }
+  body.help-open #keys { display: flex; }
+  #keys-box { width: min(780px, 94vw); max-height: 88vh; overflow-y: auto; padding: 14px 18px; font-size: 11px; color: var(--dim); background: rgba(4, 10, 20, 0.95); }
+  #keys-box h2 { margin: 0 0 8px; font: 400 12px ui-monospace, Menlo, monospace; letter-spacing: 0.24em; color: var(--cyan); display: flex; align-items: center; }
+  #keys-box h2 button { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--cyan); font: 14px/1 ui-monospace, Menlo, monospace; padding: 2px 8px; cursor: pointer; }
+  #keys-cols { column-width: 330px; column-gap: 26px; }
+  #keys-cols > div { display: grid; grid-template-columns: 92px 1fr; gap: 0 8px; break-inside: avoid; margin-bottom: 3px; }
+  body:not(.walking) #keys-cols > div.walk-only, body.walking #keys-cols > div.fly-only { display: none; }
+  #keys b { color: var(--cyan); font-weight: 400; }
+  #keys-tip { position: absolute; right: 16px; bottom: 18px; font-size: 11px; color: var(--dim); pointer-events: auto; }
+  #keys-tip button, .linkbtn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  #keys-tip button:hover, .linkbtn:hover { color: #fff; }
+  body.help-open #keys-tip, body.settings-open #keys-tip { visibility: hidden; }
   /* Photo mode: everything but the picture goes, bar a quiet strip of keys. */
   body.photo #hud, body.photo #labels { display: none; }
   /* On a voyage the screen is the film: only the captions stay. */
@@ -125,17 +138,23 @@
   #photo-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 11px; color: rgba(220, 235, 245, 0.55); letter-spacing: 0.08em; display: none; pointer-events: none; text-shadow: 0 0 6px #000; }
   body.photo #photo-bar { display: block; }
 
-  #banner { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); text-align: center; max-width: 560px; opacity: 0; transition: opacity 1.2s; }
+  /* The banner sits on a soft dark pool so the labels behind it do not run through its words. */
+  #banner { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); text-align: center; width: max-content; max-width: min(560px, 92vw); padding: 12px 28px; border-radius: 40px; opacity: 0; transition: opacity 1.2s;
+    background: radial-gradient(closest-side, rgba(0, 3, 9, 0.72), rgba(0, 3, 9, 0.55) 70%, transparent); backdrop-filter: blur(4px); }
   #banner.show { opacity: 1; }
   /* The film look (tours): widescreen bars, and captions as a lower third. */
   #cine-top, #cine-bot { position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 6; pointer-events: none; transition: height 1.4s cubic-bezier(0.4, 0, 0.2, 1); }
   #cine-top { top: 0; } #cine-bot { bottom: 0; }
   body.cine #cine-top, body.cine #cine-bot { height: max(0px, calc((100vh - 100vw / 2.39) / 2)); }
-  body.cine #banner { top: auto; bottom: calc(max(0px, (100vh - 100vw / 2.39) / 2) + 28px); left: 6vw; transform: none; text-align: left; max-width: min(560px, 60vw); z-index: 7; }
+  body.cine #banner { background: none; padding: 0; top: auto; bottom: calc(max(0px, (100vh - 100vw / 2.39) / 2) + 28px); left: 6vw; transform: none; text-align: left; max-width: min(560px, 60vw); z-index: 7; }
   body.cine #banner-title { font-size: 22px; letter-spacing: 0.26em; }
+  @media (max-aspect-ratio: 1/1) { body.cine #cine-top, body.cine #cine-bot { height: 0; } body.cine #banner { bottom: 40px; } }
   #banner-title { font-size: 30px; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; text-shadow: 0 0 18px rgba(143, 220, 255, 0.7); }
   #banner-text { margin-top: 10px; color: #c3d3df; font: 14px/1.5 -apple-system, "Helvetica Neue", sans-serif; text-shadow: 0 0 6px #000; }
 
+  /* Reduced motion (the system setting, or the switch in Settings): nothing slides or flashes. */
+  body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after { transition-duration: 0.01s !important; animation: none !important; }
+  body.reduce-motion #flash, body.reduce-motion #flash.on { background: #000; }
   #flash { position: fixed; inset: 0; background: radial-gradient(circle, #fff 0%, #bfe4ff 45%, #2f6fd0 100%); opacity: 0; pointer-events: none; transition: opacity 0.4s; }
   #flash.on { opacity: 1; }
   #loading { position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%); color: #0a2a4a; font-size: 12px; letter-spacing: 0.1em; pointer-events: none; }
@@ -143,7 +162,7 @@
 
   #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse 48% 60% at 50% 45%, rgba(0, 2, 8, 0.72), rgba(0, 2, 8, 0.12) 100%); }
   body.started #start { display: none; }
-  #start-box { width: min(560px, 90vw); padding: 28px 32px; text-align: center; }
+  #start-box { width: min(560px, 90vw); max-height: 94vh; overflow-y: auto; padding: 28px 32px; text-align: center; }
   #start h1 { margin: 0; font-size: 30px; font-weight: 400; letter-spacing: 0.34em; color: #fff; text-transform: uppercase; }
   #start p { color: #c3d3df; font: 14px/1.55 -apple-system, "Helvetica Neue", sans-serif; }
   #start dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; text-align: left; margin: 18px auto; width: fit-content; font-size: 12px; }
@@ -151,7 +170,32 @@
   #start dd { margin: 0; color: #a9bccb; }
   #launch { font-size: 15px; letter-spacing: 0.2em; padding: 9px 30px; text-transform: uppercase; }
   #launch[disabled] { opacity: 0.5; cursor: default; }
+  #start .touch-note { display: none; color: var(--amber); font-size: 12px; }
+  @media (pointer: coarse) { #start .touch-note { display: block; } }
+  #start .row2 { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
   #start small { display: block; margin-top: 16px; color: var(--dim); font-size: 10px; }
+  /* Phones and narrow windows */
+  @media (max-width: 700px) {
+    #loc { left: 8px; top: 8px; padding: 6px 10px; max-width: 46vw; }
+    #loc-name { font-size: 14px; }
+    #card { left: 8px; right: 8px; top: 78px; width: auto; padding: 8px 12px; max-height: 26%; overflow: hidden; }
+    #card-desc { font-size: 12px; }
+    #nav { left: 8px; right: 8px; width: auto; top: 78px; bottom: 120px; }
+    body #map-btn { bottom: 84px; left: 8px; }
+    #ship-name, #simclock { display: none; }
+    #banner { top: auto; bottom: 168px; max-width: 94vw; padding: 8px 18px; }
+    #banner-title { font-size: 20px; letter-spacing: 0.2em; }
+    #banner-text { font-size: 12px; margin-top: 4px; }
+    #flight { min-width: 0; width: calc(100vw - 16px); max-width: 360px; bottom: 8px; padding: 6px 12px; }
+    #speed { font-size: 18px; }
+    #hint { bottom: 124px; white-space: normal; text-align: center; width: 92vw; font-size: 11px; }
+    #keys-tip { right: 8px; bottom: 90px; }
+    #start-box { padding: 18px 16px; }
+    #start h1 { font-size: 22px; letter-spacing: 0.22em; }
+    #start dl { font-size: 11px; margin: 12px auto; }
+    body.cine #banner { left: 4vw; max-width: 92vw; }
+  }
+  @media (max-height: 520px) { #nav { top: 60px; bottom: 56px; } #card { max-height: 40%; overflow: hidden; } #flight { padding: 4px 12px; } #ship-name, #simclock { display: none; } }
 </style>
 </head>
 <body class="nav-open">
@@ -163,7 +207,7 @@
   <div id="loc" class="panel"><div id="loc-name"></div><div id="loc-sub"></div><div id="loc-near"></div></div>
 
   <div id="nav" class="panel">
-    <h2 id="nav-title">DESTINATIONS</h2>
+    <h2><span id="nav-title">DESTINATIONS</span><button type="button" id="nav-fold" aria-expanded="true">Fewer</button></h2>
     <div id="nav-list"></div>
     <div id="nav-any">
       Any of the 1,373 gates
@@ -188,9 +232,9 @@
     <div id="simclock" title="Time: , slower, . faster"></div>
   </div>
 
-  <div id="keys-tip">H — keys</div>
-  <div id="keys" class="panel">
-    <div><b>P</b>photo mode: freeze, hide the HUD, Enter saves</div>
+  <div id="keys-tip"><button type="button" id="keys-open">H — keys</button> · <button type="button" id="settings-open">U — settings</button></div>
+  <div id="keys" role="dialog" aria-modal="true" aria-label="Keys"><div id="keys-box" class="panel" tabindex="-1"><h2><span>KEYS</span><button type="button" id="keys-x" aria-label="Close keys">×</button></h2><div id="keys-cols">
+    <div><b>P</b>photo mode: freeze, hide the HUD, [ ] exposure, Enter saves</div>
     <div class="walk-only"><b>Mouse</b>look around</div>
     <div class="walk-only"><b>W A S D</b>walk</div>
     <div class="walk-only"><b>Shift</b>run</div>
@@ -208,15 +252,17 @@
     <div class="fly-only"><b>M</b>star map: where everything is, and plot a course</div>
     <div class="fly-only"><b>I</b>inspect what you aim at: the mouse turns round it, wheel zooms</div>
     <div class="fly-only"><b>I · facts</b>on a real planet, moon, asteroid or comet, I also opens facts and sources; on a place from the story it says what is real about it; I again closes</div>
-    <div><b>K</b>sound on / off</div>
+    <div><b>K</b>sound on / off (volume is in settings, U)</div>
     <div class="fly-only"><b>, .</b>slower / faster time: the planets and moons go round</div>
-    <div class="fly-only"><b>T</b>voyages: guided tours of Sol, the Ring and the gates</div>
-    <div class="fly-only"><b>Tab</b>destinations</div>
+    <div class="fly-only"><b>T · 1–9</b>voyages: guided tours of Sol, the Ring and the gates, and the Rocinante's story sequences; press T, then a number or Enter</div>
+    <div class="fly-only"><b>Tab</b>destinations: Up / Down and Enter choose, Esc closes</div>
     <div class="fly-only"><b>Right mouse</b>hold to look around</div>
     <div class="fly-only"><b>V</b>cockpit / chase view</div>
     <div class="fly-only"><b>O</b>orbit lines</div>
     <div class="fly-only"><b>Esc</b>free the mouse</div>
-  </div>
+    <div><b>U</b>settings: picture quality, volume, film look, reduced motion</div>
+    <div><b>H</b>this list</div>
+  </div></div></div>
 </div>
 
 <div id="photo-bar">PHOTO · mouse to look · [ ] exposure · Enter save · P back</div>
@@ -229,14 +275,20 @@
     <h1>Beyond the Ring</h1>
     <p>Sol, the ring space and every system behind its 1,373 gates. Your ship crosses the solar system in under a minute and slows by itself when there is something worth seeing.</p>
     <dl>
-      <dt>Mouse</dt><dd>steer</dd>
-      <dt>W / S</dt><dd>throttle</dd>
+      <dt>Mouse</dt><dd>steer (click the view first)</dd>
+      <dt>W / S</dt><dd>throttle up / down; X brakes</dd>
       <dt>F</dt><dd>fly to whatever is under the crosshair</dd>
-      <dt>Tab</dt><dd>destination list — click a name and the ship takes you</dd>
+      <dt>Tab</dt><dd>destination list: choose a name and the ship takes you</dd>
+      <dt>M</dt><dd>star map</dd>
+      <dt>I</dt><dd>inspect it; on real things, facts and sources too</dd>
+      <dt>T</dt><dd>voyages: guided tours and story sequences, nine to choose from</dd>
+      <dt>P</dt><dd>photo mode</dd>
       <dt>L</dt><dd>dock at Tycho, Ceres, Ganymede or Medina and walk around</dd>
       <dt>The Ring</dt><dd>fly through the middle to jump</dd>
+      <dt>K · H · U</dt><dd>sound · all keys · settings</dd>
     </dl>
-    <button id="launch" disabled>Charting…</button>
+    <p class="touch-note">Made for a keyboard and mouse. Touch play is not here yet.</p>
+    <div class="row2"><button id="launch" disabled>Charting…</button><button type="button" id="settings-open2" class="linkbtn">Settings</button></div>
     <small>An unofficial, non-commercial fan project inspired by The Expanse, the creation of James S. A. Corey. Not affiliated with or endorsed by the authors, their publishers or the makers of the television series. Planets, moons, ships and stations are drawn to true size and distance, so most of space is empty; ships from across the story are all on show at once.</small>
     <small>Planet maps: Solar System Scope (CC BY 4.0) and NASA/JPL/USGS. Ganymede and Callisto: Askaniy Anpilogov and others (CC BY-SA 3.0). Moon relief: NASA SVS. Stars: HYG database (CC BY-SA 4.0). Surfaces: ambientCG (CC0). <a href="https://github.com/DavidROliverBA/beyond-the-ring/blob/main/CREDITS.md" target="_blank" rel="noopener">Full credits</a>.</small>
   </div>

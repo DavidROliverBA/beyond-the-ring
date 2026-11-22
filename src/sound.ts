@@ -40,6 +40,10 @@ export interface Sound {
   /** How many of each fight sound have been played (for tests). */
   readonly played: Record<string, number>;
   toggle(): boolean;
+  /** Mute or unmute (the same switch K flips), remembered. */
+  setOn(v: boolean): void;
+  /** Loudness 0..1 (the settings panel's slider); 1 is the old fixed level. */
+  setVolume(v: number): void;
   readonly on: boolean;
   /** Loudness of what is playing now, 0..1 (for tests). */
   level(): number;
@@ -50,7 +54,7 @@ const KEY = 'btr-sound';
 export function createSound(): Sound {
   let ctx: AudioContext | null = null;
   let master: GainNode;
-  let on = true;
+  let on = true, vol = 1;
   try { on = localStorage.getItem(KEY) !== 'off'; } catch { /* private window: stay on */ }
 
   const nodes = {} as {
@@ -78,7 +82,7 @@ export function createSound(): Sound {
 
   function build(c: AudioContext) {
     master = c.createGain();
-    master.gain.value = on ? 0.55 : 0;
+    master.gain.value = on ? 0.55 * vol : 0;
     master.connect(c.destination);
     meter = c.createAnalyser(); meter.fftSize = 512; master.connect(meter);
     const brownBuf = brown(c, 3), whiteBuf = brown(c, 2, true);
@@ -334,12 +338,17 @@ export function createSound(): Sound {
       }
       if (ctx.state === 'suspended') void ctx.resume();
     },
-    toggle() {
-      on = !on;
+    toggle() { api.setOn(!on); if (on) tone([660, 880], 0.18, 0.08); return on; },
+    setOn(v: boolean) {
+      if (v === on) return;
+      on = v;
       try { localStorage.setItem(KEY, on ? 'on' : 'off'); } catch { /* ignore */ }
-      if (ctx) master.gain.setTargetAtTime(on ? 0.55 : 0, ctx.currentTime, 0.1);
-      if (on) { api.start(); tone([660, 880], 0.18, 0.08); }
-      return on;
+      if (ctx) master.gain.setTargetAtTime(on ? 0.55 * vol : 0, ctx.currentTime, 0.1);
+      if (on) api.start();
+    },
+    setVolume(v: number) {
+      vol = Math.min(1, Math.max(0, v));
+      if (ctx && on) master.gain.setTargetAtTime(0.55 * vol, ctx.currentTime, 0.05);
     },
     update(s, dt) {
       if (!ctx || !on) return;

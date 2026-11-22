@@ -100,6 +100,8 @@ export interface StartOptions {
 
 export interface Tour {
   active: boolean;
+  /** The hand-held breathing sway; false for reduced motion. */
+  sway: boolean;
   /** True if there is something to show. */
   start(spaceId: string, things: Target[], sunPos: V3 | null, opt?: StartOptions): boolean;
   stop(): void;
@@ -228,6 +230,7 @@ export function createTour(
 
   const tour: Tour = {
     active: false,
+    sway: true,
     start(spaceId, things, sunPos, opt = {}) {
       list = things;
       sun = sunPos;
@@ -340,7 +343,8 @@ export function createTour(
       steer(dt, _cam.quaternion);
       // Hand-held: a slow breathing sway, and a lean into the turn.
       const bank = THREE.MathUtils.clamp(-_ax.set(0, 1, 0).applyQuaternion(qB).dot(w) * 0.07, -0.09, 0.09);
-      _e.set(0.0013 * (Math.sin(st * 0.7) + 0.5 * Math.sin(st * 1.9 + 2)), 0.0016 * (Math.sin(st * 0.9 + 1.3) + 0.6 * Math.sin(st * 2.1 + 0.4)), bank + 0.0012 * Math.sin(st * 0.5 + 0.7), 'YXZ');
+      const sw = tour.sway ? 1 : 0;
+      _e.set(sw * 0.0013 * (Math.sin(st * 0.7) + 0.5 * Math.sin(st * 1.9 + 2)), sw * 0.0016 * (Math.sin(st * 0.9 + 1.3) + 0.6 * Math.sin(st * 2.1 + 0.4)), bank + sw * 0.0012 * Math.sin(st * 0.5 + 0.7), 'YXZ');
       camera.quaternion.copy(qB).multiply(_qs.setFromEuler(_e));
       // The lens.
       fovCur = fovT;
