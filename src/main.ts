@@ -1348,6 +1348,19 @@ const scn = createScenarioPlayer({
   scene, renderer,
   sunPos: tourSun,
   caption: (t, x) => banner(t, x),
+  camera,
+  warm: (s, c) => {
+    renderer.setRenderTarget(composer.renderTarget1);
+    try { renderer.compile(s, c); } finally { renderer.setRenderTarget(null); }
+    // One whole frame through every pass (the sun-ray pass included, which is otherwise built the first time the star comes into view),
+    // overwritten by the first real frame.
+    const raysWas = look.rays.enabled;
+    look.rays.enabled = true;
+    try { draw(s, c); } finally { look.rays.enabled = raysWas; }
+  },
+  sfx: (k, v, o) => sound.sfx(k, v, o),
+  hear: (h) => sound.scene(scn.active ? h : null),
+  duck: (secs) => sound.duck(secs),
   end: () => { const n = scn.scenario?.title ?? ''; banner(n, 'The sequence is over. Your ship is where you left her.'); stopTour(true); },
 });
 function startScenario(sc: Scenario) {
@@ -2231,6 +2244,7 @@ if (new URLSearchParams(location.search).has('debug')) (globalThis as unknown as
   pause: (on = true) => { scn.paused = on; },
   speed: (x: number) => { scn.speed = x; },
   info: () => scn.info(),
+  sounds: () => ({ ...sound.played }),
   get active() { return scn.active; },
   get time() { return scn.time; },
 };
