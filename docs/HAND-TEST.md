@@ -119,3 +119,9 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Any hitch at the start (a lamp is added to the scene, which recompiles shaders once) or at the blast (first frame of the flash).
 - [ ] Safari and Firefox: the flash and trails with and without `?logdepth`.
 - [ ] Facts to check against the books (the research could not read them): Canterbury and Knight sizes, whether the Knight is nearly hit by debris, where the Scopuli ends up, how many missiles. Each actor's confidence is in `src/scenarios/canterbury.ts` and shown with `?debug`.
+
+## The Rocinante's voyages: The Donnager (2026-11-22, branch combat-donnager, not merged)
+- [ ] T, 9, arrow down, Enter: the card lists The Canterbury and The Donnager. Watch all 200 s: tracer bursts, railgun lines, breaches venting, explosions along the hull, the Tachi leaving the belly hangar, the scuttling, the run. Too dark in places? (83-93 s is quiet and dark.) Do the stealth ships read at all?
+- [ ] Sound, on speakers: inside the Donnager (28-42 s) PDC rattle, impact and railgun thump; inside the Tachi (132-150 s) drive roar and her cannons; wide exterior shots silent apart from the score, which fades at the scuttling. Too loud, too boomy, too clicky?
+- [ ] Any hitch at the start (one ~90 ms pause as everything is drawn once) or mid-film. Safari and Firefox, with and without `?logdepth`.
+- [ ] Facts the research could not settle: number of attackers (we show four, invented), whether the Tachi has a railgun, boarding (not shown). Confidence is in `src/scenarios/donnager.ts` and `?debug`.

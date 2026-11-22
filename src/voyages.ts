@@ -150,7 +150,7 @@ export const VOYAGES: Voyage[] = [
   {
     // Not a flight through places: a card (with a spoiler warning) that starts a scripted sequence (src/scenario.ts).
     id: 'roci', name: 'The Rocinante\'s voyages', from: SOL_ONLY,
-    blurb: 'The novels\' sequences re-enacted, ship by ship. Spoilers for Leviathan Wakes.', stages: [],
+    blurb: 'The novels\' sequences re-enacted, ship by ship: the Canterbury, the Donnager. Spoilers for Leviathan Wakes.', stages: [],
   },
 ];
 
