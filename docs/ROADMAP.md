@@ -1,5 +1,7 @@
 # Roadmap
 
+> The live task list is `docs/BACKLOG.md` (epics, tasks, subtasks, status). This file keeps the research and reasoning behind it.
+
 Ordered plan for Beyond the Ring. Written 2026-11-15 from research (sources at the end). Constraints: free tools and services only, no engine change, copyright acknowledged in `CREDITS.md`, unofficial and non-commercial.
 
 ## 1. WebGPU: when, and is it worth it?
