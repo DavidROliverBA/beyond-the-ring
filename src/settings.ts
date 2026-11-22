@@ -8,6 +8,8 @@ export interface Settings {
   volume: number;
   /** Widescreen bars, colour grade and anamorphic streaks on tours and voyages. */
   film: boolean;
+  /** Sun glare (ghost discs, halo, starburst, rays) while you fly freely. Off by default: tours and voyages keep their own. */
+  flares: boolean;
   /** No camera sway on tours, no film grain, no flashes or fades: calmer. Starts from the system setting. */
   reduced: boolean;
 }
@@ -16,7 +18,7 @@ const KEY = 'btr-settings';
 const reduceQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 
 export function defaults(): Settings {
-  return { scale: 1, volume: 1, film: true, reduced: !!reduceQuery?.matches };
+  return { scale: 1, volume: 1, film: true, flares: false, reduced: !!reduceQuery?.matches };
 }
 
 export function load(): Settings {
@@ -27,6 +29,7 @@ export function load(): Settings {
       if ([0.5, 0.75, 1].includes(raw.scale as number)) s.scale = raw.scale as number;
       if (typeof raw.volume === 'number' && raw.volume >= 0 && raw.volume <= 1) s.volume = raw.volume;
       if (typeof raw.film === 'boolean') s.film = raw.film;
+      if (typeof raw.flares === 'boolean') s.flares = raw.flares;
       if (typeof raw.reduced === 'boolean') s.reduced = raw.reduced;
     }
   } catch { /* nothing stored, or storage is blocked */ }
@@ -74,6 +77,8 @@ export function createSettingsPanel(apply: (s: Settings) => void, sound: { reado
     <div class="row"><label for="set-mute">Sound off (K)</label><input type="checkbox" id="set-mute"></div>
     <div class="row"><label for="set-film">Film look on tours</label><input type="checkbox" id="set-film">
       <small>Widescreen bars, colour grade and lens streaks during tours and voyages.</small></div>
+    <div class="row"><label for="set-flares">Sun glare when flying</label><input type="checkbox" id="set-flares">
+      <small>The ghost discs, rings and rays when the Sun is in view. Tours and voyages keep theirs either way.</small></div>
     <div class="row"><label for="set-reduced">Reduced motion</label><input type="checkbox" id="set-reduced">
       <small>No camera sway, film grain or screen flashes; fades and slides stop. Starts from your system's setting.</small></div>
     <div class="foot">Remembered on this device · U or Esc closes</div>
@@ -81,15 +86,16 @@ export function createSettingsPanel(apply: (s: Settings) => void, sound: { reado
   document.body.append(root);
   const q = <T extends HTMLElement>(id: string) => root.querySelector('#' + id) as T;
   const scale = q<HTMLSelectElement>('set-scale'), vol = q<HTMLInputElement>('set-volume'), mute = q<HTMLInputElement>('set-mute');
-  const film = q<HTMLInputElement>('set-film'), red = q<HTMLInputElement>('set-reduced');
+  const film = q<HTMLInputElement>('set-film'), flares = q<HTMLInputElement>('set-flares'), red = q<HTMLInputElement>('set-reduced');
   let isOpen = false, from: HTMLElement | null = null;
 
-  const sync = () => { scale.value = String(s.scale); vol.value = String(Math.round(s.volume * 100)); mute.checked = !sound.on; film.checked = s.film; red.checked = s.reduced; };
+  const sync = () => { scale.value = String(s.scale); vol.value = String(Math.round(s.volume * 100)); mute.checked = !sound.on; film.checked = s.film; flares.checked = s.flares; red.checked = s.reduced; };
   const changed = () => { save(s); apply(s); };
   scale.addEventListener('change', () => { s.scale = Number(scale.value); changed(); });
   vol.addEventListener('input', () => { s.volume = Number(vol.value) / 100; changed(); });
   mute.addEventListener('change', () => { sound.setOn(!mute.checked); });
   film.addEventListener('change', () => { s.film = film.checked; changed(); });
+  flares.addEventListener('change', () => { s.flares = flares.checked; changed(); });
   red.addEventListener('change', () => { s.reduced = red.checked; changed(); });
   // Follow the system's setting while the person has not chosen one here.
   let chosen = false; try { chosen = JSON.parse(localStorage.getItem(KEY) ?? 'null')?.reduced !== undefined; } catch { /* */ }

@@ -223,6 +223,8 @@ export interface Look {
   enabled: boolean;
   /** 1 for the film look (tours): streaks, split-tone grade, fringing, heavier vignette and grain; it eases in and out. */
   cine: number;
+  /** Sun glare (ghosts, halo, rays) in free flight. Tours keep it regardless. */
+  flares: boolean;
   /** 0 turns the film grain off (reduced motion), 1 is normal. */
   grain: number;
   rays: Pass;
@@ -244,7 +246,7 @@ export function createLook(bloom: UnrealBloomPass): Look {
   let t = 0, rayK = 0, cineK = 0;
 
   return {
-    rays, lens, finish, enabled: true, cine: 0, grain: 1,
+    rays, lens, finish, enabled: true, cine: 0, flares: false, grain: 1,
     update(dt, place, camera, sun, aspect) {
       t += dt;
       cineK += (this.cine - cineK) * (1 - Math.exp(-dt * 2.5));
@@ -280,11 +282,13 @@ export function createLook(bloom: UnrealBloomPass): Look {
         }
       }
       rayK += (want - rayK) * (1 - Math.exp(-dt * 6));
-      lens.uniforms.rays.value = this.enabled ? rayK : 0;
-      rays.enabled = this.enabled && rayK > 0.002;
+      // In free flight the glare is off unless asked for; in a tour or film it fades up with the film look.
+      const glare = this.flares ? 1 : cineK;
+      lens.uniforms.rays.value = this.enabled ? rayK * glare : 0;
+      rays.enabled = this.enabled && rayK * glare > 0.002;
       // Ghosts, halo and starburst come from whatever is brightest, so a bright planet raised them too. Only the star
       // should: they follow the star being in view (as the rays do), and stay faint otherwise.
-      lens.uniforms.amount.value = (sun ? 0.03 + 0.27 * Math.min(1, rayK * 1.5) : 0.03) * (1 + 0.35 * cineK);
+      lens.uniforms.amount.value = (sun ? 0.03 + 0.27 * Math.min(1, rayK * 1.5) : 0.03) * (1 + 0.35 * cineK) * (0.1 + 0.9 * glare);
     },
   };
 }

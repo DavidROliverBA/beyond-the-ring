@@ -200,3 +200,7 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Venus film (lw-venus): the rock is the same Eros shape, bare, no station lights.
 - [ ] Captions say plainly that the station dressing and the speed are invented. Judge whether the last caption (the story turns dark) is too much of a spoiler.
 
+## Sun glare
+- [ ] Free flight with the Sun in view or just out of frame: no ghost discs, ring or heavy rays now (the screenshot that prompted this showed several big coloured blobs and a rainbow arc). The Sun's own glow and bloom stay.
+- [ ] Tours and voyages keep their lens look. Settings (U) has "Sun glare when flying", off by default; ticking it brings the old glare back in free flight.
+
