@@ -174,3 +174,11 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Safari and Firefox, with and without `?logdepth`: Venus close up with the flash and the tall translucent spires (alpha sorting against the atmosphere).
 - [ ] Facts the research could not settle: where the Anubis's asteroid is (invented rock and place), her state (the books have her covered in growth; ours is bare), who fires, Eros's course and the strike point (invented), the missiles launched at Eros (not shown), what the towers look like and how many (two, grade C). Confidence is in `src/scenarios/anubis.ts`, `src/scenarios/venus.ts` and `?debug`.
 
+## Toolbar (top of the screen)
+- [ ] After Launch a bar sits top-centre with Places, Map, Voyages, Info, Brake, Dock, View, Orbits, Photo, Sound, Settings, Keys. Each does what its key does (hover shows the key).
+- [ ] With the map, the voyages list, settings or the key card open, the bar stays on top; clicking another button closes the open panel and does that instead; clicking the same button closes it.
+- [ ] During a tour or voyage the bar dims, comes back on hover, and Voyages reads Stop; clicking it hands the ship back.
+- [ ] In photo mode only "Exit photo" shows. Inside a station (walking) only the buttons that apply show (no Brake, Dock, Map, Orbits).
+- [ ] Phone width: icon-only strip across the very top, scrolls sideways; panels sit below it. Check on a real phone.
+- [ ] After clicking a button, Space, Enter and the arrow keys still go to the game, not the button.
+

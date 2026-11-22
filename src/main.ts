@@ -21,6 +21,7 @@ import { addLightning } from './lightning';
 import { makeComet } from './comet';
 import { createSound } from './sound';
 import { createSettingsPanel } from './settings';
+import { initToolbar } from './toolbar';
 import { createTour, genericShots, gateShot, type Voyage } from './tour';
 import { VOYAGES, createVoyageMenu } from './voyages';
 import { createScenarioPlayer, type Scenario } from './scenario';
@@ -1442,6 +1443,7 @@ function startTour() {
 
 /** Settings (U): picture quality, sound level, the film look, reduced motion. */
 let filmLook = true;
+initToolbar();
 const settings = createSettingsPanel((s) => {
   filmLook = s.film;
   sound.setVolume(s.volume);
