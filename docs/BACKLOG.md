@@ -111,14 +111,14 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E2.2 Data model and build script
 - [x] 2026-11-22 E2.2.a (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Schema `Fact` with value, unit, source name, source URL, date retrieved, licence; schema `Entity` with id, name, kind (planet, moon, asteroid, comet, probe, station, site), real or fictional, links
-- [~] (rest of the real bodies: branch facts-all-bodies, agent) 2026-11-22 E2.2.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) A build script `tools/build-facts.ts` that pulls from JPL SBDB and Horizons and the curated lists and writes `assets/data/facts.json`; re-runnable and versioned, with a diff of what changed
+- [x] 2026-11-22 E2.2.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged; rest of the real bodies on branch facts-all-bodies, 9d4a497, not merged, humanReviewed=false everywhere) A build script `tools/build-facts.ts` that pulls from JPL SBDB and Horizons and the curated lists and writes `assets/data/facts.json`; re-runnable and versioned, with a diff of what changed
 - [x] 2026-11-22 E2.2.c (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Tests: every fact has a source and a date; no entity without a licence line
 
 ### E2.3 What appears in the game
 - [ ] E2.0 Decisions recorded 2026-11-22 (David, on my recommendation): panel labelled AI-assisted with a Sources list, never 'NASA says'; no ESA images (facts and links only); JAXA facts and links only; date control 'today' only for now; ISRO/CNSA deferred; NASA 3D: rely on media guidelines and note the licence conflict in CREDITS.md
 - [x] 2026-11-22 E2.3.a (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Info panel: open from the aim card or a key (`I`), shows the name, a one-sentence summary, key numbers (size, mass, orbit, day, temperature, discoveries), a short "what we know", "what we do not know", missions that visited, and links
 - [x] 2026-11-22 E2.3.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) A "Real" or "Fiction" badge on every object so it is never unclear
-- [~] E2.3.c (branch facts-all-bodies, agent) For fiction objects, a "based on" link to the real equivalent (Tycho station to O'Neill cylinders, Ceres concourse to real Ceres data)
+- [x] 2026-11-22 E2.3.c (branch facts-all-bodies, 9d4a497, not merged: Tycho, and the Tycho, Medina, Ceres and Ganymede interiors; Ceres and Ganymede link to the real panel, Tycho and Medina have no real habitat to link to) For fiction objects, a "based on" link to the real equivalent (Tycho station to O'Neill cylinders, Ceres concourse to real Ceres data)
 - [ ] E2.3.d Missions layer: real probes at their true trajectories or last known positions, with launch dates and what they found
 - [ ] E2.3.e Landing sites and surface features (Apollo sites, Curiosity, Perseverance, Schiaparelli) as markers visible at close range
 - [ ] E2.3.f Search and a "Discover" list: browse by agency, by mission, by kind; a "what is that?" shortcut on any object
@@ -235,6 +235,7 @@ Things that may need research and a big change. None starts without a decision g
 
 Newest first. One line per piece of work finished, so a new session can see the history without reading git.
 
+- 2026-11-22 E2.2.b and E2.3.c on branch facts-all-bodies (9d4a497, not merged): info panel and REAL badge for 55 real bodies (Sun, planets, 22 moons, Pluto/Charon, 29 asteroids, dwarf planets and comets) from cached NSSDCA sheets and JPL SBDB responses, missions only from fetched NSSDCA catalogue pages; Fiction badge with 'based on' for Tycho and the Tycho, Medina, Ceres and Ganymede interiors. Everything is humanReviewed=false. Open: Galileo, Cassini, Magellan, Rosetta, Hayabusa2, Giotto missing from the Master Catalog fetch; other small moons (Amalthea, Himalia, Mimas, Tethys, Dione, Hyperion, Phoebe, Ariel, Umbriel, Proteus, Nereid) have no panel yet; no curated diameters for Haumea, Makemake, Eris, Orcus, Quaoar, Sedna, Gonggong.
 - 2026-11-22 E2 thin slice on branch real-facts (5f2e7d3): facts schema and validation (src/facts.ts), build script reading cached NSSDCA pages (tools/build-facts.ts), info panel on Earth and Luna with Real badge, Fiction badge on ships/stations/gates/artefacts. I already meant inspect, so I now does both on Earth and Luna. Not merged.
 - 2026-11-22 Scenario engine v1 and 'The Canterbury' on branch `scenario-engine` (b507285, not merged): closed-form legs, pause/seek, torpedo trail, nuclear flash, debris, 'The Rocinante's voyages' card with spoiler warning. Headless frame time unchanged (vsync-bound 8.3 ms with every effect on); looks and feel need a hand-test.
 - 2026-11-22 Reversed-Z on the WebGL renderer (replaces log depth): same pictures, Tycho dock about 1.55x faster in headless Retina (63 to 41 ms). Fallback and `?logdepth` kept.
