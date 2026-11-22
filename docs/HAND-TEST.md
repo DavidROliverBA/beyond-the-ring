@@ -155,3 +155,11 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Luna and other moons: the dark side is darker than before, with a faint blue-white earthshine when its planet is lit. Too dark to see surface detail anywhere you need it?
 - [ ] Ships and stations should look exactly as before (only planet materials changed). Check one near Earth.
 
+## The Rocinante's voyages: The run to Tycho (2026-11-22, branch tycho-eros, not merged)
+- [ ] T, 9, arrow down twice, Enter: the card lists a third entry, The run to Tycho (205 s). Watch it through: the Tachi under burn with a long blue plume, the flip, Tycho coming up with its rings lit, the last 3 km into the bay, the cut, the renamed Rocinante on her berth, the pull-back from the station.
+- [ ] The honest numbers: captions say about 8.7 days, 1109 km/s peak, last 3 km in about 64 s. Does "this leg is faster than anything real" read clearly enough, or does the squeeze feel like cheating?
+- [ ] Framing: from 110 s to 150 s the camera is a long lens beyond the habitat rings and the ship is small. Can you follow her to the bay? Does she clip the rings or struts on the way in (she comes in level with the gap between them)?
+- [ ] The rename at 150 s: look at the hull name on the Tachi (before) and the Rocinante (after) up close, via `?debug` seek if needed. Any visible pop at the cut?
+- [ ] Sound: exterior shots are silent apart from the score (a short fade at 12 s); no ship-camera shots. Anything missing or odd on speakers?
+- [ ] Facts to check against the books: route, distance, acceleration and which bay are all invented (listed in `src/scenarios/tycho.ts`). Eros is only named in the last caption; there is no Tycho to Eros film yet.
+- [ ] Safari and Firefox, with and without `?logdepth`. Any hitch at the start?
