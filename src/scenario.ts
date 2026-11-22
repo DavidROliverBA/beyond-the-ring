@@ -280,6 +280,8 @@ export interface PlayerOptions {
   bodyPos?(id: string): V3 | null;
   /** A lower third. */
   caption(title: string, text: string): void;
+  /** Take the lower third down (a seek or the end of a caption: it must not outlive its time). */
+  captionOff?(): void;
   /** The film has run to its end. */
   end(): void;
   /** The camera the film is shown through (the shaders are compiled for it before the first frame). */
@@ -324,7 +326,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
   let fx: ReturnType<typeof createFx> | null = null;
   let origin = new THREE.Vector3();
   let sunDir = new THREE.Vector3(0, 0, 1);
-  let baseFov = 0, lastT = -1, shotIx = -1, capIx = -2, snapCam = true, fxMs = 0, prewarmMs = 0;
+  let baseFov = 0, lastT = -1, cutNext = false, shotIx = -1, capIx = -2, snapCam = true, fxMs = 0, prewarmMs = 0;
   let loading = false;
   let cues: Cue[] = [], cueIx = 0, soundT = 0, hearing = { ship: false, actor: '' };
   const _st = newState();
@@ -417,7 +419,7 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
       }
       cueIx = 0; soundT = 0;
       P.active = true; P.time = 0; P.paused = false; P.speed = 1;
-      lastT = -1; shotIx = -1; capIx = -2; snapCam = true; ended = false; baseFov = 0;
+      lastT = -1; cutNext = false; shotIx = -1; capIx = -2; snapCam = true; ended = false; baseFov = 0;
       if (debug) {
         overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;left:8px;top:8px;z-index:30;font:10px/1.35 ui-monospace,Menlo,monospace;color:#8fdcff;background:rgba(0,0,0,0.55);padding:6px 8px;white-space:pre;pointer-events:none';
@@ -439,7 +441,8 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
 
     seek(t) {
       P.time = Math.min(sc?.time.duration ?? 0, Math.max(0, t));
-      snapCam = true; ended = false;
+      // Every seek is a cut, however short: camera, drive glows, sound cues and the lower third all start fresh at the new time.
+      snapCam = true; ended = false; cutNext = true;
     },
 
     update(dt, camera) {
@@ -455,7 +458,8 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
       }
       const t = P.time;
       // A jump (a seek, a stall) is a cut: the camera and drive glows must not ease across it.
-      const jumped = Math.abs(t - lastT) > 0.5 || lastT < 0;
+      const jumped = cutNext || Math.abs(t - lastT) > 0.5 || lastT < 0;
+      cutNext = false;
       lastT = t;
 
       for (const ac of actors.values()) {
@@ -476,8 +480,12 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
       sound(t, jumped);
 
       // Lower thirds: when a caption comes round, say it.
+      // The caption belongs to its time: on a cut it is put up again (or taken down if none is due), and it stays up while paused.
       const ci = sc.captions.findIndex((c) => t >= c.t && t < c.t + c.dur);
-      if (ci !== capIx) { capIx = ci; if (ci >= 0) o.caption(sc.captions[ci].title, sc.captions[ci].text); }
+      if (ci !== capIx || (jumped && ci >= 0)) {
+        capIx = ci;
+        if (ci >= 0) o.caption(sc.captions[ci].title, sc.captions[ci].text); else o.captionOff?.();
+      }
       if (overlay) overlay.textContent = describe();
       return true;
     },
