@@ -4534,6 +4534,118 @@
       "humanReviewed": false
     },
     {
+      "id": "amalthea",
+      "name": "Amalthea",
+      "kind": "moon",
+      "real": true,
+      "summary": "A small, red, elongated moon of Jupiter that circles just outside the planet’s faint inner rings.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": "125 x 73 x 64",
+          "display": "125 × 73 × 64 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 7500000000000000000,
+          "display": "7.5 × 10¹⁸ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 3100,
+          "display": "3,100 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Jupiter",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 181400,
+          "display": "181,400 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 0.498179,
+          "display": "0.50 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 0.003,
+          "display": "0.003"
+        }
+      ],
+      "know": [
+        "It measures about 250 km long by 146 across and 128 deep (the sheet gives radii of 125 × 73 × 64 km), so it is shaped more like a lumpy brick than a ball.",
+        "It orbits at 181,400 km from Jupiter’s centre and goes round in 0.498 days, under twelve hours, always showing the same face to the planet.",
+        "It is the largest of the moons that orbit inside the four big ones, and it lies deep within Jupiter’s radiation belts.",
+        "It has been seen close up only by passing spacecraft, so its surface is mapped only in part."
+      ],
+      "unknown": [
+        "What it is made of and how porous it is. Its mass is poorly known, so the density printed for it should be read with care.",
+        "Whether it formed near Jupiter or was captured, and why it looks redder than most moons."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Jupiter",
+          "url": "https://science.nasa.gov/jupiter/"
+        },
+        {
+          "label": "NSSDCA Jovian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
       "id": "io",
       "name": "Io",
       "kind": "moon",
@@ -5219,6 +5331,105 @@
       "humanReviewed": false
     },
     {
+      "id": "himalia",
+      "name": "Himalia",
+      "kind": "moon",
+      "real": true,
+      "summary": "The largest of Jupiter’s far-out irregular moons: a dark, roughly round lump about 170 km across, orbiting millions of kilometres from the planet.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 85,
+          "display": "85 km"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 9500000000000000000,
+          "display": "9.5 × 10¹⁸ kg"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Jupiter",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 11461000,
+          "display": "11,461,000 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 250.5662,
+          "display": "250.57 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Jovian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 6 December 2023",
+          "value": 0.162,
+          "display": "0.162"
+        }
+      ],
+      "know": [
+        "Its radius is about 85 km, and it orbits 11.46 million km from Jupiter in 250.6 days, on an orbit tilted about 27.5 degrees and fairly eccentric (0.162).",
+        "It turns once in about 0.4 days, roughly ten hours.",
+        "Several other small moons share much the same orbit, which suggests they are pieces of one body that broke apart.",
+        "It reflects only about 3% of the light that falls on it."
+      ],
+      "unknown": [
+        "Its density: the sheet gives none, since its mass is only roughly known.",
+        "Where its family of moons came from, and whether it was captured whole or broke up afterwards."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Jupiter",
+          "url": "https://science.nasa.gov/jupiter/"
+        },
+        {
+          "label": "NSSDCA Jovian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/joviansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
       "id": "saturn",
       "name": "Saturn",
       "kind": "planet",
@@ -5446,6 +5657,118 @@
       "humanReviewed": false
     },
     {
+      "id": "mimas",
+      "name": "Mimas",
+      "kind": "moon",
+      "real": true,
+      "summary": "The smallest and innermost of Saturn’s big round moons, an icy ball with one huge crater that gives it a distinctive, dented look.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": "208 x 197 x 191",
+          "display": "208 × 197 × 191 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 37900000000000000000,
+          "display": "3.79 × 10¹⁹ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 1150,
+          "display": "1,150 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Saturn",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 185520,
+          "display": "185,520 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 0.9424218,
+          "display": "0.94 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 0.0202,
+          "display": "0.020"
+        }
+      ],
+      "know": [
+        "Its radii are 208 × 197 × 191 km, and its density, 1,150 kg/m³, is little above water ice, so it is nearly all ice.",
+        "It orbits 185,520 km from Saturn’s centre in 0.94 days, closer than any of the other major moons.",
+        "One crater, a third of its width, dominates a face; the impact that made it came close to breaking the moon apart.",
+        "Its orbit is slightly squashed (eccentricity 0.020) and tilted about 1.5 degrees."
+      ],
+      "unknown": [
+        "Whether anything liquid lies inside. Its wobble as it orbits has been read as either a young ocean or an odd-shaped core, and the matter is still argued.",
+        "How old its surface is."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Saturn",
+          "url": "https://science.nasa.gov/saturn/"
+        },
+        {
+          "label": "NSSDCA Saturnian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
       "id": "enceladus",
       "name": "Enceladus",
       "kind": "moon",
@@ -5559,6 +5882,230 @@
           }
         }
       ],
+      "links": [
+        {
+          "label": "NASA Science: Saturn",
+          "url": "https://science.nasa.gov/saturn/"
+        },
+        {
+          "label": "NSSDCA Saturnian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
+      "id": "tethys",
+      "name": "Tethys",
+      "kind": "moon",
+      "real": true,
+      "summary": "A bright, icy moon of Saturn, scarred by one very large crater and a vast canyon that runs most of the way round it.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": "538 x 528 x 526",
+          "display": "538 × 528 × 526 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 618000000000000000000,
+          "display": "6.18 × 10²⁰ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 985,
+          "display": "985 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Saturn",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 294660,
+          "display": "294,660 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 1.887802,
+          "display": "1.89 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 0,
+          "display": "0.000"
+        }
+      ],
+      "know": [
+        "Its radii are 538 × 528 × 526 km, and its density, 985 kg/m³, is lower than that of water ice alone.",
+        "That low density points to an almost pure-ice body with little rock.",
+        "It orbits 294,660 km from Saturn in 1.89 days on a path that is nearly circular (eccentricity 0.000 on the sheet, so very nearly circular).",
+        "Two small moons, Telesto and Calypso, share its orbit, one ahead and one behind."
+      ],
+      "unknown": [
+        "How the great canyon formed. One idea is the freezing of an internal ocean; another is the stress left by the big impact.",
+        "Why its surface is so bright and clean in places."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Saturn",
+          "url": "https://science.nasa.gov/saturn/"
+        },
+        {
+          "label": "NSSDCA Saturnian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
+      "id": "dione",
+      "name": "Dione",
+      "kind": "moon",
+      "real": true,
+      "summary": "An icy moon of Saturn with a bright, wispy-looking terrain on its trailing side, made of tall ice cliffs, and with its own small companion moons.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": "563 x 561 x 560",
+          "display": "563 × 561 × 560 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 1.1e+21,
+          "display": "1.1 × 10²¹ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 1480,
+          "display": "1,480 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Saturn",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 377400,
+          "display": "377,400 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 2.736915,
+          "display": "2.74 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 0.0022,
+          "display": "0.002"
+        }
+      ],
+      "know": [
+        "Its radii are 563 × 561 × 560 km, and its density, 1,480 kg/m³, means roughly a third rock and the rest ice.",
+        "It orbits 377,400 km from Saturn in 2.74 days.",
+        "Two small moons, Helene and Polydeuces, travel in its orbit ahead of and behind it.",
+        "One side is heavily cratered and the other is crossed by long bright fractures."
+      ],
+      "unknown": [
+        "Whether there is a liquid layer deep inside, and how thick the ice crust is.",
+        "How much its surface has been renewed."
+      ],
+      "missions": [],
       "links": [
         {
           "label": "NASA Science: Saturn",
@@ -5863,6 +6410,118 @@
       "humanReviewed": false
     },
     {
+      "id": "hyperion",
+      "name": "Hyperion",
+      "kind": "moon",
+      "real": true,
+      "summary": "A battered, sponge-looking moon of Saturn that tumbles chaotically instead of spinning on a steady axis.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": "180 x 133 x 103",
+          "display": "180 × 133 × 103 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 5600000000000000000,
+          "display": "5.6 × 10¹⁸ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 550,
+          "display": "550 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Saturn",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 1500930,
+          "display": "1,500,930 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 21.276609,
+          "display": "21.28 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 0.1042,
+          "display": "0.104"
+        }
+      ],
+      "know": [
+        "Its radii are 180 × 133 × 103 km, so it is clearly not round, and its density, 550 kg/m³, is low enough that much of it must be empty space.",
+        "It orbits 1.5 million km from Saturn in 21.3 days on a fairly stretched orbit (eccentricity 0.104).",
+        "The sheet marks its rotation as chaotic: its axis and spin rate change unpredictably, in part because of the pull of Titan.",
+        "Its surface is covered in deep, sharp-edged craters."
+      ],
+      "unknown": [
+        "What it is, in detail: a piece of a larger body or a loosely packed pile of ice and rock.",
+        "How its spin will change over time, since a tumbling body is hard to predict."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Saturn",
+          "url": "https://science.nasa.gov/saturn/"
+        },
+        {
+          "label": "NSSDCA Saturnian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
       "id": "iapetus",
       "name": "Iapetus",
       "kind": "moon",
@@ -5976,6 +6635,118 @@
           }
         }
       ],
+      "links": [
+        {
+          "label": "NASA Science: Saturn",
+          "url": "https://science.nasa.gov/saturn/"
+        },
+        {
+          "label": "NSSDCA Saturnian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
+      "id": "phoebe",
+      "name": "Phoebe",
+      "kind": "moon",
+      "real": true,
+      "summary": "A dark, irregular moon of Saturn that orbits far out, the wrong way round, and is probably a captured wanderer from the outer solar system.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": "109 x 109 x 102",
+          "display": "109 × 109 × 102 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 8300000000000000000,
+          "display": "8.3 × 10¹⁸ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 1640,
+          "display": "1,640 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Saturn",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 12944000,
+          "display": "12,944,000 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period (retrograde)",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 548,
+          "display": "548.00 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Saturnian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 22 July 2025",
+          "value": 0.164,
+          "display": "0.164"
+        }
+      ],
+      "know": [
+        "Its radii are 109 × 109 × 102 km, and its density, 1,640 kg/m³, is higher than that of Saturn’s inner icy moons.",
+        "It orbits 12.9 million km from Saturn in 548 days, backwards (retrograde), on an orbit tilted about 175 degrees.",
+        "It turns once in about 0.4 days, roughly nine and a half hours.",
+        "It reflects only about 8% of the light, and the dark dust it has shed is thought to coat part of Iapetus."
+      ],
+      "unknown": [
+        "Where it came from; its makeup looks more like a comet or a Kuiper-belt body than like the inner moons.",
+        "How much of the dust ring that carries its name is fed by it today."
+      ],
+      "missions": [],
       "links": [
         {
           "label": "NASA Science: Saturn",
@@ -6498,6 +7269,230 @@
       "humanReviewed": false
     },
     {
+      "id": "ariel",
+      "name": "Ariel",
+      "kind": "moon",
+      "real": true,
+      "summary": "The brightest of Uranus’s big moons: an icy world with a surface of canyons, valleys and relatively few craters.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": "581.1 x 577.9 x 577.7",
+          "display": "581.1 × 577.9 × 577.7 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 1.29e+21,
+          "display": "1.29 × 10²¹ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 1590,
+          "display": "1,590 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Uranus",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 190900,
+          "display": "190,900 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 2.520379,
+          "display": "2.52 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 0.0012,
+          "display": "0.001"
+        }
+      ],
+      "know": [
+        "Its radii are 581.1 × 577.9 × 577.7 km, and its density, 1,590 kg/m³, suggests about half ice and half rock.",
+        "It orbits 190,900 km from Uranus in 2.52 days, on a nearly circular path.",
+        "Only one spacecraft has seen it close up, so most of one hemisphere has never been mapped.",
+        "It reflects about 39% of the light, more than any other big moon of Uranus."
+      ],
+      "unknown": [
+        "How its valleys formed: ice cracking as the inside froze is the usual idea, and there are signs of fresh, flowing ice.",
+        "Whether any heat is left inside, and whether it ever had a liquid ocean."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Uranus",
+          "url": "https://science.nasa.gov/uranus/"
+        },
+        {
+          "label": "NSSDCA Uranian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
+      "id": "umbriel",
+      "name": "Umbriel",
+      "kind": "moon",
+      "real": true,
+      "summary": "The darkest of Uranus’s big moons: an old, heavily cratered ball of ice and rock with a single bright ring on its floor.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 584.7,
+          "display": "584.7 km"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 1.22e+21,
+          "display": "1.22 × 10²¹ kg"
+        },
+        {
+          "id": "density",
+          "label": "Mean density",
+          "unit": "kg/m3",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 1460,
+          "display": "1,460 kg/m3"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Uranus",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 266000,
+          "display": "266,000 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 4.144176,
+          "display": "4.14 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Uranian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2023",
+          "value": 0.0039,
+          "display": "0.004"
+        }
+      ],
+      "know": [
+        "Its radius is 584.7 km, and its density, 1,460 kg/m³, is a little lower than Ariel’s.",
+        "It orbits 266,000 km from Uranus in 4.14 days.",
+        "It reflects about 21% of the light, the least of the five big moons.",
+        "Few areas of fresh ice show, so its surface looks old and little changed."
+      ],
+      "unknown": [
+        "What the bright ring in one crater is: frost, fresh ice or something else.",
+        "Why it is so much darker than its neighbours, with their similar sizes."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Uranus",
+          "url": "https://science.nasa.gov/uranus/"
+        },
+        {
+          "label": "NSSDCA Uranian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uraniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
       "id": "titania",
       "name": "Titania",
       "kind": "moon",
@@ -6962,6 +7957,105 @@
       "humanReviewed": false
     },
     {
+      "id": "proteus",
+      "name": "Proteus",
+      "kind": "moon",
+      "real": true,
+      "summary": "Neptune’s second-largest moon, a dark, blocky body about as large as a moon can be without pulling itself into a ball.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": "220 x 208 x 202",
+          "display": "220 × 208 × 202 km (three axes)"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 50000000000000000000,
+          "display": "5 × 10¹⁹ kg"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Neptune",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 117647,
+          "display": "117,647 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 1.122315,
+          "display": "1.12 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 0.0004,
+          "display": "0.000"
+        }
+      ],
+      "know": [
+        "Its radii are 220 × 208 × 202 km, so it is slightly squashed and angular.",
+        "It orbits 117,647 km from Neptune in 1.12 days, on a nearly circular path.",
+        "It reflects only about 10% of the light that reaches it.",
+        "It is dark and sits close to Neptune’s glare, so it went unseen from Earth: it was found in pictures from the Voyager 2 flyby."
+      ],
+      "unknown": [
+        "Its density: the sheet lists none. Its mass is only roughly known.",
+        "Its history: it may be made of debris left after a violent event in the Neptune system, which is thought to have followed Triton’s capture."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Neptune",
+          "url": "https://science.nasa.gov/neptune/"
+        },
+        {
+          "label": "NSSDCA Neptunian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
       "id": "triton",
       "name": "Triton",
       "kind": "moon",
@@ -7114,6 +8208,105 @@
         {
           "label": "NSSDCA Solar System Small Worlds Fact Sheet",
           "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/galileanfact_table.html"
+        }
+      ],
+      "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",
+      "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+      "textBy": "ai-assisted",
+      "humanReviewed": false
+    },
+    {
+      "id": "nereid",
+      "name": "Nereid",
+      "kind": "moon",
+      "real": true,
+      "summary": "A moon of Neptune on one of the most stretched-out orbits of any moon, swinging from close to Neptune to far beyond it.",
+      "facts": [
+        {
+          "id": "radius-mean",
+          "label": "Radius",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 170,
+          "display": "170 km"
+        },
+        {
+          "id": "mass",
+          "label": "Mass",
+          "unit": "kg",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 30000000000000000000,
+          "display": "3 × 10¹⁹ kg"
+        },
+        {
+          "id": "distance",
+          "label": "Distance from Neptune",
+          "unit": "km",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 5513400,
+          "display": "5,513,400 km"
+        },
+        {
+          "id": "period",
+          "label": "Orbit period",
+          "unit": "days",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 360.13619,
+          "display": "360.14 days"
+        },
+        {
+          "id": "ecc",
+          "label": "Orbit eccentricity",
+          "unit": "",
+          "sourceName": "NASA NSSDCA Neptunian Satellite Fact Sheet",
+          "sourceUrl": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html",
+          "retrieved": "2026-11-22",
+          "licence": "NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied",
+          "credit": "NASA Space Science Data Coordinated Archive (NSSDCA), Goddard Space Flight Center",
+          "note": "Fact sheet last updated 11 March 2024",
+          "value": 0.7512,
+          "display": "0.751"
+        }
+      ],
+      "know": [
+        "Its radius is about 170 km, and it reflects about 16% of the light.",
+        "It orbits 5.51 million km from Neptune in 360 days, on a path tilted 7.2 degrees with an eccentricity of 0.751, so its distance varies by a large factor.",
+        "Its brightness changes over time, so it may be elongated or tumbling.",
+        "Triton, the large moon, probably wrecked the original system of Neptune’s moons when it was captured, and Nereid may be a survivor or a piece of that event."
+      ],
+      "unknown": [
+        "Its rotation, shape and density: no density is listed, and no spacecraft has gone near it.",
+        "Whether it formed with Neptune or was thrown into its odd orbit later."
+      ],
+      "missions": [],
+      "links": [
+        {
+          "label": "NASA Science: Neptune",
+          "url": "https://science.nasa.gov/neptune/"
+        },
+        {
+          "label": "NSSDCA Neptunian Satellite Fact Sheet",
+          "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptuniansatfact.html"
         }
       ],
       "licence": "Numbers: NASA content is generally not subject to copyright in the United States (NASA media usage guidelines); used for education and information, no endorsement implied. Summary and lists: written for this game, AI-assisted, from the sources linked.",

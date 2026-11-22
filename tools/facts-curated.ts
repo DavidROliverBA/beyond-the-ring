@@ -185,7 +185,8 @@ PLANET_FACTS.mars.splice(-1, 0, { id: 'pressure', label: 'Surface air pressure',
 for (const b of ['uranus', 'neptune', 'pluto']) PLANET_FACTS[b].push(discovery(b));
 
 /** A moon on one of the satellite sheets: bulk row first, then the orbital row (after 'Orbital parameters'). */
-function satFacts(raw: string, name: string, parent: string, o: { retro?: boolean } = {}): FactSpec[] {
+/** `noDensity`: the sheet prints no density for this moon. `rotNum`: its orbit row carries a rotation period in days (not S or C). */
+function satFacts(raw: string, name: string, parent: string, o: { retro?: boolean; noDensity?: boolean; rotNum?: boolean } = {}): FactSpec[] {
   const code = '\\([A-Z]*[IVX]+[^)]*\\)';
   const lead = `(?<![A-Za-z])${name} ${code}`;
   const radiusRe = new RegExp(`${lead} ${N} (${N}(?: x ${N}){0,2}) `);
@@ -193,10 +194,10 @@ function satFacts(raw: string, name: string, parent: string, o: { retro?: boolea
     { id: 'radius-mean', label: 'Radius', raw, re: radiusRe, unit: 'km', fmt: 'dec1',
       text: (m) => { const parts = m[1].split(' x '); return parts.length === 1 ? { value: parseFloat(m[1].replace(/,/g, '')), display: `${parseFloat(m[1].replace(/,/g, '')).toLocaleString('en-GB', { maximumFractionDigits: 1 })} km` } as never : { value: parts.join(' x '), display: `${parts.join(' \u00d7 ')} km (three axes)` }; } },
     { id: 'mass', label: 'Mass', raw, re: new RegExp(`${lead} (${N}) `), unit: 'kg', scale: 1e20, fmt: 'sci' },
-    { id: 'density', label: 'Mean density', raw, re: new RegExp(`${lead} ${N} ${N}(?: x ${N}){0,2} (${N}) `), unit: 'kg/m3', fmt: 'int' },
+    ...(o.noDensity ? [] : [{ id: 'density', label: 'Mean density', raw, re: new RegExp(`${lead} ${N} ${N}(?: x ${N}){0,2} (${N}) `), unit: 'kg/m3', fmt: 'int' } as FactSpec]),
     { id: 'distance', label: `Distance from ${parent}`, raw, after: 'Orbital parameters', re: new RegExp(`${lead} (${N}) `), unit: 'km', scale: 1e3, fmt: 'int' },
     { id: 'period', label: o.retro ? 'Orbit period (retrograde)' : 'Orbit period', raw, after: 'Orbital parameters', re: new RegExp(`${lead} ${N} ${N} ([\\d.]+)R? `), unit: 'days', fmt: 'dec2' },
-    { id: 'ecc', label: 'Orbit eccentricity', raw, after: 'Orbital parameters', re: new RegExp(`${lead} ${N} ${N} [\\d.]+R? (?:[SC] )?[\\d.]+ ([\\d.]+)`), unit: '', fmt: 'dec3' },
+    { id: 'ecc', label: 'Orbit eccentricity', raw, after: 'Orbital parameters', re: new RegExp(`${lead} ${N} ${N} [\\d.]+R? (?:[SC] )?${o.rotNum ? `${N} ` : ''}[\\d.]+ ([\\d.]+)`), unit: '', fmt: 'dec3' },
   ];
 }
 /** One column of the 'small worlds' table (the sheet lists CALLISTO GANYMEDE EUROPA IO MOON MERCURY PLUTO TITAN TRITON CERES EARTH). */
@@ -248,12 +249,19 @@ export const BODY_FACTS: Record<string, FactSpec[]> = {
   miranda: satFacts('urasat', 'Miranda', 'Uranus'), titania: satFacts('urasat', 'Titania', 'Uranus'), oberon: satFacts('urasat', 'Oberon', 'Uranus'),
   triton: [...satFacts('nepsat', 'Triton', 'Neptune', { retro: true }), ...smallWorld('TRITON')],
   charon: CHARON_FACTS,
+  amalthea: satFacts('jovsat', 'Amalthea', 'Jupiter'), himalia: satFacts('jovsat', 'Himalia', 'Jupiter', { noDensity: true, rotNum: true }),
+  mimas: satFacts('satsat', 'Mimas', 'Saturn'), tethys: satFacts('satsat', 'Tethys', 'Saturn'), dione: satFacts('satsat', 'Dione', 'Saturn'), hyperion: satFacts('satsat', 'Hyperion', 'Saturn'),
+  phoebe: satFacts('satsat', 'Phoebe', 'Saturn', { retro: true, rotNum: true }),
+  ariel: satFacts('urasat', 'Ariel', 'Uranus'), umbriel: satFacts('urasat', 'Umbriel', 'Uranus'),
+  proteus: satFacts('nepsat', 'Proteus', 'Neptune', { noDensity: true }), nereid: satFacts('nepsat', 'Nereid', 'Neptune', { noDensity: true }),
 };
 /** Which pages feed a body's 'Sources' links and which sheet the 'what we know' text leans on. */
 export const BODY_SHEETS: Record<string, string[]> = {
   sun: ['sun'], mercury: ['mercury'], venus: ['venus'], mars: ['mars'], jupiter: ['jupiter'], saturn: ['saturn'], uranus: ['uranus'], neptune: ['neptune'], pluto: ['pluto'],
   phobos: ['mars'], deimos: ['mars'], io: ['jovsat', 'smallworlds'], europa: ['jovsat', 'smallworlds'], ganymede: ['jovsat', 'smallworlds'], callisto: ['jovsat', 'smallworlds'],
   enceladus: ['satsat'], rhea: ['satsat'], titan: ['satsat', 'smallworlds'], iapetus: ['satsat'], miranda: ['urasat'], titania: ['urasat'], oberon: ['urasat'], triton: ['nepsat', 'smallworlds'], charon: ['pluto'],
+  amalthea: ['jovsat'], himalia: ['jovsat'], mimas: ['satsat'], tethys: ['satsat'], dione: ['satsat'], hyperion: ['satsat'], phoebe: ['satsat'],
+  ariel: ['urasat'], umbriel: ['urasat'], proteus: ['nepsat'], nereid: ['nepsat'],
 };
 
 /** Small bodies read from the JPL Small-Body Database API (one cached JSON response each). */

@@ -376,6 +376,171 @@ export const BODY_TEXT: Record<string, BodyText> = {
     ],
     links: [sci('Pluto', 'dwarf-planets/pluto')],
   },
+  amalthea: {
+    name: 'Amalthea', kind: 'moon',
+    summary: 'A small, red, elongated moon of Jupiter that circles just outside the planet’s faint inner rings.',
+    know: [
+      'It measures about 250 km long by 146 across and 128 deep (the sheet gives radii of 125 × 73 × 64 km), so it is shaped more like a lumpy brick than a ball.',
+      'It orbits at 181,400 km from Jupiter’s centre and goes round in 0.498 days, under twelve hours, always showing the same face to the planet.',
+      'It is the largest of the moons that orbit inside the four big ones, and it lies deep within Jupiter’s radiation belts.',
+      'It has been seen close up only by passing spacecraft, so its surface is mapped only in part.',
+    ],
+    unknown: [
+      'What it is made of and how porous it is. Its mass is poorly known, so the density printed for it should be read with care.',
+      'Whether it formed near Jupiter or was captured, and why it looks redder than most moons.',
+    ],
+    links: [sci('Jupiter', 'jupiter')],
+  },
+  himalia: {
+    name: 'Himalia', kind: 'moon',
+    summary: 'The largest of Jupiter’s far-out irregular moons: a dark, roughly round lump about 170 km across, orbiting millions of kilometres from the planet.',
+    know: [
+      'Its radius is about 85 km, and it orbits 11.46 million km from Jupiter in 250.6 days, on an orbit tilted about 27.5 degrees and fairly eccentric (0.162).',
+      'It turns once in about 0.4 days, roughly ten hours.',
+      'Several other small moons share much the same orbit, which suggests they are pieces of one body that broke apart.',
+      'It reflects only about 3% of the light that falls on it.',
+    ],
+    unknown: [
+      'Its density: the sheet gives none, since its mass is only roughly known.',
+      'Where its family of moons came from, and whether it was captured whole or broke up afterwards.',
+    ],
+    links: [sci('Jupiter', 'jupiter')],
+  },
+  mimas: {
+    name: 'Mimas', kind: 'moon',
+    summary: 'The smallest and innermost of Saturn’s big round moons, an icy ball with one huge crater that gives it a distinctive, dented look.',
+    know: [
+      'Its radii are 208 × 197 × 191 km, and its density, 1,150 kg/m³, is little above water ice, so it is nearly all ice.',
+      'It orbits 185,520 km from Saturn’s centre in 0.94 days, closer than any of the other major moons.',
+      'One crater, a third of its width, dominates a face; the impact that made it came close to breaking the moon apart.',
+      'Its orbit is slightly squashed (eccentricity 0.020) and tilted about 1.5 degrees.',
+    ],
+    unknown: [
+      'Whether anything liquid lies inside. Its wobble as it orbits has been read as either a young ocean or an odd-shaped core, and the matter is still argued.',
+      'How old its surface is.',
+    ],
+    links: [sci('Saturn', 'saturn')],
+  },
+  tethys: {
+    name: 'Tethys', kind: 'moon',
+    summary: 'A bright, icy moon of Saturn, scarred by one very large crater and a vast canyon that runs most of the way round it.',
+    know: [
+      'Its radii are 538 × 528 × 526 km, and its density, 985 kg/m³, is lower than that of water ice alone.',
+      'That low density points to an almost pure-ice body with little rock.',
+      'It orbits 294,660 km from Saturn in 1.89 days on a path that is nearly circular (eccentricity 0.000 on the sheet, so very nearly circular).',
+      'Two small moons, Telesto and Calypso, share its orbit, one ahead and one behind.',
+    ],
+    unknown: [
+      'How the great canyon formed. One idea is the freezing of an internal ocean; another is the stress left by the big impact.',
+      'Why its surface is so bright and clean in places.',
+    ],
+    links: [sci('Saturn', 'saturn')],
+  },
+  dione: {
+    name: 'Dione', kind: 'moon',
+    summary: 'An icy moon of Saturn with a bright, wispy-looking terrain on its trailing side, made of tall ice cliffs, and with its own small companion moons.',
+    know: [
+      'Its radii are 563 × 561 × 560 km, and its density, 1,480 kg/m³, means roughly a third rock and the rest ice.',
+      'It orbits 377,400 km from Saturn in 2.74 days.',
+      'Two small moons, Helene and Polydeuces, travel in its orbit ahead of and behind it.',
+      'One side is heavily cratered and the other is crossed by long bright fractures.',
+    ],
+    unknown: [
+      'Whether there is a liquid layer deep inside, and how thick the ice crust is.',
+      'How much its surface has been renewed.',
+    ],
+    links: [sci('Saturn', 'saturn')],
+  },
+  hyperion: {
+    name: 'Hyperion', kind: 'moon',
+    summary: 'A battered, sponge-looking moon of Saturn that tumbles chaotically instead of spinning on a steady axis.',
+    know: [
+      'Its radii are 180 × 133 × 103 km, so it is clearly not round, and its density, 550 kg/m³, is low enough that much of it must be empty space.',
+      'It orbits 1.5 million km from Saturn in 21.3 days on a fairly stretched orbit (eccentricity 0.104).',
+      'The sheet marks its rotation as chaotic: its axis and spin rate change unpredictably, in part because of the pull of Titan.',
+      'Its surface is covered in deep, sharp-edged craters.',
+    ],
+    unknown: [
+      'What it is, in detail: a piece of a larger body or a loosely packed pile of ice and rock.',
+      'How its spin will change over time, since a tumbling body is hard to predict.',
+    ],
+    links: [sci('Saturn', 'saturn')],
+  },
+  phoebe: {
+    name: 'Phoebe', kind: 'moon',
+    summary: 'A dark, irregular moon of Saturn that orbits far out, the wrong way round, and is probably a captured wanderer from the outer solar system.',
+    know: [
+      'Its radii are 109 × 109 × 102 km, and its density, 1,640 kg/m³, is higher than that of Saturn’s inner icy moons.',
+      'It orbits 12.9 million km from Saturn in 548 days, backwards (retrograde), on an orbit tilted about 175 degrees.',
+      'It turns once in about 0.4 days, roughly nine and a half hours.',
+      'It reflects only about 8% of the light, and the dark dust it has shed is thought to coat part of Iapetus.',
+    ],
+    unknown: [
+      'Where it came from; its makeup looks more like a comet or a Kuiper-belt body than like the inner moons.',
+      'How much of the dust ring that carries its name is fed by it today.',
+    ],
+    links: [sci('Saturn', 'saturn')],
+  },
+  ariel: {
+    name: 'Ariel', kind: 'moon',
+    summary: 'The brightest of Uranus’s big moons: an icy world with a surface of canyons, valleys and relatively few craters.',
+    know: [
+      'Its radii are 581.1 × 577.9 × 577.7 km, and its density, 1,590 kg/m³, suggests about half ice and half rock.',
+      'It orbits 190,900 km from Uranus in 2.52 days, on a nearly circular path.',
+      'Only one spacecraft has seen it close up, so most of one hemisphere has never been mapped.',
+      'It reflects about 39% of the light, more than any other big moon of Uranus.',
+    ],
+    unknown: [
+      'How its valleys formed: ice cracking as the inside froze is the usual idea, and there are signs of fresh, flowing ice.',
+      'Whether any heat is left inside, and whether it ever had a liquid ocean.',
+    ],
+    links: [sci('Uranus', 'uranus')],
+  },
+  umbriel: {
+    name: 'Umbriel', kind: 'moon',
+    summary: 'The darkest of Uranus’s big moons: an old, heavily cratered ball of ice and rock with a single bright ring on its floor.',
+    know: [
+      'Its radius is 584.7 km, and its density, 1,460 kg/m³, is a little lower than Ariel’s.',
+      'It orbits 266,000 km from Uranus in 4.14 days.',
+      'It reflects about 21% of the light, the least of the five big moons.',
+      'Few areas of fresh ice show, so its surface looks old and little changed.',
+    ],
+    unknown: [
+      'What the bright ring in one crater is: frost, fresh ice or something else.',
+      'Why it is so much darker than its neighbours, with their similar sizes.',
+    ],
+    links: [sci('Uranus', 'uranus')],
+  },
+  proteus: {
+    name: 'Proteus', kind: 'moon',
+    summary: 'Neptune’s second-largest moon, a dark, blocky body about as large as a moon can be without pulling itself into a ball.',
+    know: [
+      'Its radii are 220 × 208 × 202 km, so it is slightly squashed and angular.',
+      'It orbits 117,647 km from Neptune in 1.12 days, on a nearly circular path.',
+      'It reflects only about 10% of the light that reaches it.',
+      'It is dark and sits close to Neptune’s glare, so it went unseen from Earth: it was found in pictures from the Voyager 2 flyby.',
+    ],
+    unknown: [
+      'Its density: the sheet lists none. Its mass is only roughly known.',
+      'Its history: it may be made of debris left after a violent event in the Neptune system, which is thought to have followed Triton’s capture.',
+    ],
+    links: [sci('Neptune', 'neptune')],
+  },
+  nereid: {
+    name: 'Nereid', kind: 'moon',
+    summary: 'A moon of Neptune on one of the most stretched-out orbits of any moon, swinging from close to Neptune to far beyond it.',
+    know: [
+      'Its radius is about 170 km, and it reflects about 16% of the light.',
+      'It orbits 5.51 million km from Neptune in 360 days, on a path tilted 7.2 degrees with an eccentricity of 0.751, so its distance varies by a large factor.',
+      'Its brightness changes over time, so it may be elongated or tumbling.',
+      'Triton, the large moon, probably wrecked the original system of Neptune’s moons when it was captured, and Nereid may be a survivor or a piece of that event.',
+    ],
+    unknown: [
+      'Its rotation, shape and density: no density is listed, and no spacecraft has gone near it.',
+      'Whether it formed with Neptune or was thrown into its odd orbit later.',
+    ],
+    links: [sci('Neptune', 'neptune')],
+  },
   ceres: {
     name: 'Ceres', kind: 'dwarf',
     summary: 'The largest object in the main asteroid belt and the only dwarf planet in the inner solar system: a round, dark world of rock and ice.',

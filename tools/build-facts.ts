@@ -153,7 +153,7 @@ function fictionEntity(f: (typeof FICTION_TEXT)[number]): Entity {
 
 // The order in the file: by distance from the Sun, planets with their moons, then the small bodies.
 const ORDER = ['sun', 'mercury', 'venus', 'earth', 'luna', 'mars', 'phobos', 'deimos', 'ceres', 'vesta', 'pallas', 'hygiea', 'interamnia', 'eunomia', 'juno', 'psyche', 'eros', 'ida', 'apophis', 'bennu', 'ryugu', 'hektor',
-  'jupiter', 'io', 'europa', 'ganymede', 'callisto', 'saturn', 'enceladus', 'rhea', 'titan', 'iapetus', 'chiron', 'uranus', 'miranda', 'titania', 'oberon', 'neptune', 'triton', 'pluto', 'charon',
+  'jupiter', 'amalthea', 'io', 'europa', 'ganymede', 'callisto', 'himalia', 'saturn', 'mimas', 'enceladus', 'tethys', 'dione', 'rhea', 'titan', 'hyperion', 'iapetus', 'phoebe', 'chiron', 'uranus', 'miranda', 'ariel', 'umbriel', 'titania', 'oberon', 'neptune', 'proteus', 'triton', 'nereid', 'pluto', 'charon',
   'haumea', 'makemake', 'eris', 'orcus', 'quaoar', 'sedna', 'gonggong', 'halley', 'halebopp', '67p', 'tempel1', 'swifttuttle', 'oumuamua', 'borisov'];
 const built = new Map<string, Entity>();
 built.set('earth', entity('earth', EARTH_FACTS, EARTH_MISSIONS));
