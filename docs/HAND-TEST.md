@@ -147,3 +147,11 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Tycho is now a 1 km sphere with rings about 1.7 km across; ships at its ports should clear the rings. Looks right beside the Donnager (476 m)? Docking still works?
 - [ ] The Tachi and escorts in the Donnager film are 46 m now (were 57 m): any scene that now looks wrong?
 - [ ] Pitting on hulls: fine specks, not noisy or sparkly in motion?
+## Planet shading (2026-11-22, branch planet-shading, not merged)
+- [ ] Fly to Saturn, then circle it from above and below the ring plane. Does the ring shadow cross the globe on the hemisphere facing away from the Sun? From the side away from the Sun, do the rings glow where they are thin (the Cassini division and C ring) and stay dark where dense? Does the unlit face of the rings look right, or too dim?
+- [ ] Earth, Sun at 60 to 90 degrees to your view: a broad bright glint on the sea only (not on land or ice), no glint on the night side. Too big or too hot? Bloom may over-do it.
+- [ ] Earth low orbit towards a sunset: blue over orange at the limb, orange terminator on the surface. Is the Sun's glare column too strong (it comes from the lens rays, not the new shader)?
+- [ ] The Sun from a few radii out: darker, redder rim. Looks right or too orange?
+- [ ] Luna and other moons: the dark side is darker than before, with a faint blue-white earthshine when its planet is lit. Too dark to see surface detail anywhere you need it?
+- [ ] Ships and stations should look exactly as before (only planet materials changed). Check one near Earth.
+
