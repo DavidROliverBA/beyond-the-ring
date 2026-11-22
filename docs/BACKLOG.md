@@ -111,14 +111,14 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E2.2 Data model and build script
 - [x] 2026-11-22 E2.2.a (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Schema `Fact` with value, unit, source name, source URL, date retrieved, licence; schema `Entity` with id, name, kind (planet, moon, asteroid, comet, probe, station, site), real or fictional, links
-- [x] 2026-11-22 E2.2.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) A build script `tools/build-facts.ts` that pulls from JPL SBDB and Horizons and the curated lists and writes `assets/data/facts.json`; re-runnable and versioned, with a diff of what changed
+- [~] (rest of the real bodies: branch facts-all-bodies, agent) 2026-11-22 E2.2.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) A build script `tools/build-facts.ts` that pulls from JPL SBDB and Horizons and the curated lists and writes `assets/data/facts.json`; re-runnable and versioned, with a diff of what changed
 - [x] 2026-11-22 E2.2.c (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Tests: every fact has a source and a date; no entity without a licence line
 
 ### E2.3 What appears in the game
 - [ ] E2.0 Decisions recorded 2026-11-22 (David, on my recommendation): panel labelled AI-assisted with a Sources list, never 'NASA says'; no ESA images (facts and links only); JAXA facts and links only; date control 'today' only for now; ISRO/CNSA deferred; NASA 3D: rely on media guidelines and note the licence conflict in CREDITS.md
 - [x] 2026-11-22 E2.3.a (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) Info panel: open from the aim card or a key (`I`), shows the name, a one-sentence summary, key numbers (size, mass, orbit, day, temperature, discoveries), a short "what we know", "what we do not know", missions that visited, and links
 - [x] 2026-11-22 E2.3.b (branch real-facts, 5f2e7d3, thin slice: Earth and Luna only, not merged) A "Real" or "Fiction" badge on every object so it is never unclear
-- [ ] E2.3.c For fiction objects, a "based on" link to the real equivalent (Tycho station to O'Neill cylinders, Ceres concourse to real Ceres data)
+- [~] E2.3.c (branch facts-all-bodies, agent) For fiction objects, a "based on" link to the real equivalent (Tycho station to O'Neill cylinders, Ceres concourse to real Ceres data)
 - [ ] E2.3.d Missions layer: real probes at their true trajectories or last known positions, with launch dates and what they found
 - [ ] E2.3.e Landing sites and surface features (Apollo sites, Curiosity, Perseverance, Schiaparelli) as markers visible at close range
 - [ ] E2.3.f Search and a "Discover" list: browse by agency, by mission, by kind; a "what is that?" shortcut on any object
