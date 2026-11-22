@@ -12,7 +12,7 @@
 // nose where she is going, and the flip turns her end for end about her own up axis.
 
 import * as THREE from 'three';
-import { buildModel, type ShipModel } from './ships';
+import { buildModel, modelLength, type ShipModel } from './ships';
 import { DrivePlume } from './plume';
 import { SOL_UNIT } from './traffic';
 import type { Shot } from './tour';
@@ -348,8 +348,8 @@ export function createScenarioPlayer(o: PlayerOptions): ScenarioPlayer {
         if (!tr) throw new Error(`Scenario ${s.id}: no track for ${d.id}`);
         const g = new THREE.Group();
         g.name = d.id;
-        const model = buildModel(d.model);
-        model.scale.setScalar(d.len);
+        const model = buildModel(d.model, d.name.toLowerCase());
+        model.scale.setScalar(d.len / modelLength(d.model));
         g.add(model);
         // The model's own fixed drive glows are replaced by ones this scenario can switch.
         const plumes: DrivePlume[] = [];

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { paintGlow, rng } from './textures';
 import { scan } from './materials';
 import { DrivePlume } from './plume';
+import { addDecals, DECALS } from './decals';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import corvetteGlb from '../assets/models/corvette.glb';
@@ -509,7 +510,7 @@ export const ROCI_UNIT = ROCI.metres / ROCI.length;   // metres in one model uni
 export function playerShip(): { group: G; plume: DrivePlume } {
   const g = new THREE.Group();
   const file = loaded.get('corvette');
-  g.add(file ? file.clone(true) : corvette());
+  if (file) { const c = file.clone(true); markUp(c, file, 'corvette', 'rocinante'); g.add(c); } else g.add(corvette());
   // A tall drive plume, as long as four ship lengths at full burn.
   const plume = new DrivePlume(ROCI.nozzleR, 4.2);
   plume.position.z = ROCI.nozzleZ;
@@ -647,9 +648,32 @@ export async function loadModels() {
   await ringLoad;
 }
 
-function fromFile(name: ShipModel, src: G): G {
+/** Names, registry marks and badges (src/decals.ts), laid on the hull once per ship and shared by every clone. */
+const marked = new Map<string, THREE.Object3D[]>();
+function markUp(c: G, src: G, model: ShipModel, id?: string) {
+  const list = id ? DECALS[id] : undefined;
+  if (!list) return;
+  const key = `${model}:${id}`;
+  let set = marked.get(key);
+  if (!set) {
+    const tmp = src.clone(true);
+    addDecals(tmp, list);
+    set = tmp.children.filter((o) => o.name === 'decal');
+    marked.set(key, set);
+  }
+  for (const d of set) c.add(d.clone());
+}
+
+/** Model units in one metre-of-length unit: every model is 1 long except the Rocinante's hull, which is
+ *  ROCI.length from nose to drive cone (the 46 m the books give). Scale a ship's true length by 1 / this. */
+export function modelLength(m: ShipModel): number {
+  return m === 'corvette' || m === 'player' ? ROCI.length : 1;
+}
+
+function fromFile(name: ShipModel, src: G, id?: string): G {
   const g = new THREE.Group();
   const c = src.clone(true);
+  markUp(c, src, name, id);
   g.add(c);
   const burn = BURN[name];
   if (burn) {
@@ -669,10 +693,11 @@ function fromFile(name: ShipModel, src: G): G {
   return g;
 }
 
-export function buildModel(m: ShipModel): G {
+/** `id` names the ship (a body's id, or a scenario actor's name in lower case): the hero ships carry their names. */
+export function buildModel(m: ShipModel, id?: string): G {
   if (m === 'player') return playerShip().group;
   const file = loaded.get(m === 'wreck' ? 'racer' : m);
-  if (file) return fromFile(m, file);
+  if (file) return fromFile(m, file, id);
   const make = BUILDERS[m];
   if (!make) throw new Error(`No model called "${m}"`);
   return make();

@@ -8,7 +8,7 @@
 // camera) and glints are stored relative to their fleet's origin, so nothing jitters.
 
 import * as THREE from 'three';
-import { buildModel, type ShipModel } from './ships';
+import { buildModel, modelLength, type ShipModel } from './ships';
 import { rng } from './textures';
 
 type V3 = THREE.Vector3;
@@ -160,7 +160,7 @@ export function makeTraffic(fleets: Fleet[], seed: number, unit = SOL_UNIT, vLoc
       const kind = pickKind(f.only);
       const g = tpl(kind.model).clone(true);
       const len = kind.m * unit * (0.85 + r() * 0.3);
-      g.scale.setScalar(len);
+      g.scale.setScalar(len / modelLength(kind.model));
       group.add(g);
       const c: Craft = {
         g, fleet: fi, len, port: Math.floor(r() * f.ports.length), fport: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(),
