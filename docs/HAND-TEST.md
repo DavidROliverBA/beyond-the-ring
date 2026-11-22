@@ -182,3 +182,13 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] Phone width: icon-only strip across the very top, scrolls sideways; panels sit below it. Check on a real phone.
 - [ ] After clicking a button, Space, Enter and the arrow keys still go to the game, not the button.
 
+## Voyage playback controls (branch scn-controls)
+- [ ] Start any Rocinante voyage: a strip appears bottom-centre with chapter name, prev, play/pause, next, a scrub bar with orange chapter ticks, time, speed and Exit. In the film look it dims to about a third and comes back on mouse move or hover; while paused it stays bright.
+- [ ] Space pauses and resumes; Left/Right seek 5 s; [ and ] go to the previous (restart this one if over 2 s in) and next chapter; Esc hands the ship back. Any other key (W, Tab...) still ends the voyage as before. With the keys card, settings or Places open, these keys belong to that panel.
+- [ ] Click and drag the scrub bar: the picture, ships, debris and flashes follow; after scrubbing back to an early moment no wreckage or fire from later shows, after scrubbing forward it is all there.
+- [ ] After a seek the lower third matches the moment: right caption when one is due, none in the gaps; it stays up while paused.
+- [ ] Sound after a seek: no burst of old noises; ship-camera shots (Donnager pov) play their guns and impacts again from the new time. Needs real speakers.
+- [ ] 0.5x and 2x change the speed; the label on the button shows it. Clicking the picture during a voyage does not grab the mouse.
+- [ ] Phone width: the strip is two rows (buttons, then a full-width scrub bar), captions sit above it, buttons are easy to tap. Touch drag on the scrub bar seeks. Check on a real phone.
+- [ ] Card (T, then Rocinante's voyages): "Hide later books" with "I have read up to" a book; with all voyages in Book 1 nothing disappears at Book 1 (check again when a later book is added). Setting survives a reload.
+- [ ] Leave a voyage midway (Exit or any key): the card shows "Resume at m:ss" under it; clicking resumes there; R resumes the highlighted one; finishing the film or leaving in the first 5 s clears it. Private window: nothing remembered, no error.
