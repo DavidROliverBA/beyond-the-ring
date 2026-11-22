@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { paintGlow, rng } from './textures';
 import { scan } from './materials';
+import { erosGeometry, erosHit, erosMaterial, erosRock, SPAR, STATION_SPOTS } from './eros';
 import { DrivePlume } from './plume';
 import { addDecals, DECALS } from './decals';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -102,7 +103,7 @@ function windows(g: G, x: number, y: number, z0: number, z1: number, n: number, 
 
 export type ShipModel =
   | 'corvette' | 'battleship' | 'dreadnought' | 'hauler' | 'racer' | 'wreck' | 'freighter' | 'stealth'
-  | 'survey' | 'magnetar' | 'tycho' | 'medina' | 'mirrors' | 'asteroid' | 'spire' | 'player';
+  | 'survey' | 'magnetar' | 'tycho' | 'medina' | 'mirrors' | 'asteroid' | 'spire' | 'eros' | 'eros-station' | 'player';
 
 const MCRN = () => [metal(0x62675f), metal(0xa8452c, { roughness: 0.6 }), metal(0x2b2e30)] as const;
 const UNN = () => [metal(0x7c8998), metal(0xd7dde2, { roughness: 0.6 }), metal(0x2d3540)] as const;
@@ -538,6 +539,66 @@ function asteroid(): G {
   return g;
 }
 
+/** 433 Eros (the rock is built in src/eros.ts: real length and proportions, procedural surface, one unit long along Z). */
+function eros(): G {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(erosGeometry().geo, erosMaterial()));
+  return g;
+}
+
+/** Eros Station. FICTIONAL DRESSING ON A REAL SHAPE: the story's Eros station is a hollowed-out asteroid with lit surface works (a spaceport,
+ *  docks, a Protogen site), and no source gives their layout. Everything added to the rock below is our own invention: a field of domes,
+ *  a landing pad with a glow, a long docking spar with a lit cradle, two slim towers. The rock under it is `eros()`, unchanged. */
+function erosStation(): G {
+  const g = eros();
+  const rock = erosRock();
+  const hull = metal(0x8a8f92, { roughness: 0.55 }), dark = metal(0x2e3134);
+  const warm = lit(0xffd7a0), cool = lit(0x9fd0ff), red = lit(0xff5a40);
+  const dome = new THREE.MeshStandardMaterial({ color: 0xcfd6da, emissive: 0xffc27a, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.2 });
+  // Stand a structure on the surface: its local +Y along the surface normal.
+  const stand = (o: THREE.Object3D, dir: readonly [number, number, number], lift = 0) => {
+    const { p, n } = erosHit(new THREE.Vector3(dir[0] * 2, dir[1] * 2, dir[2]), rock);
+    o.position.copy(p).addScaledVector(n, lift);
+    o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+    g.add(o);
+    return o;
+  };
+  // Domes with a ring of lit windows.
+  const domeAt = (r: number, dir: readonly [number, number, number]) => {
+    const o = new THREE.Group();
+    o.add(new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), dome));
+    for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; const w = bx(o, warm, r * 0.12, r * 0.1, r * 0.12, Math.cos(a) * r * 0.97, r * 0.22, Math.sin(a) * r * 0.97); w.rotation.y = -a; }
+    bx(o, dark, r * 2.3, r * 0.08, r * 2.3, 0, 0, 0);
+    stand(o, dir, -r * 0.05);
+  };
+  domeAt(0.0125, STATION_SPOTS.domeA);
+  domeAt(0.009, STATION_SPOTS.domeB);
+  domeAt(0.007, STATION_SPOTS.domeC);
+  domeAt(0.01, STATION_SPOTS.domeD);
+  // The spaceport: a flat pad edged with beacons and a soft glow over it.
+  const pad = new THREE.Group();
+  bx(pad, hull, 0.07, 0.003, 0.034, 0, 0.0015, 0);
+  for (let i = 0; i <= 8; i++) { bx(pad, i % 2 ? warm : cool, 0.0025, 0.0025, 0.0025, -0.033 + i * 0.00825, 0.004, 0.0155); bx(pad, i % 2 ? warm : cool, 0.0025, 0.0025, 0.0025, -0.033 + i * 0.00825, 0.004, -0.0155); }
+  const glow = glowSprite(0xffc890, 0.16, 0.5); glow.position.y = 0.012; pad.add(glow);
+  stand(pad, STATION_SPOTS.pad, 0.001);
+  // A docking spar: a long arm out from the rock, a lit cradle disc at the end (a ship berths just above its middle), strobes along it.
+  const spar = new THREE.Group();
+  bx(spar, hull, 0.004, SPAR.len, 0.004, 0, SPAR.len / 2, 0);
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(SPAR.r, SPAR.r, 0.0007, 24), hull); disc.position.y = SPAR.len; spar.add(disc);
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; bx(spar, i % 4 ? cool : warm, 0.0004, 0.0004, 0.0004, Math.cos(a) * SPAR.r, SPAR.len + 0.0005, Math.sin(a) * SPAR.r); }
+  for (let i = 1; i < 6; i++) bx(spar, i % 2 ? red : warm, 0.0016, 0.0016, 0.0016, 0.003, i * 0.008, 0);
+  stand(spar, STATION_SPOTS.spar, -0.002);
+  // Two slim towers.
+  for (const spot of [STATION_SPOTS.towerA, STATION_SPOTS.towerB]) {
+    const t = new THREE.Group();
+    bx(t, hull, 0.004, 0.035, 0.004, 0, 0.0175, 0);
+    for (let i = 0; i < 5; i++) bx(t, warm, 0.0016, 0.0016, 0.0046, 0, 0.005 + i * 0.006, 0);
+    bx(t, red, 0.003, 0.003, 0.003, 0, 0.036, 0);
+    stand(t, spot, -0.002);
+  }
+  return g;
+}
+
 /** A crystalline spire for the Venus epilogue: a hexagonal shaft with a point, two shorter ones leaning against it. One unit long, its foot at the
  *  origin and its tip towards -Z (so a leg that faces along the surface normal stands it upright). A guess at a shape the books leave open. */
 function spire(): G {
@@ -559,7 +620,7 @@ function spire(): G {
 }
 
 const BUILDERS: Record<Exclude<ShipModel, 'player'>, () => G> = {
-  corvette, battleship, dreadnought, hauler, racer: () => racer(1), wreck: () => racer(0), freighter, stealth, survey, magnetar, tycho, medina, mirrors, asteroid, spire,
+  corvette, battleship, dreadnought, hauler, racer: () => racer(1), wreck: () => racer(0), freighter, stealth, survey, magnetar, tycho, medina, mirrors, asteroid, spire, eros, 'eros-station': erosStation,
 };
 
 // ---- Models made in Blender (tools/blender), loaded once at start-up. The

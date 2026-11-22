@@ -17,7 +17,8 @@
 //  - The epilogue (SP9, grade C): two crystalline towers grow at the impact site (GS, grade C; W says only "a vast structure"). Their number is
 //    from GS; their shape, height (2,000 km), how fast they grow and where they stand are INVENTED. A time-jump caption says so.
 //  - Venus's clouds turn on the real planet's own rotation, so the impact site slides slowly under the camera; the towers are not tied to it.
-//  - Eros's size (34 km, the real asteroid's length) is from our body data (E). Its shape here is a made-up peanut.
+//  - Eros's size (34.4 km, the real asteroid's length and proportions) is from JPL's figures. Its shape is the procedural Eros of src/eros.ts: the
+//    right proportions, with seeded craters, and NOT the NEAR Shoemaker shape model. The bare rock is used here (no station dressing).
 // No book text is used; captions are written fresh.
 
 import type { Scenario, ScnShot, Vec } from '../scenario';
@@ -63,7 +64,7 @@ export const VENUS: Scenario = {
   },
   time: { duration: 196, scale: 'compressed', note: 'Invented: a time-lapse of a dive no source times. The epilogue jumps ahead by an unstated time.' },
   actors: [
-    { id: 'eros', name: 'Eros', model: 'asteroid', len: 34000, confidence: 'B', invented: true, note: 'Fate B (it hits Venus). Size from our body data; shape, course and speed invented. No drive plume.' },
+    { id: 'eros', name: 'Eros', model: 'eros', len: 34400, confidence: 'B', invented: true, note: 'Fate B (it hits Venus). Real length (34.4 km) and proportions; the surface is our procedural rock (src/eros.ts), not the real shape model. Course and speed invented. No drive plume.' },
     { id: 'roci', name: 'Rocinante', model: 'corvette', len: 46, faction: 'mcrn', confidence: 'C', plume: { burn: 1.6 }, crew: 4, invented: true, note: 'The chase is C; her place in it, and breaking off, are invented.' },
     { id: 'tower1', name: 'Tower', model: 'spire', len: SPIRE_H, confidence: 'C', invented: true, grow: { t0: 142, t1: 186, from: 0.001 }, note: 'Two towers: GS, grade C. Shape, height, place and growth invented.' },
     { id: 'tower2', name: 'Tower', model: 'spire', len: SPIRE_H * 0.8, confidence: 'C', invented: true, grow: { t0: 146, t1: 186, from: 0.001 } },
