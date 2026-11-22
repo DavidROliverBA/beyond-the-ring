@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { AU, DAY, G0, transit, transitAt, transitAU } from '../src/transit';
+import { AU, DAY, G0, accelFor, transit, transitAt, transitAU } from '../src/transit';
 
 // The canon note's table (docs/research/canon/leviathan-wakes.md, section 1, "Accelerations"):
 // brachistochrone at 0.1, 0.3, 1 and 3 g, flip at half way, peak speed at the flip.
@@ -72,5 +72,21 @@ describe('transit physics', () => {
     // One-way, 1 g for 12 h then 1 g braking: D = a (T/2)^2 = 9.80665 * 43200^2
     const D = G0 * 43200 ** 2;
     expect(transit(D, G0).time / DAY).toBeCloseTo(1, 9);
+  });
+});
+
+describe('accelFor', () => {
+  test('is the inverse of transit', () => {
+    for (const [D, a, f] of [[1e6, 3, 0], [2.9e3, 2.94, 8], [4.2e11, 2.94, 600]] as const) {
+      const tr = transit(D, a, f);
+      expect(accelFor(D, tr.time, f) / a).toBeCloseTo(1, 9);
+    }
+  });
+  test('film leg of 150 km in 72 s with a 7 s flip takes exactly 72 s', () => {
+    const a = accelFor(150e3, 72, 7);
+    expect(transit(150e3, a, 7).time).toBeCloseTo(72, 9);
+  });
+  test('rejects a flip longer than the time', () => {
+    expect(() => accelFor(1000, 5, 6)).toThrow(RangeError);
   });
 });

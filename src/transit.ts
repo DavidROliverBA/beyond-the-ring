@@ -68,3 +68,12 @@ export function transitAU(au: number, g: number, flipSecs = 0): { days: number; 
   const tr = transit(au * AU, g * G0, flipSecs);
   return { days: tr.time / DAY, peakKms: tr.peakSpeed / 1000, flipDays: (tr.flipStart + tr.flip / 2) / DAY };
 }
+
+/** The acceleration that covers `distance` metres rest to rest in `time` seconds with `flip` seconds of drive-off turning in the middle
+ *  (the inverse of `transit`). Used to squeeze a long, honestly timed flight into a short film: the film leg keeps the shape of the flight
+ *  (burn, flip, brake) but not its size. Pure maths, SI units. */
+export function accelFor(distance: number, time: number, flip = 0): number {
+  const tb = (time - flip) / 2;
+  if (!(distance > 0) || !(tb > 0) || !(flip >= 0)) throw new RangeError('accelFor needs distance > 0, time > flip >= 0');
+  return distance / (tb * (tb + flip));
+}
