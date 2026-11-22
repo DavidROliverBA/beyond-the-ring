@@ -1455,6 +1455,7 @@ const settings = createSettingsPanel((s) => {
 const scn = createScenarioPlayer({
   scene, renderer,
   sunPos: tourSun,
+  bodyPos: (id) => space.things.find((t) => t.id === id)?.pos ?? null,
   caption: (t, x) => banner(t, x),
   camera,
   warm: (s, c) => {
@@ -2539,7 +2540,8 @@ function frame(now: number) {
   dustMat.opacity = 0.6 * clamp(1 - Math.abs(ship.speed) / (DUST_BOX * 6), 0, 1);
 
   simDt = dt;
-  simStep = busy ? 0 : RATES[rateIdx][0] * dt;
+  // A film pinned to a planet (Venus in lw-venus) holds the planets still: it follows the body, and the sim must not move it between the film's place and its camera.
+  simStep = busy || (scn.active && scn.scenario?.frame.body) ? 0 : RATES[rateIdx][0] * dt;
   simElapsed += simStep;
   space.tick(clock, dt);
   tickShipLights(clock);
