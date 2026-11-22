@@ -2506,6 +2506,7 @@ async function boot() {
 
 $('launch').addEventListener('click', () => {
   if (matchMedia('(max-width: 700px)').matches) document.body.classList.remove('nav-open');
+  info.close();
   sound.start();
   stopTour();
   started = true;

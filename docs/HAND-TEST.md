@@ -136,3 +136,9 @@ All of this text is AI-assisted and flagged `humanReviewed: false`. Please read 
 - [ ] On a short window (about 600 px high) does the destination list scroll, fold with More / Fewer, and show a fade at the foot?
 - [ ] Phone or a narrow window: nothing collides, the destination list starts closed, Tab-equivalent is the MAP button only (touch controls do not exist yet).
 
+## Data and maths (2026-11-22, branch data-and-maths, not merged)
+- [ ] Start screen: below the credits line there is a line about facts from NASA NSSDCA and JPL, "not yet checked by a person", with a "Data and sources" link. Click it: a short account opens inside the box (counts, three source families, licence, link to CREDITS.md); click again to close. Does it read as honest and not too long? Launch closes it.
+- [ ] In flight, aim at Phoebe, Hyperion, Nereid, Ariel (the 11 new moons: Amalthea, Himalia, Mimas, Tethys, Dione, Hyperion, Phoebe, Ariel, Umbriel, Proteus, Nereid) and press I: each has numbers, a Real tag, what we know / do not know, links. Check a few of the sentences against what you know; Himalia, Proteus and Nereid show no density because the sheet lists none. At the foot of the panel, "Data and sources" opens the same account with a back link.
+- [ ] Mars now lists 17 missions and the Moon 9; is the folded "Missions that visited" list too long on a phone?
+- [ ] Person review: `bun tools/review-facts.ts` lists the 71 unchecked entities; `--show mars` prints one with its sources. If you want to try an approval, use a scratch copy (`--file` and `--reviews` point at other files), because a real approval is recorded in tools/facts-reviews.json. The panel then says "Checked by a person: name, date, note".
+- [ ] Honest transit times (src/transit.ts) are tested but not shown anywhere yet; the Canterbury burn should look exactly as before (it is bit-identical in the numbers; seeking at 0, 20, 40, 60 s gives the same positions).

@@ -28,7 +28,11 @@ export const NMC: Record<string, [string, string]> = {
   pioneer10: ['1972-012A', 'Pioneer 10'], pioneer11: ['1973-019A', 'Pioneer 11'], voyager1: ['1977-084A', 'Voyager 1'], voyager2: ['1977-076A', 'Voyager 2'],
   vikinglander1: ['1975-075C', 'Viking 1 Lander'], vikingorbiter1: ['1975-075A', 'Viking 1 Orbiter'], pvo: ['1978-051A', 'Pioneer Venus Orbiter'], pathfinder: ['1996-068A', 'Mars Pathfinder'],
   near: ['1996-008A', 'NEAR Shoemaker'], stardust: ['1999-003A', 'Stardust/NExT'], deepimpact: ['2005-001A', 'Deep Impact/EPOXI'], messenger: ['2004-030A', 'MESSENGER'], dawn: ['2007-043A', 'Dawn'],
-  msl: ['2011-070A', 'Mars Science Laboratory'], juno: ['2011-040A', 'Juno'], mars2020: ['2020-052A', 'Mars 2020'], newhorizons: ['2006-001A', 'New Horizons'], osirisrex: ['2016-055A', 'OSIRIS-REx'], parker: ['2018-065A', 'Parker Solar Probe'],
+  msl: ['2011-070A', 'Mars Science Laboratory'],
+  mariner6: ['1969-014A', 'Mariner 6'], mariner7: ['1969-030A', 'Mariner 7'], viking2lander: ['1975-083C', 'Viking 2 Lander'], mgs: ['1996-062A', 'Mars Global Surveyor'], odyssey: ['2001-013A', '2001 Mars Odyssey'],
+  spirit: ['2003-027A', 'Spirit'], opportunity: ['2003-032A', 'Opportunity'], mro: ['2005-029A', 'Mars Reconnaissance Orbiter'], phoenix: ['2007-034A', 'Phoenix Mars Lander'], maven: ['2013-063A', 'MAVEN'], insight: ['2018-042A', 'InSight'],
+  psyche: ['2023-157A', 'Psyche'], lunarprospector: ['1998-001A', 'Lunar Prospector'], grail: ['2011-046A', 'GRAIL'], ladee: ['2013-047A', 'LADEE'], ranger7: ['1964-041A', 'Ranger 7'], surveyor1: ['1966-045A', 'Surveyor 1'], pvlarge: ['1978-078D', 'Pioneer Venus Large Probe'],
+  juno: ['2011-040A', 'Juno'], mars2020: ['2020-052A', 'Mars 2020'], newhorizons: ['2006-001A', 'New Horizons'], osirisrex: ['2016-055A', 'OSIRIS-REx'], parker: ['2018-065A', 'Parker Solar Probe'],
 };
 for (const [k, [id, label]] of Object.entries(NMC)) RAW[k] = { file: `nmc-${id}.html`, url: `https://nssdc.gsfc.nasa.gov/nmc/spacecraft/display.action?id=${id}`, name: `NASA NSSDCA Master Catalog: ${label}` };
 
@@ -77,6 +81,11 @@ export const MOON_MISSIONS: MissionSpec[] = [
   { name: 'Apollo 8', raw: 'apollo8', what: 'The first crew to orbit the Moon, photographing its near and far sides to prepare the landings.' },
   { name: 'Apollo 11', raw: 'apollo11', what: 'Its lunar module Eagle made the first crewed landing, on 20 July 1969: Neil Armstrong and Buzz Aldrin walked on the surface.' },
   { name: 'Apollo 17', raw: 'apollo17', what: 'The sixth and last Apollo landing, at Taurus-Littrow in December 1972, and the first with a scientist on the surface.' },
+  { name: 'Ranger 7', raw: 'ranger7', what: 'Sent back the first close-up pictures of the lunar surface in July 1964, in the minutes before it struck the Moon on purpose.', mentions: ['Moon'] },
+  { name: 'Surveyor 1', raw: 'surveyor1', what: 'The first American soft landing on the Moon, in June 1966, which showed that the surface could carry the weight of a lander.', mentions: ['Moon'] },
+  { name: 'Lunar Prospector', raw: 'lunarprospector', what: 'Mapped the Moon from a low polar orbit in 1998 and 1999 and found signs of hydrogen near the poles, consistent with water ice.', mentions: ['Moon'] },
+  { name: 'GRAIL', raw: 'grail', what: 'Two spacecraft flying in step in 2012, measuring the Moon\u2019s gravity field in fine detail to learn about its interior.', mentions: ['Moon'] },
+  { name: 'LADEE', raw: 'ladee', what: 'Orbited the Moon in 2013 and 2014 to sample its thin atmosphere and the dust that rises above the surface.', mentions: ['Moon'] },
   { name: 'Lunar Reconnaissance Orbiter', raw: 'lro', what: 'An orbiter launched in 2009 to map the surface, look for resources such as ice, and survey possible landing sites.' },
 ];
 
@@ -185,7 +194,8 @@ PLANET_FACTS.mars.splice(-1, 0, { id: 'pressure', label: 'Surface air pressure',
 for (const b of ['uranus', 'neptune', 'pluto']) PLANET_FACTS[b].push(discovery(b));
 
 /** A moon on one of the satellite sheets: bulk row first, then the orbital row (after 'Orbital parameters'). */
-function satFacts(raw: string, name: string, parent: string, o: { retro?: boolean } = {}): FactSpec[] {
+/** `noDensity`: the sheet prints no density for this moon. `rotNum`: its orbit row carries a rotation period in days (not S or C). */
+function satFacts(raw: string, name: string, parent: string, o: { retro?: boolean; noDensity?: boolean; rotNum?: boolean } = {}): FactSpec[] {
   const code = '\\([A-Z]*[IVX]+[^)]*\\)';
   const lead = `(?<![A-Za-z])${name} ${code}`;
   const radiusRe = new RegExp(`${lead} ${N} (${N}(?: x ${N}){0,2}) `);
@@ -193,10 +203,10 @@ function satFacts(raw: string, name: string, parent: string, o: { retro?: boolea
     { id: 'radius-mean', label: 'Radius', raw, re: radiusRe, unit: 'km', fmt: 'dec1',
       text: (m) => { const parts = m[1].split(' x '); return parts.length === 1 ? { value: parseFloat(m[1].replace(/,/g, '')), display: `${parseFloat(m[1].replace(/,/g, '')).toLocaleString('en-GB', { maximumFractionDigits: 1 })} km` } as never : { value: parts.join(' x '), display: `${parts.join(' \u00d7 ')} km (three axes)` }; } },
     { id: 'mass', label: 'Mass', raw, re: new RegExp(`${lead} (${N}) `), unit: 'kg', scale: 1e20, fmt: 'sci' },
-    { id: 'density', label: 'Mean density', raw, re: new RegExp(`${lead} ${N} ${N}(?: x ${N}){0,2} (${N}) `), unit: 'kg/m3', fmt: 'int' },
+    ...(o.noDensity ? [] : [{ id: 'density', label: 'Mean density', raw, re: new RegExp(`${lead} ${N} ${N}(?: x ${N}){0,2} (${N}) `), unit: 'kg/m3', fmt: 'int' } as FactSpec]),
     { id: 'distance', label: `Distance from ${parent}`, raw, after: 'Orbital parameters', re: new RegExp(`${lead} (${N}) `), unit: 'km', scale: 1e3, fmt: 'int' },
     { id: 'period', label: o.retro ? 'Orbit period (retrograde)' : 'Orbit period', raw, after: 'Orbital parameters', re: new RegExp(`${lead} ${N} ${N} ([\\d.]+)R? `), unit: 'days', fmt: 'dec2' },
-    { id: 'ecc', label: 'Orbit eccentricity', raw, after: 'Orbital parameters', re: new RegExp(`${lead} ${N} ${N} [\\d.]+R? (?:[SC] )?[\\d.]+ ([\\d.]+)`), unit: '', fmt: 'dec3' },
+    { id: 'ecc', label: 'Orbit eccentricity', raw, after: 'Orbital parameters', re: new RegExp(`${lead} ${N} ${N} [\\d.]+R? (?:[SC] )?${o.rotNum ? `${N} ` : ''}[\\d.]+ ([\\d.]+)`), unit: '', fmt: 'dec3' },
   ];
 }
 /** One column of the 'small worlds' table (the sheet lists CALLISTO GANYMEDE EUROPA IO MOON MERCURY PLUTO TITAN TRITON CERES EARTH). */
@@ -248,12 +258,19 @@ export const BODY_FACTS: Record<string, FactSpec[]> = {
   miranda: satFacts('urasat', 'Miranda', 'Uranus'), titania: satFacts('urasat', 'Titania', 'Uranus'), oberon: satFacts('urasat', 'Oberon', 'Uranus'),
   triton: [...satFacts('nepsat', 'Triton', 'Neptune', { retro: true }), ...smallWorld('TRITON')],
   charon: CHARON_FACTS,
+  amalthea: satFacts('jovsat', 'Amalthea', 'Jupiter'), himalia: satFacts('jovsat', 'Himalia', 'Jupiter', { noDensity: true, rotNum: true }),
+  mimas: satFacts('satsat', 'Mimas', 'Saturn'), tethys: satFacts('satsat', 'Tethys', 'Saturn'), dione: satFacts('satsat', 'Dione', 'Saturn'), hyperion: satFacts('satsat', 'Hyperion', 'Saturn'),
+  phoebe: satFacts('satsat', 'Phoebe', 'Saturn', { retro: true, rotNum: true }),
+  ariel: satFacts('urasat', 'Ariel', 'Uranus'), umbriel: satFacts('urasat', 'Umbriel', 'Uranus'),
+  proteus: satFacts('nepsat', 'Proteus', 'Neptune', { noDensity: true }), nereid: satFacts('nepsat', 'Nereid', 'Neptune', { noDensity: true }),
 };
 /** Which pages feed a body's 'Sources' links and which sheet the 'what we know' text leans on. */
 export const BODY_SHEETS: Record<string, string[]> = {
   sun: ['sun'], mercury: ['mercury'], venus: ['venus'], mars: ['mars'], jupiter: ['jupiter'], saturn: ['saturn'], uranus: ['uranus'], neptune: ['neptune'], pluto: ['pluto'],
   phobos: ['mars'], deimos: ['mars'], io: ['jovsat', 'smallworlds'], europa: ['jovsat', 'smallworlds'], ganymede: ['jovsat', 'smallworlds'], callisto: ['jovsat', 'smallworlds'],
   enceladus: ['satsat'], rhea: ['satsat'], titan: ['satsat', 'smallworlds'], iapetus: ['satsat'], miranda: ['urasat'], titania: ['urasat'], oberon: ['urasat'], triton: ['nepsat', 'smallworlds'], charon: ['pluto'],
+  amalthea: ['jovsat'], himalia: ['jovsat'], mimas: ['satsat'], tethys: ['satsat'], dione: ['satsat'], hyperion: ['satsat'], phoebe: ['satsat'],
+  ariel: ['urasat'], umbriel: ['urasat'], proteus: ['nepsat'], nereid: ['nepsat'],
 };
 
 /** Small bodies read from the JPL Small-Body Database API (one cached JSON response each). */
@@ -282,6 +299,7 @@ export const BODY_MISSIONS: Record<string, MissionSpec[]> = {
   venus: [
     M('Mariner 2', 'mariner2', 'Flew past Venus in December 1962 and measured its temperature and atmosphere from close range.', ['Venus']),
     M('Mariner 5', 'mariner5', 'Passed close to Venus in 1967 and measured its atmosphere and magnetic environment.', ['Venus']),
+    M('Pioneer Venus Large Probe', 'pvlarge', 'Plunged into the Venus atmosphere in December 1978, measuring the air as it fell.', ['Venus']),
     M('Pioneer Venus Orbiter', 'pvo', 'Orbited Venus from 1978 and mapped its surface by radar, as well as studying the clouds and upper air.', ['Venus']),
   ],
   mars: [
@@ -290,6 +308,17 @@ export const BODY_MISSIONS: Record<string, MissionSpec[]> = {
     M('Viking 1 Lander', 'vikinglander1', 'Touched down in 1976 and worked on the surface for years, searching the soil for signs of life.', ['Mars']),
     M('Mars Pathfinder', 'pathfinder', 'A lander and the small rover Sojourner, which drove around beside it on the surface in 1997.', ['Mars']),
     M('Curiosity (Mars Science Laboratory)', 'msl', 'A car-sized rover that landed in Gale crater in 2012 to judge whether the place could once have supported microbes.', ['Mars']),
+    M('Mariner 6', 'mariner6', 'Flew past Mars in July 1969 and sent back pictures of the surface, and measured the thin atmosphere.', ['Mars']),
+    M('Mariner 7', 'mariner7', 'Passed Mars a few days after Mariner 6, in August 1969, extending the coverage of the surface and polar caps.', ['Mars']),
+    M('Viking 2 Lander', 'viking2lander', 'Landed on Utopia Planitia in September 1976 and worked on the surface for years, taking pictures and testing the soil.', ['Mars']),
+    M('Mars Global Surveyor', 'mgs', 'Orbited Mars from 1997 to 2006, mapping the surface in detail and measuring patches of old magnetism in the crust.', ['Mars']),
+    M('2001 Mars Odyssey', 'odyssey', 'An orbiter that arrived in October 2001; its instruments found hydrogen just under the surface near the poles, a sign of buried ice.', ['Mars']),
+    M('Spirit', 'spirit', 'A rover that landed in Gusev crater in January 2004 and found rocks changed by water, before it became stuck in soft soil in 2009.', ['Mars']),
+    M('Opportunity', 'opportunity', 'A rover that landed on Meridiani Planum in January 2004, meant to work for three months and which kept going until a dust storm in 2018.', ['Mars']),
+    M('Mars Reconnaissance Orbiter', 'mro', 'An orbiter working since 2006, whose camera can pick out objects about the size of a table on the surface.', ['Mars']),
+    M('Phoenix', 'phoenix', 'Landed near the north pole in May 2008 and dug into the soil to reach water ice just beneath it.', ['Mars']),
+    M('MAVEN', 'maven', 'An orbiter that arrived in 2014 to study how the Sun and its wind have stripped away much of the Mars atmosphere.', ['Mars']),
+    M('InSight', 'insight', 'A lander that touched down on Elysium Planitia in November 2018 and listened for marsquakes to learn about the planet\u2019s interior.', ['Mars']),
     M('Perseverance (Mars 2020)', 'mars2020', 'A rover that landed in Jezero crater in 2021 to look for signs of ancient life and to cache rock samples.', ['Mars']),
   ],
   phobos: [M('Mariner 9', 'mariner9', 'Photographed both moons of Mars as it orbited the planet, showing Phobos as a cratered, potato-shaped lump.', ['Phobos']), M('Viking 1 Orbiter', 'vikingorbiter1', 'Made close approaches to Phobos in 1977, with its closest orbit point lowered to about 300 km.', ['Phobos'])],
@@ -324,6 +353,7 @@ export const BODY_MISSIONS: Record<string, MissionSpec[]> = {
   charon: [M('New Horizons', 'newhorizons', 'Mapped Charon during the 2015 flyby and found a huge canyon system and a dark polar cap.', ['Charon'])],
   ceres: [M('Dawn', 'dawn', 'Orbited Vesta first and then moved on to orbit Ceres, studying both from close in.', ['Ceres'])],
   vesta: [M('Dawn', 'dawn', 'Orbited Vesta in 2011 and 2012 before moving on to Ceres.', ['Vesta'])],
+  psyche: [M('Psyche', 'psyche', 'Launched in October 2023 on a trip to the metal-rich asteroid it is named for, due to reach it in 2029.', ['Psyche'])],
   eros: [M('NEAR Shoemaker', 'near', 'Orbited Eros for a year from 2000 and then landed on it, the first landing on an asteroid.', ['Eros'])],
   bennu: [M('OSIRIS-REx', 'osirisrex', 'Studied Bennu, took a sample from its surface in 2020 and brought it back to Earth in 2023.', ['Bennu'])],
   tempel1: [M('Deep Impact', 'deepimpact', 'Fired a copper-heavy impactor into the nucleus in 2005 to see what lay beneath the surface.', ['Tempel']), M('Stardust/NExT', 'stardust', 'After collecting comet dust elsewhere, the craft was redirected and flew past Tempel 1 in 2011 to look at the crater.', ['Tempel'])],

@@ -33,7 +33,8 @@ test('text may not be phrased as the agency speaking', () => {
 const byId = () => new Map(file().entities.map((e) => [e.id, e]));
 const REAL = ['sun', 'mercury', 'venus', 'earth', 'luna', 'mars', 'phobos', 'deimos', 'jupiter', 'io', 'europa', 'ganymede', 'callisto', 'saturn', 'enceladus', 'rhea', 'titan', 'iapetus', 'uranus', 'miranda', 'titania', 'oberon',
   'neptune', 'triton', 'pluto', 'charon', 'ceres', 'vesta', 'pallas', 'hygiea', 'interamnia', 'eunomia', 'juno', 'psyche', 'eros', 'ida', 'apophis', 'bennu', 'ryugu', 'hektor', 'chiron', 'oumuamua', 'haumea', 'makemake', 'eris',
-  'orcus', 'quaoar', 'sedna', 'gonggong', 'halley', 'halebopp', '67p', 'tempel1', 'swifttuttle', 'borisov'];
+  'orcus', 'quaoar', 'sedna', 'gonggong', 'halley', 'halebopp', '67p', 'tempel1', 'swifttuttle', 'borisov',
+  'amalthea', 'himalia', 'mimas', 'tethys', 'dione', 'hyperion', 'phoebe', 'ariel', 'umbriel', 'proteus', 'nereid'];
 
 test('every real body we promised has an entity that is real, with facts and a link out', () => {
   const m = byId();
@@ -63,7 +64,7 @@ test('badges: real bodies are Real, the story\u2019s things are Fiction, bodies 
   expect(badgeFor({ id: 'medina', kind: 'station' }, m)?.label).toBe('Fiction');
   expect(badgeFor({ id: 'gate-1', kind: 'gate' }, m)?.label).toBe('Fiction');
   expect(badgeFor({ id: 'oort', kind: 'dwarf' }, m)).toBeNull();
-  expect(badgeFor({ id: 'amalthea', kind: 'moon' }, m)).toBeNull();
+  expect(badgeFor({ id: 'metis', kind: 'moon' }, m)).toBeNull();
 });
 
 test('Tycho and the story\u2019s places say what they are based on, and point at the real thing only where one has a panel', () => {
@@ -124,4 +125,17 @@ test('nothing has been checked by a person yet, and every text is marked AI-assi
 
 test('no text attributes a statement to the agency', () => {
   for (const e of file().entities) { const t = [e.summary, ...e.know, ...e.unknown, ...e.missions.map((m) => m.what)].join(' '); expect(t, e.id).not.toMatch(/according to NASA|NASA says|NASA states|NASA reports/i); }
+});
+
+test('the small moons: numbers read from the satellite sheets, no density guessed where the sheet gives none', () => {
+  const m = byId(); const d = (id: string, f: string) => m.get(id)!.facts.find((x) => x.id === f)?.display;
+  expect(d('mimas', 'distance')).toBe('185,520 km');
+  expect(d('phoebe', 'period')).toContain('548');
+  expect(m.get('phoebe')!.facts.find((x) => x.id === 'period')!.label).toContain('retrograde');
+  expect(d('phoebe', 'ecc')).toBe('0.164');
+  expect(d('himalia', 'ecc')).toBe('0.162');
+  expect(d('nereid', 'ecc')).toBe('0.751');
+  expect(d('umbriel', 'radius-mean')).toBe('584.7 km');
+  for (const id of ['himalia', 'proteus', 'nereid']) expect(d(id, 'density'), id).toBeUndefined();
+  for (const id of ['amalthea', 'mimas', 'tethys', 'dione', 'hyperion', 'phoebe', 'ariel', 'umbriel']) expect(d(id, 'density'), id).toBeDefined();
 });

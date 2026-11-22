@@ -18,6 +18,7 @@ import { SOL_UNIT } from './traffic';
 import type { Shot } from './tour';
 import { createFx, type Cue } from './scenarioFx';
 import type { Sfx } from './sound';
+import { G0, transit, transitAt } from './transit';
 
 type V3 = THREE.Vector3;
 export type Vec = [number, number, number];
@@ -133,7 +134,6 @@ export interface Scenario {
 
 // ------------------------------------------------------------------ the legs
 
-const G0 = 9.80665;
 const UP = new THREE.Vector3(0, 1, 0);
 const _m = new THREE.Matrix4(), _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -152,8 +152,7 @@ function facing(d: V3, out = new THREE.Quaternion()): THREE.Quaternion {
 
 /** Time a rest-to-rest burn of `distance` metres at `g` takes, with `flip` seconds of turning in the middle. */
 export function burnTime(distance: number, g: number, flip = 8): number {
-  const a = g * G0, ta = (-flip + Math.sqrt(flip * flip + 4 * distance / a)) / 2;
-  return 2 * ta + flip;
+  return transit(distance, g * G0, flip).time;
 }
 
 interface Compiled { t: number; eval(tau: number, out: State): void }
@@ -170,15 +169,11 @@ function compileLeg(leg: Leg, start: State, look: (id: string) => Track | undefi
     case 'burn': {
       const a0 = vec(leg.from, p0), b = new THREE.Vector3(...leg.to);
       const d = b.clone().sub(a0), D = d.length(), dir = d.clone().divideScalar(D || 1);
-      const fl = leg.flip ?? 8, a = leg.g * G0, ta = (-fl + Math.sqrt(fl * fl + 4 * D / a)) / 2, T = 2 * ta + fl, vm = a * ta;
+      const fl = leg.flip ?? 8, tr = transit(D, leg.g * G0, fl), ta = tr.burn;
       const qa = facing(dir), flipQ = new THREE.Quaternion();
       return { t: leg.t, eval: (tau, o) => {
-        let s: number, v: number;
-        if (tau <= 0) { s = 0; v = 0; o.thrust = 0; }
-        else if (tau < ta) { s = 0.5 * a * tau * tau; v = a * tau; o.thrust = 1; }
-        else if (tau < ta + fl) { s = 0.5 * a * ta * ta + vm * (tau - ta); v = vm; o.thrust = 0; }
-        else if (tau < T) { const r = T - tau; s = D - 0.5 * a * r * r; v = a * r; o.thrust = 1; }
-        else { s = D; v = 0; o.thrust = 0; }
+        const st = transitAt(tr, tau), s = st.s, v = st.v;
+        o.thrust = st.thrust ? 1 : 0;
         o.p.copy(a0).addScaledVector(dir, s);
         o.v.copy(dir).multiplyScalar(v);
         // Turn end for end about her own up axis while the drive is off.
