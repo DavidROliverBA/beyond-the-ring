@@ -7,7 +7,7 @@ import { fmtTime, loadGuard, loadResume, saveGuard, visibleScenarios, type Guard
 const CSS = `
 #scncard { position: fixed; inset: 0; z-index: 22; display: none; align-items: center; justify-content: center; background: rgba(1,4,10,0.62); backdrop-filter: blur(3px); font: 13px/1.45 -apple-system, "Helvetica Neue", sans-serif; color: #cfe3f2; }
 body.scncard-open #scncard { display: flex; }
-#scncard-box { width: min(520px, 92vw); background: rgba(4,10,20,0.95); border: 1px solid rgba(143,220,255,0.3); border-radius: 5px; padding: 18px 20px 14px; }
+#scncard-box { width: min(520px, 92vw); background: rgba(4,10,20,0.95); border: 1px solid rgba(143,220,255,0.3); border-radius: 5px; padding: 18px 20px 14px; max-height: 94vh; overflow-y: auto; box-sizing: border-box; }
 #scncard h2 { margin: 0 0 10px; font: 400 13px ui-monospace, Menlo, monospace; letter-spacing: 0.24em; color: #8fdcff; text-transform: uppercase; }
 #scncard .warn { margin: 0 0 12px; padding: 8px 10px; border: 1px solid rgba(255,196,110,0.55); border-radius: 3px; background: rgba(255,170,60,0.08); color: #ffd9a0; font: 11px/1.5 ui-monospace, Menlo, monospace; letter-spacing: 0.08em; }
 #scncard .warn b { display: block; letter-spacing: 0.2em; color: #ffc46e; margin-bottom: 2px; }
@@ -35,7 +35,7 @@ export function createScenarioCard(list: Scenario[], go: (s: Scenario, at?: numb
   document.head.append(style);
   const root = document.createElement('div');
   root.id = 'scncard'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'The Rocinante\'s voyages');
-  root.innerHTML = '<div id="scncard-box"><h2>The Rocinante\'s voyages</h2><div class="warn"><b id="scn-warn">SPOILERS</b>These sequences re-enact events from the novels, including battles and the loss of ships, in our own words. Unofficial, non-commercial fan work.</div><div class="guard"><label><input type="checkbox" id="scn-hide"> Hide later books</label><label>I have read up to <select id="scn-upto" aria-label="Last book you have read"></select></label></div><div id="scn-list"></div><div class="foot">Click or Enter to watch · R resumes · while it plays: Space pause, arrows seek, [ ] chapters, Esc exits · Esc closes</div></div>';
+  root.innerHTML = '<div id="scncard-box"><h2>The Rocinante\'s voyages</h2><div class="warn"><b id="scn-warn">SPOILERS</b>These sequences re-enact events from the novels, including battles and the loss of ships, in our own words. Unofficial, non-commercial fan work.</div><div class="guard"><label><input type="checkbox" id="scn-hide"> Hide later books</label><label>I have read up to <select id="scn-upto" aria-label="Last book you have read"></select></label></div><div id="scn-list"></div><div class="foot">Click or Enter to watch · R resumes · Esc closes this card. While a voyage plays: Space pause, arrows seek, [ ] chapters, Esc exits</div></div>';
   document.body.append(root);
   const listEl = root.querySelector('#scn-list') as HTMLElement;
   let isOpen = false, sel = 0;
