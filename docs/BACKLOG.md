@@ -72,9 +72,9 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 
 ### E1.4 Ships and stations
 - [ ] E1.4.a [research] Reference gathering for each hero vessel: Rocinante, Donnager, Canterbury, Agatha King, Tycho, Medina, Behemoth, Nauvoo, Pella, Razorback, Mormon ships, MCRN and UNN classes. Note what the books give (lengths, drive, look) as the authority; the show's design where the books are silent, credited as fan homage
-- [ ] E1.4.b [rework] Hull material pass: panel lines, weathering, scorch, micrometeorite pitting, real-metal roughness, emissive windows; the existing hero-ship pass (branch `hero-ships`) is the starting point
-- [ ] E1.4.c [rework] Rebuild hauler, battleship and tycho GLBs at true size with the same pass (outstanding)
-- [ ] E1.4.d Hull names, insignia and registry decals (outstanding)
+- [~] E1.4.b (branch ships-true-size, agent) [rework] Hull material pass: panel lines, weathering, scorch, micrometeorite pitting, real-metal roughness, emissive windows; the existing hero-ship pass (branch `hero-ships`) is the starting point
+- [~] E1.4.c (branch ships-true-size, agent) [rework] Rebuild hauler, battleship and tycho GLBs at true size with the same pass (outstanding)
+- [~] E1.4.d (branch ships-true-size, agent) Hull names, insignia and registry decals (outstanding)
 - [ ] E1.4.e Station exteriors: spin structures, docking arms, solar and radiator arrays, real-world detail density
 - [ ] E1.4.f Real spacecraft in Sol: use real models for the ISS, Tiangong, JWST, Hubble, Voyager, Cassini, Parker, Perseverance etc. (see E2)
 - [ ] E1.4.g Engine and reaction-control effects, exhaust and plume; extend the existing plume shader
