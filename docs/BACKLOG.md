@@ -160,7 +160,7 @@ This is the piece that makes a battle different from a camera tour: many moving 
 - [x] 2026-11-22 427bce3 (branch combat-donnager, not merged; light: wrecks tumble with fires and venting, secondary blasts, plating torn off; no section-loss geometry) E3.2.d Damage model for show only: hull sections lost, fires, venting, tumbling wrecks
 - [x] 2026-11-22 427bce3 (branch combat-donnager; synthesised PDC rattle, launch, impact, railgun, boom, breach hiss, drive roar; ship cameras hear, exterior shots silent, score ducks at big events; needs real speakers) E3.2.e Sound for combat: PDC bursts, impacts through the hull (not in space, so for interior and ship cameras), drive roars, silent exterior shots where the book is clear that space is quiet (extend `src/sound.ts`)
 - [~] 2026-11-22 b507285 (branch scenario-engine; orbit, static long lens, pov and chase shots with cuts, lower thirds, bars and grade reused; no spring reuse beyond a simple damped turn; no cockpit interiors) E3.2.f Director: shot list per scenario that follows the Roci with the cinematic camera (follow, over the shoulder, long lens from a distance, cockpit, POV from other ships); reuse the tour spring, fov, bars and grade
-- [~] 2026-11-22 b507285 (branch scenario-engine; done: menu entry and spoiler card; still to do: chapter list, hide-later-books toggle) E3.2.g Tour menu: a new "The Rocinante's voyages" section, separate from place tours, with a spoiler warning and a chapter list
+- [~] (branch scn-controls, agent) 2026-11-22 b507285 (branch scenario-engine; done: menu entry and spoiler card; still to do: chapter list, hide-later-books toggle) E3.2.g Tour menu: a new "The Rocinante's voyages" section, separate from place tours, with a spoiler warning and a chapter list
 - [ ] E3.2.h Performance: many actors and effects at once; budget and test on a mid GPU; instanced tracers and particles
 
 ### E3.3 Set pieces, by book (each is a scenario; build in this order of value and feasibility)
@@ -198,10 +198,10 @@ This is the piece that makes a battle different from a camera tour: many moving 
 - [ ] E3.4.c Crew and characters: voices are not provided (no show audio, no AI voices of actors); captions in our own words; decide whether interior cutaways of the Roci are worthwhile
 
 ### E3.5 Tour experience
-- [ ] E3.5.a Chapter selector and "resume where you left off"
+- [~] (branch scn-controls, agent) E3.5.a Chapter selector and "resume where you left off"
 - [ ] E3.5.b "Watch" mode (hands off) and "Fly alongside" mode (the player flies a ship nearby while the scenario plays)
 - [ ] E3.5.c Photo mode and recorded clip export for scenarios
-- [ ] E3.5.d Spoiler guard: an opening card listing which books are covered and a toggle to hide the later ones
+- [~] (branch scn-controls, agent) E3.5.d Spoiler guard: an opening card listing which books are covered and a toggle to hide the later ones
 
 ---
 
