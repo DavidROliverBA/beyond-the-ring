@@ -65,6 +65,8 @@
   .badge.real { color: #8fe3b0; }
   .badge.fiction { color: #d9b3ff; }
   #card-badge:empty { display: none; }
+  #card-based { color: var(--dim); font-size: 11px; margin-top: 6px; }
+  #card-based:empty { display: none; }
   #info { z-index: 2; position: absolute; right: 16px; top: 14px; width: 360px; max-height: calc(100% - 28px); overflow-y: auto; padding: 12px 16px 10px; display: none; pointer-events: auto;
     font: 13px/1.5 -apple-system, "Helvetica Neue", sans-serif; color: #c3d3df; }
   body.info-open #info { display: block; }
@@ -79,6 +81,7 @@
   #info h3 { margin: 12px 0 4px; font: 400 11px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
   #info dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 0; }
   #info dt { color: #9fb3c2; }
+  #info dd { max-width: 14em; }
   #info dd { margin: 0; text-align: right; color: #fff; font-variant-numeric: tabular-nums; }
   #info ul { margin: 0; padding-left: 18px; }
   #info li { margin-bottom: 4px; }
@@ -86,6 +89,10 @@
   #info ul.missions { list-style: none; padding: 0; }
   #info .when { color: var(--dim); }
   #info a { color: var(--cyan); }
+  #info .based a, #info .back a { cursor: pointer; }
+  #info .based { margin: 0 0 6px; color: var(--amber); }
+  #info .back { margin: 0 0 4px; font-size: 11px; }
+  #info details summary { cursor: pointer; color: var(--dim); font: 400 11px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase; margin: 12px 0 4px; }
   #info .small { margin: 6px 0 0; font-size: 11px; color: var(--dim); }
   #info .keyhint { margin-top: 12px; }
   @media (max-width: 700px) { #info { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 60%; } body.help-open #info { max-height: 30%; } }
@@ -165,7 +172,7 @@
   </div>
 
   <div id="card" class="panel">
-    <div><span id="card-name"></span><span id="card-badge" class="badge"></span></div><div id="card-sub"></div><div id="card-desc"></div>
+    <div><span id="card-name"></span><span id="card-badge" class="badge"></span></div><div id="card-sub"></div><div id="card-desc"></div><div id="card-based"></div>
     <div id="card-foot"><span id="card-key"></span><span id="card-dist"></span></div>
   </div>
 
@@ -200,7 +207,7 @@
     <div class="fly-only"><b>G</b>fly to the nearest ring</div>
     <div class="fly-only"><b>M</b>star map: where everything is, and plot a course</div>
     <div class="fly-only"><b>I</b>inspect what you aim at: the mouse turns round it, wheel zooms</div>
-    <div class="fly-only"><b>I · facts</b>on Earth and Luna, I also opens facts and sources; I again closes</div>
+    <div class="fly-only"><b>I · facts</b>on a real planet, moon, asteroid or comet, I also opens facts and sources; on a place from the story it says what is real about it; I again closes</div>
     <div><b>K</b>sound on / off</div>
     <div class="fly-only"><b>, .</b>slower / faster time: the planets and moons go round</div>
     <div class="fly-only"><b>T</b>voyages: guided tours of Sol, the Ring and the gates</div>

@@ -2,7 +2,7 @@
 // script and the tests share. No data lives here: assets/data/facts.json is written by
 // tools/build-facts.ts and read by src/infopanel.ts. The game never calls a third party at runtime.
 
-export type EntityKind = 'planet' | 'moon' | 'dwarf' | 'asteroid' | 'comet' | 'probe' | 'station' | 'site' | 'ship' | 'artifact' | 'gate';
+export type EntityKind = 'star' | 'planet' | 'moon' | 'dwarf' | 'asteroid' | 'comet' | 'probe' | 'station' | 'site' | 'ship' | 'artifact' | 'gate';
 
 /** One number or value, with everything needed to say where it came from. */
 export interface Fact {
@@ -29,7 +29,8 @@ export interface Entity {
   name: string;
   kind: EntityKind;
   real: boolean;         // false = fiction (badge 'Fiction')
-  basedOn?: string;      // for fiction: the real thing it resembles. Left empty for now.
+  basedOn?: string;      // for fiction: the real thing it resembles, in a few words (E2.3.c)
+  basedOnId?: string;    // for fiction: the id of the real entity whose panel the 'based on' line links to, where one exists
   summary: string;       // one sentence, our own words
   facts: Fact[];         // the key numbers, in the order shown
   know: string[];        // what we know
@@ -45,10 +46,17 @@ export interface Entity {
 export interface FactsFile { version: 1; generated: string; entities: Entity[] }
 
 /** Kinds of thing in the game that are fiction. Everything with these kinds today (the Rocinante and
- *  other ships, Tycho, Medina, the Ring Station, gates, the Adro Diamond) comes from the story.
- *  'Based on' is left empty on purpose until E2.3.c. */
+ *  other ships, Tycho, Medina, the Ring Station, gates, the Adro Diamond) comes from the story. */
 export const FICTION_KINDS: ReadonlySet<string> = new Set(['ship', 'station', 'gate', 'artifact']);
-export const BASED_ON: Readonly<Record<string, string>> = {};
+/** 'Based on' for fiction that has an honest real analogue (E2.3.c). Kept modest: only where the likeness is real.
+ *  The same words are written into the fiction entities in facts.json; this is the fallback for things with no panel. */
+export const BASED_ON: Readonly<Record<string, string>> = {
+  tycho: 'rotating space-habitat designs such as the O\u2019Neill cylinder and the Stanford torus',
+  'interior:tycho': 'rotating space-habitat designs such as the O\u2019Neill cylinder and the Stanford torus',
+  'interior:medina': 'rotating space-habitat designs such as the O\u2019Neill cylinder',
+  'interior:ceres': 'the real Ceres, the largest object in the asteroid belt',
+  'interior:ganymede': 'the real Ganymede, Jupiter\u2019s largest moon',
+};
 
 export type Badge = { label: 'Real' | 'Fiction'; basedOn?: string } | null;
 
@@ -83,12 +91,15 @@ export function validateFacts(file: FactsFile): string[] {
     for (const k of ['name', 'kind', 'summary', 'licence', 'credit'] as const) if (!e[k] || !String(e[k]).trim()) errs.push(`${w}: no ${k}`);
     if (e.textBy !== 'ai-assisted') errs.push(`${w}: textBy must be 'ai-assisted'`);
     if (/\b(according to|NASA says|NASA states|NASA reports)\b/i.test([e.summary, ...e.know, ...e.unknown].join(' '))) errs.push(`${w}: text attributes a statement to the agency`);
+    if (!e.real && e.facts.length) errs.push(`${w}: a fiction entity may not carry facts`);
+    if (e.basedOnId && e.real) errs.push(`${w}: only fiction has a 'based on' link`);
     if (e.real) {
       if (!e.facts.length) errs.push(`${w}: a real entity with no facts`);
       if (!e.links.length) errs.push(`${w}: no links out`);
     }
     for (const f of e.facts) checkFact(f, w, errs);
     for (const m of e.missions) { if (!m.name || !m.what) errs.push(`${w}: mission without name or text`); checkFact(m.launch, `${w}, mission '${m.name}'`, errs); }
+    if (e.basedOnId && !file.entities.some((x) => x.id === e.basedOnId && x.real)) errs.push(`${w}: 'based on' points at '${e.basedOnId}', which is not a real entity here`);
     for (const l of e.links) if (!l.label || !URL_OK.test(l.url)) errs.push(`${w}: bad link '${l.label}'`);
   }
   return errs;

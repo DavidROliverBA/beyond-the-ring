@@ -1442,6 +1442,7 @@ function setBadge(b: ReturnType<typeof info.badge>) {
   el.className = b ? `badge ${b.label === 'Real' ? 'real' : 'fiction'}` : 'badge';
   el.textContent = b ? b.label : '';
   el.title = b?.basedOn ? `Based on ${b.basedOn}` : '';
+  $('card-based').textContent = b?.basedOn ? `Based on ${b.basedOn}` : '';
 }
 function stopInspect() {
   if (!inspect.on) return;
@@ -1510,6 +1511,11 @@ addEventListener('keydown', (e) => {
     } else if (e.code === 'KeyE' && nearPoint?.kind === 'exit') void undock();
     else if (e.code === 'KeyK') sound.toggle();
     else if (e.code === 'KeyH') document.body.classList.toggle('help-open');
+    else if (e.code === 'KeyI') {
+      // Inside a place from the story, I opens what is real about it and what is made up (E2.3.c).
+      if (info.isOpen()) info.close();
+      else { const ent = info.entityFor({ id: `interior:${walk.id}` }); if (ent) info.open(ent); }
+    }
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
     return;
   }
@@ -1517,7 +1523,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Comma' || e.code === 'Period') { rateIdx = clamp(rateIdx + (e.code === 'Period' ? 1 : -1), 0, RATES.length - 1); return; }
   if (e.code === 'KeyT') { if (tour.active || voyage) stopTour(); else voyageMenu.open(); return; }
   if (e.code === 'KeyI') {
-    // On a thing we hold facts about (Earth, Luna), I also opens the info panel; I again closes both.
+    // On a thing we hold facts about (the real bodies, and the story's Tycho), I also opens the info panel; I again closes both.
     if (info.isOpen()) { info.close(); if (inspect.on) stopInspect(); return; }
     if (inspect.on) { stopInspect(); return; }
     const ent = info.entityFor(aimed ?? cardFocus);
@@ -1886,6 +1892,7 @@ async function dock(th: Thing) {
       while (!it.bounce.step(renderer, 24, here, PROBE_FAR)) await pause();
     }
     walk = it;
+    info.close();
     Object.assign(walker, { x: it.spawn.x, z: it.spawn.z, yaw: it.spawn.yaw, pitch: 0, vx: 0, vz: 0 });
     document.body.classList.add('walking');
     buildNav();
@@ -1902,6 +1909,7 @@ async function undock() {
   await fade(() => {
     walk = null;
     nearPoint = null;
+    info.close();
     document.body.classList.remove('walking');
     buildNav();
     $('loc-name').textContent = space.name;
@@ -2127,17 +2135,17 @@ function updateHud(dt: number) {
     const now = new Date();
     // Where gravity is spin, show what you weigh this moment: it moves as you run with or against the turn.
     const g = SPIN_ON && walk.spin ? ` · ${(walk.spin.g * walker.weight).toFixed(2)} g` : '';
-    $('loc-sub').textContent = `On foot${g} · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time`;
+    const here = info.badge({ id: `interior:${walk.id}`, kind: 'station' });
+    $('loc-sub').textContent = `On foot${g} · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} station time${here ? ' · Fiction · I: what is real' : ''}`;
     const pt = nearPoint as Point | null;
-    if (info.isOpen()) info.close();
     $('card').style.display = pt ? 'block' : 'none';
     if (pt) {
       $('card-name').textContent = pt.title;
       $('card-sub').textContent = walk.name;
       $('card-desc').textContent = pt.text;
       $('card-dist').textContent = '';
-      $('card-key').textContent = pt.kind === 'exit' ? 'E — board and undock' : '';
-      setBadge(null);
+      $('card-key').textContent = (pt.kind === 'exit' ? 'E — board and undock' : '') + (info.entityFor({ id: `interior:${walk.id}` }) ? `${pt.kind === 'exit' ? ' · ' : ''}I — real or made up?` : '');
+      setBadge(here && pt.kind === 'exit' ? { label: 'Fiction' } : here); // the ship is not 'based on' the rock it is docked at
     }
     $('hint').textContent = !locked() && !document.body.classList.contains('nav-open')
       ? 'Click the view to look around · Tab for places'
@@ -2176,7 +2184,7 @@ function updateHud(dt: number) {
     $('card-key').textContent = auto ? 'En route — any flight key takes back control'
       : focus.dock ? (focus === here ? 'L — dock and go aboard' : 'F — fly there · you can dock here')
       : focus === aimed ? 'F — fly there' : '';
-    if (info.entityFor(focus)) $('card-key').textContent += ($('card-key').textContent ? ' · ' : '') + 'I — facts and sources';
+    if (info.entityFor(focus)) $('card-key').textContent += ($('card-key').textContent ? ' · ' : '') + (info.entityFor(focus)!.real ? 'I — facts and sources' : 'I — real or made up?');
     setBadge(info.badge(focus));
   } else {
     card.style.display = 'none';
