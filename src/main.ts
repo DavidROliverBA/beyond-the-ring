@@ -498,17 +498,62 @@ interface BuildCtx {
   lods: Lod[];
   /** Use photographic maps for the real bodies of Sol. */
   photos?: boolean;
+  /** Where each body is (live vectors), so a moon can see the planet it orbits. */
+  posOf?: Map<string, V3>;
 }
 
-/** Settlement lights should only show on the night side: fade the emissive map out where the sun reaches. */
-function nightOnly(mat: THREE.MeshStandardMaterial) {
-  mat.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-      #if NUM_POINT_LIGHTS > 0
-        totalEmissiveRadiance *= smoothstep(0.1, -0.2, dot(normal, normalize(pointLights[0].position + vViewPosition)));
-      #endif`);
+/**
+ * Sun-only shading for a planet or moon (E1.3, E1.5.d). One light, the star: the fill the scene's ambient gives
+ * is turned down on bodies (what is left is earthshine, from the planet a moon orbits), and, by option:
+ *   night  settlement lights only on the dark side;
+ *   ocean  sun glint: a wide specular lobe on water (Cox-Munk slopes, Fresnel), water found from the colour map;
+ *   term   the low sun reddens as it crosses more air, so the terminator goes orange;
+ *   ring   the rings throw their shadow on the globe (read from the ring texture's own opacity).
+ * Everything is done in view space from uniforms refreshed each frame, so true-scale distances cost no precision.
+ */
+interface FxOpts { night: boolean; ocean: boolean; term: boolean; ring: boolean; shine: boolean; beta?: V3 }
+function planetFx(mat: THREE.MeshStandardMaterial, o: FxOpts) {
+  const u = {
+    uSunV: { value: new V3(0, 0, 1) }, uAmb: { value: 0.3 },
+    uRingC: { value: new V3() }, uRingN: { value: new V3(0, 1, 0) }, uRingR: { value: new THREE.Vector2(0.5, 1) }, uRingTex: { value: null as THREE.Texture | null },
+    uShineV: { value: new V3(0, 1, 0) }, uShineK: { value: 0 }, uBeta: { value: o.beta ?? new V3(39, 90, 220) },
   };
-  mat.customProgramCacheKey = () => 'night-only';
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.fragmentShader = `uniform vec3 uSunV; uniform float uAmb;
+uniform vec3 uRingC, uRingN; uniform vec2 uRingR; uniform sampler2D uRingTex;
+uniform vec3 uShineV; uniform float uShineK; uniform vec3 uBeta;\n` + sh.fragmentShader;
+    if (o.night) sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      totalEmissiveRadiance *= smoothstep(0.1, -0.2, dot(normal, normalize(uSunV)));`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      {
+        vec3 Ls = normalize(uSunV), Nn = normalize(vNormal), Vv = normalize(vViewPosition);
+        reflectedLight.indirectDiffuse *= uAmb;
+        ${o.shine ? 'reflectedLight.indirectDiffuse += diffuseColor.rgb * uShineK * max(dot(normal, uShineV), 0.0);' : ''}
+        ${o.term ? `float nl = max(dot(Nn, Ls), 0.0);
+        reflectedLight.directDiffuse *= exp(-uBeta * 0.0025 * 0.25 / max(nl, 0.04));   // light through more air loses its blue first` : ''}
+        ${o.ring ? `{
+          vec3 Pv = -vViewPosition; float dn = dot(Ls, uRingN);
+          float t = dot(uRingC - Pv, uRingN) / (abs(dn) > 1e-4 ? dn : 1e-4);
+          vec3 Hh = Pv + Ls * t;
+          float uu = (length(Hh - uRingC) - uRingR.x) / (uRingR.y - uRingR.x);
+          float a = texture2D(uRingTex, vec2(clamp(uu, 0.0, 1.0), 0.5)).a;
+          float inside = step(0.0, t) * step(0.0, uu) * step(uu, 1.0);
+          float shade = 1.0 - 0.93 * a * inside;
+          reflectedLight.directDiffuse *= shade; reflectedLight.directSpecular *= shade;
+        }` : ''}
+        ${o.ocean ? `{
+          float water = clamp((diffuseColor.b - max(diffuseColor.r, diffuseColor.g) * 0.9 - 0.02) * 9.0, 0.0, 1.0);
+          vec3 Hl = normalize(Ls + Vv);
+          float nh = clamp(dot(Nn, Hl), 0.0, 1.0), t2 = (1.0 - nh * nh) / (nh * nh);
+          float F = 0.02 + 0.98 * pow(1.0 - clamp(dot(Vv, Hl), 0.0, 1.0), 5.0);
+          float glint = exp(-t2 / 0.028) * (0.04 + F) / (4.0 * max(dot(Nn, Vv), 0.15));
+          reflectedLight.directSpecular += vec3(1.0, 0.96, 0.88) * glint * water * smoothstep(0.0, 0.08, dot(Nn, Ls)) * 30.0;
+        }` : ''}
+      }`);
+  };
+  mat.customProgramCacheKey = () => `fx-${+o.night}${+o.ocean}${+o.term}${+o.ring}${+o.shine}`;
+  return u;
 }
 
 function applyMaps(l: Lod, maps: Maps) {
@@ -585,8 +630,17 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
   const geo = new THREE.SphereGeometry(R, big ? 128 : 64, big ? 64 : 32);
   if (b.shape) lump(geo, b.shape);
   const lod: Lod = { spec: b, pos, mat: new THREE.MeshBasicMaterial(), level: 0, photo };
+  let fx: ReturnType<typeof planetFx> | undefined;
   if (b.kind === 'star') {
     lod.mat.color.setScalar(1.7);
+    // Limb darkening: the edge shows cooler, higher gas, so it is dimmer and redder than the middle (linear law per colour).
+    lod.mat.onBeforeCompile = (sh) => {
+      sh.vertexShader = 'varying vec3 vLN; varying vec3 vLV;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vLN = normalize(normalMatrix * normal); vLV = -mvPosition.xyz;');
+      sh.fragmentShader = 'varying vec3 vLN; varying vec3 vLV;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        float mu = clamp(dot(normalize(vLN), normalize(vLV)), 0.0, 1.0);
+        diffuseColor.rgb *= 1.0 - vec3(0.6, 0.78, 0.9) * (1.0 - mu);`);
+    };
+    lod.mat.customProgramCacheKey = () => 'limb-dark';
     holder.add(glowSprite(new THREE.Color(tex.palette[Math.floor(tex.palette.length / 2)][1]).lerp(new THREE.Color(0xffffff), 0.4), R * 9));
   } else {
     const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, bumpScale: photo?.bumpScale ?? 3 });
@@ -596,12 +650,36 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
     if (kinds.lights) {
       mat.emissive = new THREE.Color(0xffffff);
       mat.emissiveIntensity = tex.style === 'lava' ? 1 : 1.5;
-      if (tex.style !== 'lava') nightOnly(mat);
     }
     lod.mat = mat;
+    fx = planetFx(mat, {
+      night: kinds.lights && tex.style !== 'lava', ocean: b.id === 'earth', term: b.id === 'earth', ring: !!b.rings,
+      shine: !!b.parent && !!ctx.posOf?.has(b.parent),
+      beta: b.id === 'earth' ? new V3(39, 90, 220) : undefined,
+    });
   }
   const mesh = new THREE.Mesh(geo, lod.mat);
   tilt.add(mesh);
+  if (fx) {
+    const f = fx, wp = new V3(), sw = new V3(), pp = new V3();
+    const parentPos = b.parent ? ctx.posOf?.get(b.parent) : undefined;
+    mesh.onBeforeRender = (_r, _s, cam) => {
+      const vm = cam.matrixWorldInverse;
+      mesh.getWorldPosition(wp);
+      sw.copy(wp).negate();
+      if (sw.lengthSq() > 0) sw.normalize(); else sw.set(0, 1, 0);
+      f.uSunV.value.copy(sw).transformDirection(vm);
+      f.uRingC.value.copy(wp).applyMatrix4(vm);
+      f.uRingN.value.set(0, 1, 0).transformDirection(tilt.matrixWorld).transformDirection(vm);
+      if (parentPos) {
+        // Earthshine: the planet a moon orbits lights its dark side, as much as the planet is lit as seen from the moon.
+        pp.copy(parentPos).sub(wp).normalize();
+        const lit = 0.5 * (1 - pp.dot(_a.copy(parentPos).negate().normalize()));
+        f.uShineK.value = 0.07 * lit;
+        f.uShineV.value.copy(pp).transformDirection(vm);
+      }
+    };
+  }
   if (b.kind === 'comet' && b.tail) { const cm = makeComet(b.tail, b.coma ?? 0.4, pos.lengthSq() > 0 ? pos.clone().normalize() : new V3(1, 0, 0)); holder.add(cm); ctx.anim.push(() => cm.userData.away(pos)); }
   ctx.spin.push({ o: mesh, r: b.spin ?? 0.02 });
   if (kinds.clouds) {
@@ -659,17 +737,31 @@ async function bodyVisual(b: BodySpec, holder: THREE.Group, pos: V3, ctx: BuildC
     const ring = new THREE.Mesh(g, rmat);
     ring.rotation.x = -Math.PI / 2;
     tilt.add(ring);
-    // The planet throws its shadow across the rings.
-    ring.updateWorldMatrix(true, false);
-    const sun = pos.clone().negate().normalize().transformDirection(ring.matrixWorld.clone().invert());
+    if (fx) { fx.uRingR.value.set(rg.inner, rg.outer); fx.uRingTex.value = tex; }
+    // The planet throws its shadow across the rings; and the rings are particles, so they pass light on: seen from the
+    // far side of the ring plane from the Sun they glow where they are thin (forward scatter), as in Cassini's frame
+    // from Saturn's shadow. All in the ring's own axes, with the Sun and eye refreshed each frame.
+    const ru = { ringSun: { value: new V3(0, 0, 1) }, camL: { value: new V3(0, 0, 5) }, ringR: { value: R } };
+    const rp = new V3(), rq = new THREE.Quaternion();
+    ring.onBeforeRender = (_r, _s, cam) => {
+      ring.getWorldPosition(rp);
+      ring.getWorldQuaternion(rq).invert();
+      ru.ringSun.value.copy(rp).negate().normalize().applyQuaternion(rq);
+      ru.camL.value.copy(cam.position).sub(rp).applyQuaternion(rq);
+    };
     rmat.onBeforeCompile = (sh) => {
-      sh.uniforms.ringSun = { value: sun };
-      sh.uniforms.ringR = { value: R };
+      Object.assign(sh.uniforms, ru);
       sh.vertexShader = 'varying vec3 vRing;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vRing = position;');
-      sh.fragmentShader = 'varying vec3 vRing; uniform vec3 ringSun; uniform float ringR;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      sh.fragmentShader = 'varying vec3 vRing; uniform vec3 ringSun; uniform vec3 camL; uniform float ringR;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
         float along = dot(vRing, ringSun);
         float miss = length(vRing - ringSun * along);
-        diffuseColor.rgb *= along < 0.0 ? mix(0.06, 1.0, smoothstep(ringR * 0.97, ringR * 1.03, miss)) : 1.0;`);
+        diffuseColor.rgb *= along < 0.0 ? mix(0.06, 1.0, smoothstep(ringR * 0.97, ringR * 1.03, miss)) : 1.0;
+        vec3 eye = normalize(camL - vRing);
+        float mu = dot(-ringSun, eye);                                 // 1 when the light comes straight on to the eye
+        float fwd = 0.0549 / pow(1.3844 - 1.24 * mu, 1.5);             // Henyey-Greenstein, g = 0.62, scaled to 1 at mu = 1
+        float through = smoothstep(0.03, -0.03, eye.z * ringSun.z);    // the Sun is on the far side of the sheet
+        float glow = 0.05 + 7.0 * fwd * (0.2 + 1.4 * (1.0 - diffuseColor.a));
+        diffuseColor.rgb *= mix(1.0, glow, through);`);
     };
     rmat.customProgramCacheKey = () => 'ring-shadow';
   }
@@ -774,10 +866,10 @@ async function buildSystem(spec: SystemSpec, progress: (s: string) => void): Pro
   const group = new THREE.Group();
   const labels = document.createElement('div');
   const things: Thing[] = [];
-  const ctx: BuildCtx = { spin: [], timed: [], anim: [], lods: [], photos: spec.id === 'sol' };
+  const posOf = new Map<string, V3>();
+  const ctx: BuildCtx = { spin: [], timed: [], anim: [], lods: [], photos: spec.id === 'sol', posOf };
   group.add(new THREE.AmbientLight(0x8fa0c0, 0.16));
   group.add(new THREE.PointLight(spec.light, 3.4, 0, 0));
-  const posOf = new Map<string, V3>();
 
   const movers: Mover[] = [];
   const kOf = (parent: string): number | null => {

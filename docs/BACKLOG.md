@@ -51,7 +51,8 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 ### E1.1 [x] 2026-11-22 research note: docs/research/photoreal-and-renderer.md [research] Define "photoreal" and set a measurable bar
 - [ ] E1.1.a Pick 10 reference shots (real NASA photos for planets and moons, film stills for ships) and write them to `docs/research/photoreal-targets.md`
 - [ ] E1.1.b Decide the performance budget: target frame rate and GPU (David's Mac, and a mid laptop) so the bar is realistic
-- [~] (branch planet-shading, agent) E1.1.c Capture side-by-side comparison frames (game vs reference) from fixed camera positions; keep them in `docs/studies/` and re-shoot after each milestone
+- [x] 2026-11-22 ecfd000 (branch planet-shading, not merged) E1.1.c Capture side-by-side comparison frames (game vs reference) from fixed camera positions; keep them in `docs/studies/` and re-shoot after each milestone. `bun tools/compare.ts` (10 targets, fixed exposure, contact sheet); frames in `docs/studies/compare/`; reference photos are never committed, IDs only
+  - [ ] E1.1.e Targets 9 and 10 (hull in sunlight, film hero shot) are not in the harness yet; add ship cameras once E1.4 has a hull to judge
 
 ### E1.2 [x] 2026-11-22 DECIDED by David: stay on WebGL (three r187); reversed-Z first; bounded WebGPU stills trial in parallel; no migration, engine or native move now (docs/research/photoreal-and-renderer.md) [research] Renderer decision: stay on WebGL, or replatform
 - [ ] E1.2.a Re-read the WebGPU spike (`docs/WEBGPU-SPIKE.md`, branch `webgpu-spike`) and list which photoreal features it would enable (GTAO, SSGI, compute crowds, path-traced stills) versus what WebGL can do with libraries
@@ -64,10 +65,13 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 ### E1.3 Planets, moons and small bodies
 - [ ] E1.3.a [research] Best open data for each body: NASA Blue Marble and Black Marble (Earth), LRO and LROC (Moon), MOLA and HiRISE (Mars), MESSENGER (Mercury), Magellan (Venus), Juno, Cassini, New Horizons (Pluto), OSIRIS-REx (Bennu), Hayabusa2, Rosetta (67P), Dawn (Ceres, Vesta). Licence and resolution for each; list in the research note
 - [ ] E1.3.b Displacement and normal maps from elevation data where it exists, so terminators and limbs show real relief (neutral)
-- [~] (branch planet-shading, agent) E1.3.c Earth: clouds as a separate moving layer, city lights, ocean specular and sun glint, atmosphere scattering that matches photographs at the limb and from orbit
-- [~] (branch planet-shading, agent) E1.3.d Gas and ice giants: banding, storms and rings with proper shadowing and forward-scatter brightening; Saturn's ring-on-planet shadow
+- [~] 2026-11-22 (branch planet-shading, not merged) E1.3.c Earth: clouds as a separate moving layer, city lights, ocean specular and sun glint, atmosphere scattering that matches photographs at the limb and from orbit
+  - done on planet-shading: ocean sun glint (wide Cox-Munk lobe, water read from the colour map), real Rayleigh colour ratios for Earth's air, terminator reddening of the direct light. Open: clouds as a lit/shadowed layer, a proper multiple-scattering limb (horizon band is thin and the Sun's Mie glare is too strong), city-light points
+- [~] 2026-11-22 (branch planet-shading, not merged) E1.3.d Gas and ice giants: banding, storms and rings with proper shadowing and forward-scatter brightening; Saturn's ring-on-planet shadow
+  - done on planet-shading: ring shadow on the globe (from the ring texture's own opacity), forward-scatter glow on the unlit face of the rings (thin parts brightest), the unlit face is now correctly dim. Open: Saturn's dust rings and limb haze, banding and storms for Jupiter, Uranus, Neptune; a Pluto haze (needs a per-body shell height)
 - [ ] E1.3.e Irregular bodies (Eros, Psyche, Ida, Halley, 67P, Bennu): replace spheres with real shape models (NASA 3D Resources, JPL, ESA), with true albedo maps
-- [~] (branch planet-shading, agent) E1.3.f Sun: limb darkening, corona, granulation texture
+- [~] 2026-11-22 (branch planet-shading, not merged) E1.3.f Sun: limb darkening, corona, granulation texture
+  - limb darkening done (linear law per colour, redder rim). Corona and granulation open
 - [ ] E1.3.g Where a texture is limited by resolution (Moon 18 MB, Mars 10 MB already large), add tiled streaming or KTX2 and LOD by distance; budget for download size
 
 ### E1.4 Ships and stations
@@ -84,7 +88,8 @@ Created 2026-11-22. Constraints are unchanged: free tools and services only, uno
 - [ ] E1.5.a Per-interior HDR environments (shelved 2026-11-19; reopen if E1.2 allows)
 - [ ] E1.5.b Ambient occlusion and contact shadows (ROADMAP Phase A step 3)
 - [ ] E1.5.c Path-traced stills for photo mode (`three-gpu-pathtracer`)
-- [ ] E1.5.d Sun-only lighting in open space: hard light, deep shadow, correct earthshine and ringshine
+- [~] 2026-11-22 (branch planet-shading, not merged) E1.5.d Sun-only lighting in open space: hard light, deep shadow, correct earthshine and ringshine
+  - done for planets and moons only: ambient fill cut to 30% on their materials, earthshine on a moon from its planet (about 100 times brighter than real, still faint). Ships and stations still use the scene's ambient. Ringshine on Saturn open
 
 ### E1.6 People and interiors
 - [ ] E1.6.a [rework] Better people: hand-built topology, baked occlusion, skin and cloth shaders (ROADMAP step 11)
@@ -233,6 +238,7 @@ Things that may need research and a big change. None starts without a decision g
 
 ## Log
 
+- 2026-11-22 Planet shading on branch `planet-shading` (not merged): comparison harness (tools/compare.ts, docs/studies/compare/), ring shadow on Saturn and forward-scatter ring glow, ocean glint, Rayleigh Earth limb and terminator reddening, Sun limb darkening, sun-only ambient and earthshine for bodies. Headless uncapped frame time unchanged (about 3.8 ms before and after, noise 3.7 to 8 ms either way). Effects are subtle at the harness distances; see the sheets.
 Newest first. One line per piece of work finished, so a new session can see the history without reading git.
 
 - 2026-11-22 E2.2.b and E2.3.c on branch facts-all-bodies (9d4a497, not merged): info panel and REAL badge for 55 real bodies (the Sun, 8 planets, Luna and 15 other moons, Pluto, and 29 asteroids, dwarf planets and comets) from cached NSSDCA sheets and JPL SBDB responses, missions only from fetched NSSDCA catalogue pages; Fiction badge with 'based on' for Tycho and the Tycho, Medina, Ceres and Ganymede interiors. Everything is humanReviewed=false. Open: Galileo, Cassini, Magellan, Rosetta, Hayabusa2, Giotto missing from the Master Catalog fetch; other small moons (Amalthea, Himalia, Mimas, Tethys, Dione, Hyperion, Phoebe, Ariel, Umbriel, Proteus, Nereid) have no panel yet; no curated diameters for Haumea, Makemake, Eris, Orcus, Quaoar, Sedna, Gonggong.

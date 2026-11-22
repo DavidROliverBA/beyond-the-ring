@@ -37,12 +37,12 @@ interface Target {
 }
 
 export const TARGETS: Target[] = [
-  { id: 'earth-full', n: 1, title: 'Whole Earth, Sun behind camera', ref: 'NASA Apollo 17 AS17-148-22727', body: 'earth', dist: 5.2, phase: 8, elev: 12, tilt: 0.41, exposure: 1, note: 'cloud layer, blue ocean, thin blue limb' },
+  { id: 'earth-full', n: 1, title: 'Whole Earth, Sun behind camera', ref: 'NASA Apollo 17 AS17-148-22727', body: 'earth', dist: 2.8, phase: 8, elev: 12, tilt: 0.41, exposure: 1, note: 'cloud layer, blue ocean, thin blue limb' },
   { id: 'earth-glint', n: 1, title: 'Earth, ocean glint', ref: 'any NASA frame of sun glint on the ocean (e.g. ISS Earth observations)', body: 'earth', dist: 3.2, phase: 62, elev: 8, tilt: 0.41, exposure: 1, note: 'specular sun glint on water, gibbous phase' },
-  { id: 'earth-limb', n: 2, title: 'Orbital sunset limb', ref: 'NASA ISS iss023e057948', body: 'earth', dist: 1.062, phase: 90, elev: 0, look: 'sunTangent', pitch: -14, exposure: 1, note: 'orange to blue layers, horizon sunset' },
+  { id: 'earth-limb', n: 2, title: 'Orbital sunset limb', ref: 'NASA ISS iss023e057948', body: 'earth', dist: 1.062, phase: 180, elev: 72, look: 'sunTangent', pitch: -12, exposure: 1, note: 'orange to blue layers, horizon sunset' },
   { id: 'earth-night', n: 3, title: 'Earth at night', ref: 'NASA ISS iss035e017673', body: 'earth', dist: 1.35, phase: 172, elev: 20, look: 'center', exposure: 1.6, note: 'city lights, dark ocean, airglow' },
   { id: 'saturn-back', n: 4, title: 'Saturn backlit', ref: 'NASA Cassini PIA08329 In Saturn\'s Shadow', body: 'saturn', dist: 5.5, phase: 165, elev: 6, tilt: 0.47, exposure: 1, note: 'rings glow, dark disc, bright thin limb' },
-  { id: 'saturn-shadow', n: 4, title: 'Saturn, ring shadow on the globe', ref: 'any Cassini frame of the ring shadow on the globe', body: 'saturn', dist: 4.2, phase: 25, elev: 14, tilt: 0.47, exposure: 1, note: 'ring shadow across the globe; planet shadow on rings' },
+  { id: 'saturn-shadow', n: 4, title: 'Saturn, ring shadow on the globe', ref: 'any Cassini frame of the ring shadow on the globe', body: 'saturn', dist: 4.2, phase: 25, elev: -14, tilt: 0.47, exposure: 1, note: 'ring shadow across the globe; planet shadow on rings' },
   { id: 'moon-hard', n: 5, title: 'Hard-lit airless world', ref: 'NASA Apollo 8 as08-14-2383 (Earthrise)', body: 'luna', dist: 4, phase: 90, elev: 10, exposure: 1, note: 'black sky, razor terminator, no fill' },
   { id: 'pluto-twilight', n: 6, title: 'Backlit haze on a small world', ref: 'NASA New Horizons PIA19931', body: 'pluto', dist: 4, phase: 168, elev: 6, exposure: 1.4, note: 'thin blue haze around a dark disc' },
   { id: 'comet-67p', n: 7, title: 'Small body in raw sunlight', ref: 'ESA Rosetta OSIRIS, NASA PIA19040 (licence: check at source)', body: '67p', dist: 6, phase: 70, elev: 10, exposure: 1, note: 'hard terminator, near-black albedo' },
@@ -123,6 +123,8 @@ for (const t of TARGETS) {
 console.log(errs.length ? errs.slice(0, 3) : 'no page errors');
 await browser.close();
 
+// (The frame list first, so a failed sheet does not lose it.)
+writeFileSync(join(out, `${label}_targets.json`), JSON.stringify(done.map(({ id, n, title, ref, body }) => ({ id, n, title, ref, body })), null, 1));
 // Contact sheet, assembled in a browser page so there is no image library to install.
 async function sheet(file: string, withRef: boolean) {
   const b2 = await chromium.launch({ headless: true, executablePath: process.env.CHROME });
@@ -141,12 +143,12 @@ async function sheet(file: string, withRef: boolean) {
   }).join('');
   const pg = await b2.newPage({ viewport: { width: withRef ? 1400 : 1320, height: 800 } });
   await pg.setContent(`<style>body{margin:0;background:#111;color:#ddd;font:13px system-ui}main{display:grid;grid-template-columns:repeat(${withRef ? 1 : cols},1fr);gap:8px;padding:8px}
-  figure{margin:0}.pair{display:flex;gap:4px}.pair img{flex:1;min-width:0;width:100%;object-fit:cover;aspect-ratio:16/9;background:#000}.none{flex:1;display:grid;place-items:center;background:#000;color:#777}figcaption{padding:3px 0}</style><main>${cells}</main>`);
-  await pg.waitForTimeout(800);
+  figure{margin:0}.pair{display:flex;gap:4px}.pair img{flex:1;min-width:0;width:100%;object-fit:cover;aspect-ratio:16/9;background:#000}.none{flex:1;display:grid;place-items:center;background:#000;color:#777}figcaption{padding:3px 0}</style><main>${cells}</main>`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await pg.waitForTimeout(2500);
   await pg.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 88 });
   await b2.close();
 }
-await sheet(join(out, `sheet_${label}.jpg`), false);
-if (refDir && refOut) { mkdirSync(refOut, { recursive: true }); await sheet(join(refOut, `sheet_${label}_vs_ref.jpg`), true); }
-writeFileSync(join(out, `${label}_targets.json`), JSON.stringify(done.map(({ id, n, title, ref, body }) => ({ id, n, title, ref, body })), null, 1));
+const part = only ? '_part' : '';   // a partial run must not overwrite the full sheet
+await sheet(join(out, `sheet_${label}${part}.jpg`), false);
+if (refDir && refOut) { mkdirSync(refOut, { recursive: true }); await sheet(join(refOut, `sheet_${label}${part}_vs_ref.jpg`), true); }
 console.log('wrote', done.length, 'frames to', out);
