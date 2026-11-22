@@ -168,7 +168,7 @@ This is the piece that makes a battle different from a camera tour: many moving 
 - [x] 2026-11-22 b507285 (branch scenario-engine, not merged; 190 s; timings, ranges, accelerations invented; Scopuli not destroyed; needs a hand-test, see HAND-TEST.md) E3.3.a The *Canterbury* destroyed and the *Knight* shuttle escape
 - [x] 2026-11-22 427bce3 (branch combat-donnager, not merged; 200 s, four invented attackers, no boarding; needs hand-test) E3.3.b The *Donnager* battle: the Roci's escape from the stealth ships
 - [ ] E3.3.c The Roci's flight from Tycho to Eros; Eros and Phoebe sequences
-- [ ] E3.3.d Venus and the Ring creation event; final approach to Eros's crash
+- [~] (branch anubis-venus, agent) E3.3.d Venus and the Ring creation event; final approach to Eros's crash
 
 **Book 2, Caliban's War**
 - [ ] E3.3.e Ganymede: the opening attack and the Roci's role
